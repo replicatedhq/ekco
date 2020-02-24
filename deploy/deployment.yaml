@@ -1,0 +1,63 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ekc-operator
+spec:
+  selector:
+    matchLabels:
+      app: ekc-operator
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: ekc-operator
+    spec:
+      restartPolicy: Always
+      nodeSelector:
+        node-role.kubernetes.io/master: ""
+      containers:
+        - name: ekc-operator
+          image: replicated/ekco
+          imagePullPolicy: IfNotPresent
+          command: [ /usr/bin/ekco, operator ]
+          resources:
+            requests:
+              cpu: 100m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+          env:
+            - name: NODE_UNREACHABLE_TOLERATION
+              value: 1h
+            - name: PURGE_DEAD_NODES
+              value: "1"
+            - name: MIN_READY_MASTER_NODES
+              value: "2"
+            - name: MIN_READY_WORKER_NODES
+              value: "0"
+            - name: MAINTAIN_ROOK_STORAGE_NODES
+              value: "1"
+            - name: CEPH_BLOCK_POOL
+              value: replicapool
+            - name: CEPH_FILESYSTEM
+              value: rook-shared-fs
+            - name: CEPH_OBJECT_STORE
+              value: rook-ceph-store
+            - name: MIN_CEPH_POOL_REPLICATION
+              value: "1"
+            - name: MAX_CEPH_POOL_REPLICATION
+              value: "3"
+            - name: CERTIFICATES_DIR
+              value: /etc/kubernetes/pki
+            - name: RECONCILE_INTERVAL
+              value: 1m
+          volumeMounts:
+            - mountPath: /etc/kubernetes/pki
+              name: certificates-dir
+      volumes:
+        - name: certificates-dir
+          hostPath:
+            path: /etc/kubernetes/pki
+            type: Directory

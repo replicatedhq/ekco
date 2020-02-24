@@ -1,0 +1,23 @@
+steps:
+  - label: "test"
+    command: make deps test
+    plugins:
+      - docker#v3.5.0:
+          always-pull: true
+          image: replicated/gitops-builder:buildkite
+          workdir: /go/src/github.com/replicatedhq/ekco
+
+  - wait
+
+  - label: "alpha release"
+    commands:
+      - make docker-image DOCKER_IMAGE=replicated/ekco:alpha
+      - docker push replicated/ekco:alpha
+    branches: "master"
+
+  - label: "tagged release"
+    commands:
+      - make docker-image DOCKER_IMAGE=replicated/ekco:${BUILDKITE_TAG}
+      - docker push replicated/ekco:${BUILDKITE_TAG}
+    if: |
+      build.env("BUILDKITE_TAG") =~ /^v20[0-9]{2}\.[0-9]{2}\.[0-9]{2}-[0-9a-z-]+\$/
