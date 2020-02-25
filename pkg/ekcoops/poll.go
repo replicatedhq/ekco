@@ -14,8 +14,6 @@ func (o *Operator) Poll(ctx context.Context, interval time.Duration) {
 	for {
 		select {
 		case <-ticker.C:
-			o.log.Debugf("Poll now")
-
 			nodeList, err := o.client.CoreV1().Nodes().List(metav1.ListOptions{})
 			if err != nil {
 				o.log.Infof("Skipping reconcile: failed to list nodes: %v", err)

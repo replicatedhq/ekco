@@ -41,8 +41,6 @@ func (o *Operator) Reconcile(nodes []corev1.Node) error {
 	o.mtx.Lock()
 	defer o.mtx.Unlock()
 
-	o.log.Debugf("Reconcile %d nodes", len(nodes))
-
 	readyMasters, readyWorkers := util.NodeReadyCounts(nodes)
 	for _, node := range nodes {
 		err := o.reconcile(node, readyMasters, readyWorkers)
@@ -66,8 +64,6 @@ func (o *Operator) Reconcile(nodes []corev1.Node) error {
 }
 
 func (o *Operator) reconcile(node corev1.Node, readyMasters, readyWorkers int) error {
-	o.log.Debugf("Reconcile node %q", node.Name)
-
 	if o.config.PurgeDeadNodes && o.isDead(node) {
 		if util.NodeIsMaster(node) && readyMasters < o.config.MinReadyMasterNodes {
 			o.log.Debugf("Skipping auto-purge master: %d ready masters", readyMasters)
