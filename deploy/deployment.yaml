@@ -1,7 +1,9 @@
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: ekc-operator
+  namespace: kurl
 spec:
   selector:
     matchLabels:
@@ -13,13 +15,14 @@ spec:
       labels:
         app: ekc-operator
     spec:
+      serviceAccountName: ekco
       restartPolicy: Always
       nodeSelector:
         node-role.kubernetes.io/master: ""
       containers:
         - name: ekc-operator
           image: replicated/ekco
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           command: [ /usr/bin/ekco, operator ]
           resources:
             requests:
@@ -53,6 +56,8 @@ spec:
               value: /etc/kubernetes/pki
             - name: RECONCILE_INTERVAL
               value: 1m
+            - name: LOG_LEVEL
+              value: debug
           volumeMounts:
             - mountPath: /etc/kubernetes/pki
               name: certificates-dir

@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/replicatedhq/ekco/pkg/cluster"
 	"github.com/replicatedhq/ekco/pkg/ekcoops"
 	"github.com/replicatedhq/ekco/pkg/logger"
@@ -14,35 +15,38 @@ import (
 	restclient "k8s.io/client-go/rest"
 )
 
-func OperatorCmd() *cobra.Command {
+func OperatorCmd(v *viper.Viper) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "operator",
 		Short: "Replicated Embedded Kubernetes operator",
 		Long:  `Manage nodes and storage of a Replicated Embbedded Kubernetes cluster`,
 		PreRun: func(cmd *cobra.Command, args []string) {
-			viper.BindPFlags(cmd.Flags())
+			v.BindPFlags(cmd.Flags())
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			config := &ekcoops.Config{}
-			if err := viper.Unmarshal(config); err != nil {
-				return err
+			if err := v.Unmarshal(config); err != nil {
+				return errors.Wrap(err, "failed to unmarshal config")
 			}
 
-			log := logger.NewLogger()
+			log, err := logger.FromViper(v)
+			if err != nil {
+				return errors.Wrap(err, "failed to initialize logger")
+			}
 
 			clientConfig, err := restclient.InClusterConfig()
 			if err != nil {
-				return err
+				return errors.Wrap(err, "failed to load kubernetes config")
 			}
 
 			client, err := kubernetes.NewForConfig(clientConfig)
 			if err != nil {
-				return err
+				return errors.Wrap(err, "failed to initialize kubernetes client")
 			}
 
 			rookcephclient, err := cephv1.NewForConfig(clientConfig)
 			if err != nil {
-				return err
+				return errors.Wrap(err, "failed to initialize ceph client")
 			}
 
 			clusterController := cluster.NewController(cluster.ControllerConfig{
@@ -72,7 +76,6 @@ func OperatorCmd() *cobra.Command {
 	cmd.Flags().Int("max_ceph_pool_replication", 3, "Maximum replication factor of ceph_block_pool and ceph_filesystem pools")
 	cmd.Flags().String("certificates_dir", "/etc/kubernetes/pki", "Kubernetes certificates directory")
 	cmd.Flags().Duration("reconcile_interval", time.Minute, "Frequency to run the operator's control loop")
-	cmd.Flags().String("log_level", "info", "Log level")
 
 	return cmd
 }

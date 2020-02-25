@@ -9,8 +9,8 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/replicatedhq/ekco/pkg/cluster"
-	"github.com/replicatedhq/ekco/pkg/logger"
 	"github.com/replicatedhq/ekco/pkg/util"
+	"go.uber.org/zap"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
 )
@@ -19,7 +19,7 @@ type Operator struct {
 	config     Config
 	client     kubernetes.Interface
 	controller *cluster.Controller
-	log        *logger.Logger
+	log        *zap.SugaredLogger
 	mtx        sync.Mutex
 }
 
@@ -27,7 +27,7 @@ func New(
 	config Config,
 	client kubernetes.Interface,
 	controller *cluster.Controller,
-	log *logger.Logger,
+	log *zap.SugaredLogger,
 ) *Operator {
 	return &Operator{
 		config:     config,
@@ -40,6 +40,8 @@ func New(
 func (o *Operator) Reconcile(nodes []corev1.Node) error {
 	o.mtx.Lock()
 	defer o.mtx.Unlock()
+
+	o.log.Debugf("Reconcile %d nodes", len(nodes))
 
 	readyMasters, readyWorkers := util.NodeReadyCounts(nodes)
 	for _, node := range nodes {
@@ -64,15 +66,17 @@ func (o *Operator) Reconcile(nodes []corev1.Node) error {
 }
 
 func (o *Operator) reconcile(node corev1.Node, readyMasters, readyWorkers int) error {
+	o.log.Debugf("Reconcile node %q", node.Name)
+
 	if o.config.PurgeDeadNodes && o.isDead(node) {
 		if util.NodeIsMaster(node) && readyMasters < o.config.MinReadyMasterNodes {
-			o.log.Debug("Skipping auto-purge master: %d ready masters", readyMasters)
+			o.log.Debugf("Skipping auto-purge master: %d ready masters", readyMasters)
 			return nil
 		} else if readyWorkers < o.config.MinReadyWorkerNodes {
-			o.log.Debug("Skipping auto-purge worker: %d ready workers", readyWorkers)
+			o.log.Debugf("Skipping auto-purge worker: %d ready workers", readyWorkers)
 			return nil
 		}
-		o.log.Info("Ekco automatically purging dead node %s", node.Name)
+		o.log.Infof("Ekco automatically purging dead node %s", node.Name)
 		err := o.controller.PurgeNode(context.TODO(), node.Name, o.config.MaintainRookStorageNodes)
 		if err != nil {
 			return errors.Wrapf(err, "purge dead node %s", node.Name)

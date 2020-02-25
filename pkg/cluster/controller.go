@@ -3,8 +3,8 @@ package cluster
 import (
 	"sync"
 
-	"github.com/replicatedhq/ekco/pkg/logger"
 	cephv1 "github.com/rook/rook/pkg/client/clientset/versioned/typed/ceph.rook.io/v1"
+	"go.uber.org/zap"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 )
@@ -22,11 +22,11 @@ type ControllerConfig struct {
 
 type Controller struct {
 	Config ControllerConfig
-	Log    *logger.Logger
+	Log    *zap.SugaredLogger
 
 	sync.Mutex
 }
 
-func NewController(config ControllerConfig, log *logger.Logger) *Controller {
+func NewController(config ControllerConfig, log *zap.SugaredLogger) *Controller {
 	return &Controller{Config: config, Log: log}
 }

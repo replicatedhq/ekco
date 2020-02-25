@@ -32,5 +32,4 @@ type Config struct {
 	CertificatesDir string `mapstructure:"certificates_dir"`
 
 	ReconcileInterval time.Duration `mapstructure:"reconcile_interval"`
-	LogLevel          string        `mapstructure:"log_level"`
 }

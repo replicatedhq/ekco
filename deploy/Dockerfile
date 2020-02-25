@@ -17,4 +17,4 @@ COPY --from=build /go/src/github.com/replicatedhq/ekco/bin/* /usr/bin/
 ARG commit=unknown
 ENV COMMIT=$commit
 
-CMD [ /usr/bin/ekco ]
+ENTRYPOINT [ /usr/bin/ekco ]

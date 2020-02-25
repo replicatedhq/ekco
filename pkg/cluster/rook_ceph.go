@@ -31,6 +31,7 @@ func (c *Controller) UseNodesForStorage(names []string) (int, error) {
 	changed := false
 	for _, name := range names {
 		if !storageNodes[name] {
+			c.Log.Debugf("Adding node %q to CephCluster node storage list", name)
 			cluster.Spec.Storage.Nodes = append(cluster.Spec.Storage.Nodes, rookv1alpha2.Node{
 				Name: name,
 			})
@@ -56,7 +57,7 @@ func (c *Controller) removeCephClusterStorageNode(name string) error {
 	var keep []v1alpha2.Node
 	for _, node := range cluster.Spec.Storage.Nodes {
 		if node.Name == name {
-			c.Log.Debug("Removing node %q from CephCluster storage list", name)
+			c.Log.Debugf("Removing node %q from CephCluster storage list", name)
 		} else {
 			keep = append(keep, node)
 		}
@@ -67,7 +68,7 @@ func (c *Controller) removeCephClusterStorageNode(name string) error {
 		if err != nil {
 			return errors.Wrap(err, "update CephCluster with new storage node list")
 		}
-		c.Log.Debug("Purge node %q: removed from CephCluster node storage list", name)
+		c.Log.Debugf("Purge node %q: removed from CephCluster node storage list", name)
 	}
 
 	return nil
@@ -98,7 +99,7 @@ func (c *Controller) deleteK8sDeploymentOSD(name string) (string, error) {
 			if err != nil {
 				return "", errors.Wrapf(err, "delete deployment %s", deploy.Name)
 			}
-			c.Log.Debug("Deleted OSD Deployment for node %s", name)
+			c.Log.Debugf("Deleted OSD Deployment for node %s", name)
 			break
 		}
 	}
@@ -121,7 +122,7 @@ func (c *Controller) SetPoolReplication(name string, level int) error {
 	}
 	current := int(pool.Spec.Replicated.Size)
 	if current != level {
-		c.Log.Info("Changing CephBlockPool replication level from %d to %d", current, level)
+		c.Log.Infof("Changing CephBlockPool replication level from %d to %d", current, level)
 		pool.Spec.Replicated.Size = uint(level)
 		_, err := c.Config.CephV1.CephBlockPools(RookCephNS).Update(pool)
 		if err != nil {
@@ -160,7 +161,7 @@ func (c *Controller) SetFilesystemReplication(name string, level int) error {
 	}
 
 	if changed {
-		c.Log.Info("Changing CephFilesystem pool replication level from %d to %d", current, level)
+		c.Log.Infof("Changing CephFilesystem pool replication level from %d to %d", current, level)
 		_, err := c.Config.CephV1.CephFilesystems("rook-ceph").Update(fs)
 		if err != nil {
 			return errors.Wrapf(err, "update Filesystem %s", name)
@@ -208,7 +209,7 @@ func (c *Controller) SetObjectStoreReplication(name string, level int) error {
 	}
 
 	if changed {
-		c.Log.Info("Changing CephObjectStore pool replication level from %d to %d", current, level)
+		c.Log.Infof("Changing CephObjectStore pool replication level from %d to %d", current, level)
 		_, err := c.Config.CephV1.CephObjectStores(RookCephNS).Update(os)
 		if err != nil {
 			return errors.Wrapf(err, "update CephObjectStore %s", name)
@@ -223,7 +224,7 @@ func (c *Controller) rookCephOperatorExec(cmd ...string) error {
 	opts := metav1.ListOptions{
 		LabelSelector: labels.SelectorFromSet(rookOperatorLabels).String(),
 	}
-	pods, err := c.Config.Client.CoreV1().Pods("rook-ceph-system").List(opts)
+	pods, err := c.Config.Client.CoreV1().Pods("rook-ceph").List(opts)
 	if err != nil {
 		return errors.Wrap(err, "list Rook Operator pods")
 	}
@@ -231,17 +232,17 @@ func (c *Controller) rookCephOperatorExec(cmd ...string) error {
 		return errors.Wrapf(err, "found %d Rook Operator pods", len(pods.Items))
 	}
 
-	exitCode, stdout, stderr, err := k8s.SyncExec(c.Config.Client.CoreV1(), c.Config.ClientConfig, "rook-ceph-system", pods.Items[0].Name, "rook-ceph-operator", cmd...)
+	exitCode, stdout, stderr, err := k8s.SyncExec(c.Config.Client.CoreV1(), c.Config.ClientConfig, "rook-ceph", pods.Items[0].Name, "rook-ceph-operator", cmd...)
 	if err != nil {
 		return err
 	}
 	if exitCode != 0 {
-		c.Log.Info("Rook ceph operator exec %q exited with code %d and stderr: %s", cmd, exitCode, stderr)
+		c.Log.Infof("Rook ceph operator exec %q exited with code %d and stderr: %s", cmd, exitCode, stderr)
 
 		return fmt.Errorf("exec %q: %d", cmd, exitCode)
 	}
 
-	c.Log.Debug("Exec Rook ceph operator %q exited with code %d and stdout: %s", cmd, exitCode, stdout)
+	c.Log.Debugf("Exec Rook ceph operator %q exited with code %d and stdout: %s", cmd, exitCode, stdout)
 
 	return nil
 }
@@ -251,7 +252,7 @@ func (c *Controller) execCephOSDPurge(osdID string) error {
 	opts := metav1.ListOptions{
 		LabelSelector: labels.SelectorFromSet(rookOperatorLabels).String(),
 	}
-	pods, err := c.Config.Client.CoreV1().Pods("rook-ceph-system").List(opts)
+	pods, err := c.Config.Client.CoreV1().Pods("rook-ceph").List(opts)
 	if err != nil {
 		return errors.Wrap(err, "list Rook Operator pods")
 	}
@@ -259,10 +260,10 @@ func (c *Controller) execCephOSDPurge(osdID string) error {
 		return errors.Wrapf(err, "found %d Rook Operator pods", len(pods.Items))
 	}
 	// ignore error
-	k8s.SyncExec(c.Config.Client.CoreV1(), c.Config.ClientConfig, "rook-ceph-system", pods.Items[0].Name, "rook-ceph-operator", "ceph", "osd", "down", osdID)
-	exitCode, stdout, stderr, err := k8s.SyncExec(c.Config.Client.CoreV1(), c.Config.ClientConfig, "rook-ceph-system", pods.Items[0].Name, "rook-ceph-operator", "ceph", "osd", "purge", osdID, "--yes-i-really-mean-it")
+	k8s.SyncExec(c.Config.Client.CoreV1(), c.Config.ClientConfig, "rook-ceph", pods.Items[0].Name, "rook-ceph-operator", "ceph", "osd", "down", osdID)
+	exitCode, stdout, stderr, err := k8s.SyncExec(c.Config.Client.CoreV1(), c.Config.ClientConfig, "rook-ceph", pods.Items[0].Name, "rook-ceph-operator", "ceph", "osd", "purge", osdID, "--yes-i-really-mean-it")
 	if exitCode != 0 {
-		c.Log.Debug("`ceph osd purge %s` stdout: %s", osdID, stdout)
+		c.Log.Debugf("`ceph osd purge %s` stdout: %s", osdID, stdout)
 		return fmt.Errorf("Failed to purge OSD: %s", stderr)
 	}
 
@@ -274,7 +275,7 @@ func (c *Controller) CephFilesystemOK(name string) (bool, error) {
 	opts := metav1.ListOptions{
 		LabelSelector: labels.SelectorFromSet(rookOperatorLabels).String(),
 	}
-	pods, err := c.Config.Client.CoreV1().Pods("rook-ceph-system").List(opts)
+	pods, err := c.Config.Client.CoreV1().Pods("rook-ceph").List(opts)
 	if err != nil {
 		return false, errors.Wrap(err, "list Rook Operator pods")
 	}
@@ -283,9 +284,9 @@ func (c *Controller) CephFilesystemOK(name string) (bool, error) {
 	}
 	// The filesystem will appear in `ceph fs ls` before it's ready to use. `ceph mds metadata` is
 	// better because it waits for the mds daemons to be running
-	exitCode, stdout, stderr, err := k8s.SyncExec(c.Config.Client.CoreV1(), c.Config.ClientConfig, "rook-ceph-system", pods.Items[0].Name, "rook-ceph-operator", "ceph", "mds", "metadata")
+	exitCode, stdout, stderr, err := k8s.SyncExec(c.Config.Client.CoreV1(), c.Config.ClientConfig, "rook-ceph", pods.Items[0].Name, "rook-ceph-operator", "ceph", "mds", "metadata")
 	if exitCode != 0 {
-		c.Log.Debug("`ceph fs ls` stdout: %s", stdout)
+		c.Log.Debugf("`ceph fs ls` stdout: %s", stdout)
 		return false, fmt.Errorf("Failed to list ceph filesystems: %s", stderr)
 	}
 

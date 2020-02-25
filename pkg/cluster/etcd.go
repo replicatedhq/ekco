@@ -52,9 +52,9 @@ func (c *Controller) removeEtcdPeer(ctx context.Context, ip string, remainingIPs
 		if err != nil {
 			return errors.Wrapf(err, "remove etcd member %d", purgedMemberID)
 		}
-		c.Log.Debug("Removed etcd member %d", purgedMemberID)
+		c.Log.Debugf("Removed etcd member %d", purgedMemberID)
 	} else {
-		c.Log.Debug("Etcd cluster does not have member %s", removedPeerURL)
+		c.Log.Debugf("Etcd cluster does not have member %s", removedPeerURL)
 	}
 
 	return nil
