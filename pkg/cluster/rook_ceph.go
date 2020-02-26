@@ -31,7 +31,7 @@ func (c *Controller) UseNodesForStorage(names []string) (int, error) {
 	changed := false
 	for _, name := range names {
 		if !storageNodes[name] {
-			c.Log.Debugf("Adding node %q to CephCluster node storage list", name)
+			c.Log.Infof("Adding node %q to CephCluster node storage list", name)
 			cluster.Spec.Storage.Nodes = append(cluster.Spec.Storage.Nodes, rookv1alpha2.Node{
 				Name: name,
 			})
@@ -57,7 +57,7 @@ func (c *Controller) removeCephClusterStorageNode(name string) error {
 	var keep []v1alpha2.Node
 	for _, node := range cluster.Spec.Storage.Nodes {
 		if node.Name == name {
-			c.Log.Debugf("Removing node %q from CephCluster storage list", name)
+			c.Log.Infof("Removing node %q from CephCluster storage list", name)
 		} else {
 			keep = append(keep, node)
 		}
@@ -68,7 +68,7 @@ func (c *Controller) removeCephClusterStorageNode(name string) error {
 		if err != nil {
 			return errors.Wrap(err, "update CephCluster with new storage node list")
 		}
-		c.Log.Debugf("Purge node %q: removed from CephCluster node storage list", name)
+		c.Log.Infof("Purge node %q: removed from CephCluster node storage list", name)
 	}
 
 	return nil
@@ -99,7 +99,7 @@ func (c *Controller) deleteK8sDeploymentOSD(name string) (string, error) {
 			if err != nil {
 				return "", errors.Wrapf(err, "delete deployment %s", deploy.Name)
 			}
-			c.Log.Debugf("Deleted OSD Deployment for node %s", name)
+			c.Log.Infof("Deleted OSD Deployment for node %s", name)
 			break
 		}
 	}

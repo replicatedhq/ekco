@@ -14,7 +14,7 @@ import (
 
 // PurgeNode cleans up a lost node.
 func (c *Controller) PurgeNode(ctx context.Context, name string, rook bool) error {
-	c.Log.Debugf("Purge node %q", name)
+	c.Log.Infof("Purge node %q", name)
 
 	// get the Node before deleting because the etcd peer member removal step below may need the IP
 	node, err := c.Config.Client.CoreV1().Nodes().Get(name, metav1.GetOptions{})
@@ -39,7 +39,7 @@ func (c *Controller) PurgeNode(ctx context.Context, name string, rook bool) erro
 			if err := c.execCephOSDPurge(osdID); err != nil {
 				return err
 			}
-			c.Log.Debugf("Purge node %q: ceph osd purge command executed", node.Name)
+			c.Log.Infof("Purge node %q: ceph osd purge command executed", node.Name)
 		}
 	}
 
@@ -60,7 +60,7 @@ func (c *Controller) PurgeNode(ctx context.Context, name string, rook bool) erro
 			return err
 		}
 		if ip != "" {
-			c.Log.Debugf("Purge node %q: kubeadm-config API endpoint removed", name)
+			c.Log.Infof("Purge node %q: kubeadm-config API endpoint removed", name)
 		}
 
 		// get etcd peer URL for purged node if it wasn't in kubeadm's ClusterStatus
@@ -86,7 +86,7 @@ func (c *Controller) PurgeNode(ctx context.Context, name string, rook bool) erro
 		if err := c.deleteK8sNode(ctx, name); err != nil {
 			return err
 		}
-		c.Log.Debugf("Purge node %q: deleted Kubernetes Node object", name)
+		c.Log.Infof("Purge node %q: deleted Kubernetes Node object", name)
 	}
 
 	return nil
@@ -132,7 +132,7 @@ func (c *Controller) removeKubeadmEndpoint(name string) (string, []string, error
 		if err != nil {
 			return "", nil, errors.Wrap(err, "update kube-system kubeadm-config ConfigMap")
 		}
-		c.Log.Debugf("Purge node %q: kubeadm-config API endpoint removed", name)
+		c.Log.Infof("Purge node %q: kubeadm-config API endpoint removed", name)
 	}
 
 	for _, apiEndpoint := range clusterStatus.APIEndpoints {
