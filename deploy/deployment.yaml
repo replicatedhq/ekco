@@ -1,0 +1,71 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ekco-config
+  namespace: kurl
+data:
+  config.yaml: |
+    node_unreachable_toleration: 1h
+    purge_dead_nodes: 1
+    min_ready_master_nodes: 2
+    min_ready_worker_nodes: 0
+    maintain_rook_storage_nodes: 1
+    ceph_block_pool: replicapool
+    ceph_filesystem: rook-shared-fs
+    ceph_object_store: rook-ceph-store
+    min_ceph_pool_replication: 1
+    max_ceph_pool_replication: 3
+    certificates_dir: /etc/kubernetes/pki
+    reconcile_interval: 1m
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ekc-operator
+  namespace: kurl
+spec:
+  selector:
+    matchLabels:
+      app: ekc-operator
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: ekc-operator
+    spec:
+      serviceAccountName: ekco
+      restartPolicy: Always
+      nodeSelector:
+        node-role.kubernetes.io/master: ""
+      containers:
+        - name: ekc-operator
+          image: replicated/ekco
+          imagePullPolicy: Always
+          command: [ /usr/bin/ekco, operator ]
+          resources:
+            requests:
+              cpu: 100m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+          env:
+            - name: LOG_LEVEL
+              value: debug
+          volumeMounts:
+            - name: ekco-config
+              mountPath: /etc/ekco
+              readOnly: true
+            - name: certificates-dir
+              mountPath: /etc/kubernetes/pki
+              readOnly: true
+      volumes:
+        - name: ekco-config
+          configMap:
+            name: ekco-config
+        - name: certificates-dir
+          hostPath:
+            path: /etc/kubernetes/pki
+            type: Directory
