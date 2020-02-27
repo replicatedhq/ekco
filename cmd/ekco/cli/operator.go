@@ -2,6 +2,9 @@ package cli
 
 import (
 	"context"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/pkg/errors"
@@ -58,7 +61,17 @@ func OperatorCmd(v *viper.Viper) *cobra.Command {
 
 			operator := ekcoops.New(*config, client, clusterController, log)
 
-			operator.Poll(context.Background(), config.ReconcileInterval)
+			sigs := make(chan os.Signal, 1)
+			signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+
+			ctx, cancel := context.WithCancel(context.Background())
+			go func() {
+				sig := <-sigs
+				log.Infof("Operator got signal %s, exiting on next poll", sig)
+				cancel()
+			}()
+
+			operator.Poll(ctx, config.ReconcileInterval)
 
 			return nil
 		},

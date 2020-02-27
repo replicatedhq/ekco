@@ -28,8 +28,8 @@ kubectl apply -k deploy/
 
 ## Release
 
-To make a new release push a tag in the format `vYYYY.MM.DD-[0-9]`.
+To make a new release push a tag in the format `v[0-9]+\.[0-9]+\.[0-9]+(-[0-9a-z-]+)?`.
 
 ```bash
-git tag -a v2020.01.28-0 -m "Release v2020.01.28-0" && git push origin v2020.01.28-0
+git tag -a v0.1.0 -m "Release v0.1.0" && git push origin v0.1.0
 ```
