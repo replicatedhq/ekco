@@ -7,10 +7,10 @@ metadata:
 data:
   config.yaml: |
     node_unreachable_toleration: 1h
-    purge_dead_nodes: 1
+    purge_dead_nodes: true
     min_ready_master_nodes: 2
     min_ready_worker_nodes: 0
-    maintain_rook_storage_nodes: 1
+    maintain_rook_storage_nodes: true
     ceph_block_pool: replicapool
     ceph_filesystem: rook-shared-fs
     ceph_object_store: rook-ceph-store
