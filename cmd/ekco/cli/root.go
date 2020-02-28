@@ -31,6 +31,7 @@ func RootCmd(v *viper.Viper) *cobra.Command {
 	cmd.PersistentFlags().String("log_level", "info", "Log level")
 
 	cmd.AddCommand(OperatorCmd(v))
+	cmd.AddCommand(PurgeNodeCmd(v))
 
 	cobra.OnInitialize(initConfig(v, cfgFile))
 	v.AutomaticEnv()
