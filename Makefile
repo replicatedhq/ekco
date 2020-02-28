@@ -1,9 +1,12 @@
-SHELL := /bin/bash
-
-DOCKER_IMAGE ?= replicated/ekco:latest
+SHELL := /bin/bash -o pipefail
 
 export GO111MODULE=on
 
+VERSION_PACKAGE = github.com/replicatedhq/ekco/pkg/version
+VERSION ?= `git describe --tags --dirty`
+DATE = `date -u +"%Y-%m-%dT%H:%M:%SZ"`
+
+ifndef GIT_SHA
 GIT_TREE = $(shell git rev-parse --is-inside-work-tree 2>/dev/null)
 ifneq "$(GIT_TREE)" ""
 define GIT_UPDATE_INDEX_CMD
@@ -20,6 +23,15 @@ define GIT_SHA
 ""
 endef
 endif
+endif
+
+define LDFLAGS
+-ldflags "\
+	-X $(VERSION_PACKAGE).version=$(VERSION) \
+	-X $(VERSION_PACKAGE).gitSHA=$(GIT_SHA) \
+	-X $(VERSION_PACKAGE).buildTime=$(DATE) \
+"
+endef
 
 .PHONY: clean
 clean:
@@ -46,8 +58,15 @@ test: lint vet
 
 .PHONY: build
 build:
-	go build -o bin/ekco cmd/ekco/main.go
+	go build $(LDFLAGS) -o bin/ekco cmd/ekco/main.go
+
+DOCKER_IMAGE ?= replicated/ekco:latest
 
 .PHONY: docker-image
 docker-image:
-	docker build -t $(DOCKER_IMAGE) -f deploy/Dockerfile --build-arg commit="${GIT_SHA}" .
+	docker build \
+		-t $(DOCKER_IMAGE) \
+		-f deploy/Dockerfile \
+		--build-arg git_sha="$(GIT_SHA)" \
+		--build-arg version="$(VERSION)" \
+		.

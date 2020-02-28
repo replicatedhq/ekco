@@ -21,8 +21,8 @@ import (
 func OperatorCmd(v *viper.Viper) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "operator",
-		Short: "Replicated Embedded Kubernetes operator",
-		Long:  `Manage nodes and storage of a Replicated Embbedded Kubernetes cluster`,
+		Short: "Embedded kURL cluster operator",
+		Long:  `Manage nodes and storage of an embedded kURL cluster`,
 		PreRun: func(cmd *cobra.Command, args []string) {
 			v.BindPFlags(cmd.Flags())
 		},

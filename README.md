@@ -1,6 +1,6 @@
-# Embedded Kurl cluster operator (EKCO)
+# Embedded kURL cluster operator (EKCO)
 
-EKCO is responsible for performing various operations to maintain the health of a Kurl cluster.
+EKCO is responsible for performing various operations to maintain the health of a kURL cluster.
 
 ### Purge nodes
 
