@@ -8,14 +8,10 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/replicatedhq/ekco/pkg/cluster"
 	"github.com/replicatedhq/ekco/pkg/ekcoops"
 	"github.com/replicatedhq/ekco/pkg/logger"
-	cephv1 "github.com/rook/rook/pkg/client/clientset/versioned/typed/ceph.rook.io/v1"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"k8s.io/client-go/kubernetes"
-	restclient "k8s.io/client-go/rest"
 )
 
 func OperatorCmd(v *viper.Viper) *cobra.Command {
@@ -27,9 +23,9 @@ func OperatorCmd(v *viper.Viper) *cobra.Command {
 			v.BindPFlags(cmd.Flags())
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			config := &ekcoops.Config{}
-			if err := v.Unmarshal(config); err != nil {
-				return errors.Wrap(err, "failed to unmarshal config")
+			config, err := initEKCOConfig(v)
+			if err != nil {
+				return errors.Wrap(err, "failed to initialize config")
 			}
 
 			log, err := logger.FromViper(v)
@@ -37,29 +33,12 @@ func OperatorCmd(v *viper.Viper) *cobra.Command {
 				return errors.Wrap(err, "failed to initialize logger")
 			}
 
-			clientConfig, err := restclient.InClusterConfig()
+			clusterController, err := initClusterController(config, log)
 			if err != nil {
-				return errors.Wrap(err, "failed to load kubernetes config")
+				return errors.Wrap(err, "failed to initialize cluster controller")
 			}
 
-			client, err := kubernetes.NewForConfig(clientConfig)
-			if err != nil {
-				return errors.Wrap(err, "failed to initialize kubernetes client")
-			}
-
-			rookcephclient, err := cephv1.NewForConfig(clientConfig)
-			if err != nil {
-				return errors.Wrap(err, "failed to initialize ceph client")
-			}
-
-			clusterController := cluster.NewController(cluster.ControllerConfig{
-				Client:          client,
-				ClientConfig:    clientConfig,
-				CephV1:          rookcephclient,
-				CertificatesDir: config.CertificatesDir,
-			}, log)
-
-			operator := ekcoops.New(*config, client, clusterController, log)
+			operator := ekcoops.New(*config, clusterController.Config.Client, clusterController, log)
 
 			sigs := make(chan os.Signal, 1)
 			signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
