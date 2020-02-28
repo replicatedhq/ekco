@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"fmt"
 	"log"
 
 	"github.com/replicatedhq/ekco/pkg/version"
@@ -14,8 +13,8 @@ func RootCmd(v *viper.Viper) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "ekco",
-		Short: "Embedded Kurl cluster operator (ekco) version",
-		Long:  `Print the version of this ekco command`,
+		Short: "Embedded kURL cluster operator (EKCO) version",
+		Long:  `Print the version of this ECKO command`,
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
 			v.BindPFlags(cmd.PersistentFlags())
 		},
@@ -23,7 +22,7 @@ func RootCmd(v *viper.Viper) *cobra.Command {
 			v.BindPFlags(cmd.Flags())
 		},
 		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Printf("Embedded Kurl cluster operator (ekco) %s\n", version.Version())
+			cmd.Printf("Embedded kURL cluster operator (EKCO) %s\n", version.Version())
 		},
 	}
 

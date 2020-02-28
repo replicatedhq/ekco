@@ -1,4 +1,4 @@
-// Package ekcoops provides a Kubernetes Operator for a Replicated Embedded Kubernetes cluster.
+// Package ekcoops provides a Kubernetes Operator for an embedded kURL cluster.
 // It automates the functions that would otherwise be required of a cluster administrator.
 package ekcoops
 
@@ -72,7 +72,7 @@ func (o *Operator) reconcile(node corev1.Node, readyMasters, readyWorkers int) e
 			o.log.Debugf("Skipping auto-purge worker: %d ready workers", readyWorkers)
 			return nil
 		}
-		o.log.Infof("Ekco automatically purging dead node %s", node.Name)
+		o.log.Infof("Automatically purging dead node %s", node.Name)
 		err := o.controller.PurgeNode(context.TODO(), node.Name, o.config.MaintainRookStorageNodes)
 		if err != nil {
 			return errors.Wrapf(err, "purge dead node %s", node.Name)
