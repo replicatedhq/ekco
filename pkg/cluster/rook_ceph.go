@@ -214,6 +214,24 @@ func (c *Controller) SetObjectStoreReplication(name string, level int) error {
 		if err != nil {
 			return errors.Wrapf(err, "update CephObjectStore %s", name)
 		}
+		// Changing the size in the CephObjectStore has no effect so it needs to be set manually
+		// https://github.com/rook/rook/issues/4341
+		err = c.rookCephOperatorExec("ceph", "osd", "pool", "set", objectStorePoolName(name, RookCephObjectStoreRootPool), "size", strconv.Itoa(level))
+		if err != nil {
+			return errors.Wrap(err, "scale ceph object store root pool")
+		}
+		for _, pool := range RookCephObjectStoreMetadataPools {
+			err = c.rookCephOperatorExec("ceph", "osd", "pool", "set", objectStorePoolName(name, pool), "size", strconv.Itoa(level))
+			if err != nil {
+				return errors.Wrapf(err, "scale ceph object store metadata pool %s", pool)
+			}
+		}
+		for _, pool := range RookCephObjectStoreDataPools {
+			err = c.rookCephOperatorExec("ceph", "osd", "pool", "set", objectStorePoolName(name, pool), "size", strconv.Itoa(level))
+			if err != nil {
+				return errors.Wrapf(err, "scale ceph object store data pool %s", pool)
+			}
+		}
 	}
 
 	return nil
@@ -322,4 +340,12 @@ func (c *Controller) WaitCephFilesystem(ctx context.Context, name string) error 
 			}
 		}
 	}
+}
+
+func objectStorePoolName(storeName, poolName string) string {
+	if strings.HasPrefix(poolName, ".") {
+		return poolName
+	}
+	// the name of the pool is <instance>.<name>, except for the pool ".rgw.root" that spans object stores
+	return fmt.Sprintf("%s.%s", storeName, poolName)
 }
