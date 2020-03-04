@@ -128,17 +128,17 @@ func (c *Controller) SetPoolReplication(name string, level int) error {
 		if err != nil {
 			return errors.Wrapf(err, "update CephBlockPool %s", name)
 		}
-	}
-	// Changing the replicated size of the pool in the CephBlockPool does not set the min_size on
-	// the pool. The min_size remains at 1, which allows I/O in a degraded state and can lead to
-	// data loss. https://github.com/rook/rook/issues/4718
-	minSize := 1
-	if level > 1 {
-		minSize = 2
-	}
-	err = c.rookCephOperatorExec("ceph", "osd", "pool", "set", name, "min_size", strconv.Itoa(minSize))
-	if err != nil {
-		return errors.Wrapf(err, "set block pool %q min_size to %d", name, minSize)
+		// Changing the replicated size of the pool in the CephBlockPool does not set the min_size on
+		// the pool. The min_size remains at 1, which allows I/O in a degraded state and can lead to
+		// data loss. https://github.com/rook/rook/issues/4718
+		minSize := 1
+		if level > 1 {
+			minSize = 2
+		}
+		err = c.rookCephOperatorExec("ceph", "osd", "pool", "set", name, "min_size", strconv.Itoa(minSize))
+		if err != nil {
+			return errors.Wrapf(err, "set block pool %q min_size to %d", name, minSize)
+		}
 	}
 
 	return nil
