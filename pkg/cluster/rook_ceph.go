@@ -129,6 +129,17 @@ func (c *Controller) SetPoolReplication(name string, level int) error {
 			return errors.Wrapf(err, "update CephBlockPool %s", name)
 		}
 	}
+	// Changing the replicated size of the pool in the CephBlockPool does not set the min_size on
+	// the pool. The min_size remains at 1, which allows I/O in a degraded state and can lead to
+	// data loss. https://github.com/rook/rook/issues/4718
+	minSize := 1
+	if level > 1 {
+		minSize = 2
+	}
+	err = c.rookCephOperatorExec("ceph", "osd", "pool", "set", name, "min_size", strconv.Itoa(minSize))
+	if err != nil {
+		return errors.Wrapf(err, "set block pool %q min_size to %d", name, minSize)
+	}
 
 	return nil
 }
@@ -166,15 +177,27 @@ func (c *Controller) SetFilesystemReplication(name string, level int) error {
 		if err != nil {
 			return errors.Wrapf(err, "update Filesystem %s", name)
 		}
+		minSize := 1
+		if level > 1 {
+			minSize = 2
+		}
 		// Changing the size in the CephFilesystem has no effect so it needs to be set manually
 		// https://github.com/rook/rook/issues/3144
 		err = c.rookCephOperatorExec("ceph", "osd", "pool", "set", RookCephSharedFSMetadataPool, "size", strconv.Itoa(level))
 		if err != nil {
-			return errors.Wrapf(err, "scale shared fs metadata pool")
+			return errors.Wrapf(err, "scale shared fs metadata pool size")
+		}
+		err = c.rookCephOperatorExec("ceph", "osd", "pool", "set", RookCephSharedFSMetadataPool, "min_size", strconv.Itoa(minSize))
+		if err != nil {
+			return errors.Wrapf(err, "scale shared fs metadata pool min_size")
 		}
 		err = c.rookCephOperatorExec("ceph", "osd", "pool", "set", RookCephSharedFSDataPool, "size", strconv.Itoa(level))
 		if err != nil {
-			return errors.Wrapf(err, "scale shared fs data pool")
+			return errors.Wrapf(err, "scale shared fs data pool size")
+		}
+		err = c.rookCephOperatorExec("ceph", "osd", "pool", "set", RookCephSharedFSDataPool, "min_size", strconv.Itoa(minSize))
+		if err != nil {
+			return errors.Wrapf(err, "scale shared fs data pool min_size")
 		}
 	}
 
@@ -209,6 +232,10 @@ func (c *Controller) SetObjectStoreReplication(name string, level int) error {
 	}
 
 	if changed {
+		minSize := 1
+		if level > 1 {
+			minSize = 2
+		}
 		c.Log.Infof("Changing CephObjectStore pool replication level from %d to %d", current, level)
 		_, err := c.Config.CephV1.CephObjectStores(RookCephNS).Update(os)
 		if err != nil {
@@ -218,18 +245,30 @@ func (c *Controller) SetObjectStoreReplication(name string, level int) error {
 		// https://github.com/rook/rook/issues/4341
 		err = c.rookCephOperatorExec("ceph", "osd", "pool", "set", objectStorePoolName(name, RookCephObjectStoreRootPool), "size", strconv.Itoa(level))
 		if err != nil {
-			return errors.Wrap(err, "scale ceph object store root pool")
+			return errors.Wrap(err, "scale ceph object store root pool size")
+		}
+		err = c.rookCephOperatorExec("ceph", "osd", "pool", "set", objectStorePoolName(name, RookCephObjectStoreRootPool), "min_size", strconv.Itoa(minSize))
+		if err != nil {
+			return errors.Wrap(err, "scale ceph object store root pool min_size")
 		}
 		for _, pool := range RookCephObjectStoreMetadataPools {
 			err = c.rookCephOperatorExec("ceph", "osd", "pool", "set", objectStorePoolName(name, pool), "size", strconv.Itoa(level))
 			if err != nil {
-				return errors.Wrapf(err, "scale ceph object store metadata pool %s", pool)
+				return errors.Wrapf(err, "scale ceph object store metadata pool %s size", pool)
+			}
+			err = c.rookCephOperatorExec("ceph", "osd", "pool", "set", objectStorePoolName(name, pool), "min_size", strconv.Itoa(minSize))
+			if err != nil {
+				return errors.Wrapf(err, "scale ceph object store metadata pool %s min_size", pool)
 			}
 		}
 		for _, pool := range RookCephObjectStoreDataPools {
 			err = c.rookCephOperatorExec("ceph", "osd", "pool", "set", objectStorePoolName(name, pool), "size", strconv.Itoa(level))
 			if err != nil {
-				return errors.Wrapf(err, "scale ceph object store data pool %s", pool)
+				return errors.Wrapf(err, "scale ceph object store data pool %s size", pool)
+			}
+			err = c.rookCephOperatorExec("ceph", "osd", "pool", "set", objectStorePoolName(name, pool), "min_size", strconv.Itoa(minSize))
+			if err != nil {
+				return errors.Wrapf(err, "scale ceph object store data pool %s min_size", pool)
 			}
 		}
 	}
