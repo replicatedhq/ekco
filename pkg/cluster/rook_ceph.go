@@ -135,6 +135,13 @@ func (c *Controller) SetPoolReplication(name string, level int) error {
 		if level > 1 {
 			minSize = 2
 		}
+		// Rook will also run this command but there is a race condition: if the next command that
+		// sets the min_size runs before Rook has increased the size, then the min_size command will
+		// fail. This command is idempotent.
+		err = c.rookCephOperatorExec("ceph", "osd", "pool", "set", name, "size", strconv.Itoa(level))
+		if err != nil {
+			return errors.Wrapf(err, "set block pool %q size to %d", name, minSize)
+		}
 		err = c.rookCephOperatorExec("ceph", "osd", "pool", "set", name, "min_size", strconv.Itoa(minSize))
 		if err != nil {
 			return errors.Wrapf(err, "set block pool %q min_size to %d", name, minSize)
