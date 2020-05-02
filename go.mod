@@ -3,6 +3,7 @@ module github.com/replicatedhq/ekco
 go 1.13
 
 require (
+	github.com/client9/misspell v0.3.4 // indirect
 	github.com/coreos/bbolt v1.3.3 // indirect
 	github.com/coreos/etcd v3.3.13+incompatible
 	github.com/pkg/errors v0.8.1
@@ -12,6 +13,10 @@ require (
 	go.etcd.io/bbolt v1.3.3 // indirect
 	go.uber.org/zap v0.0.0-20180814183419-67bc79d13d15
 	go.undefinedlabs.com/scopeagent v0.1.12
+	golang.org/x/lint v0.0.0-20190313153728-d0100b6bd8b3 // indirect
+	golang.org/x/tools v0.0.0-20190524140312-2c0ae7006135 // indirect
+	google.golang.org/appengine v1.6.5
+	honnef.co/go/tools v0.0.0-20190523083050-ea95bdfd59fc // indirect
 	k8s.io/api v0.15.10
 	k8s.io/apimachinery v0.15.10
 	k8s.io/client-go v0.15.10
