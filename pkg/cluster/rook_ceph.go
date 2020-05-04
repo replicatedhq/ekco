@@ -129,7 +129,6 @@ func (c *Controller) SetBlockPoolReplication(name string, level int, doFullRecon
 		} else {
 			c.Log.Debugf("Ensuring CephBlockPool replication level is %d", level)
 		}
-		c.Log.Infof("Changing CephBlockPool replication level from %d to %d", current, level)
 		pool.Spec.Replicated.Size = uint(level)
 		_, err := c.Config.CephV1.CephBlockPools(RookCephNS).Update(pool)
 		if err != nil {
