@@ -37,7 +37,7 @@ func New(
 	}
 }
 
-func (o *Operator) Reconcile(nodes []corev1.Node) error {
+func (o *Operator) Reconcile(nodes []corev1.Node, doFullReconcile bool) error {
 	o.mtx.Lock()
 	defer o.mtx.Unlock()
 
@@ -54,7 +54,7 @@ func (o *Operator) Reconcile(nodes []corev1.Node) error {
 		if err != nil {
 			return errors.Wrapf(err, "ensure all ready nodes used for storage")
 		}
-		err = o.adjustPoolReplicationLevels(readyCount)
+		err = o.adjustPoolReplicationLevels(readyCount, doFullReconcile)
 		if err != nil {
 			return errors.Wrapf(err, "adjust pool replication levels")
 		}
@@ -108,7 +108,7 @@ func (o *Operator) ensureAllUsedForStorage(nodes []corev1.Node) (int, error) {
 }
 
 // adjustPoolSizes changes ceph pool replication factors up and down
-func (o *Operator) adjustPoolReplicationLevels(numNodes int) error {
+func (o *Operator) adjustPoolReplicationLevels(numNodes int, doFullReconcile bool) error {
 	factor := numNodes
 
 	if factor < o.config.MinCephPoolReplication {
@@ -118,17 +118,17 @@ func (o *Operator) adjustPoolReplicationLevels(numNodes int) error {
 		factor = o.config.MaxCephPoolReplication
 	}
 
-	err := o.controller.SetPoolReplication(o.config.CephBlockPool, factor)
+	err := o.controller.SetBlockPoolReplication(o.config.CephBlockPool, factor, doFullReconcile)
 	if err != nil {
 		return errors.Wrapf(err, "set pool %s replication to %d", o.config.CephBlockPool, factor)
 	}
 
-	err = o.controller.SetFilesystemReplication(o.config.CephFilesystem, factor)
+	err = o.controller.SetFilesystemReplication(o.config.CephFilesystem, factor, doFullReconcile)
 	if err != nil {
 		return errors.Wrapf(err, "set filesystem %s replication to %d", o.config.CephFilesystem, factor)
 	}
 
-	err = o.controller.SetObjectStoreReplication(o.config.CephObjectStore, factor)
+	err = o.controller.SetObjectStoreReplication(o.config.CephObjectStore, factor, doFullReconcile)
 	if err != nil {
 		return errors.Wrapf(err, "set object store %s replication to %d", o.config.CephObjectStore, factor)
 	}

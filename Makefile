@@ -5,6 +5,7 @@ export GO111MODULE=on
 VERSION_PACKAGE = github.com/replicatedhq/ekco/pkg/version
 VERSION ?= `git describe --tags --dirty`
 DATE = `date -u +"%Y-%m-%dT%H:%M:%SZ"`
+CURRENT_USER=$(shell id -u -n)
 
 ifndef GIT_SHA
 GIT_TREE = $(shell git rev-parse --is-inside-work-tree 2>/dev/null)
@@ -70,3 +71,11 @@ docker-image:
 		--build-arg git_sha="$(GIT_SHA)" \
 		--build-arg version="$(VERSION)" \
 		.
+build-ttl.sh:
+	docker build \
+		-t ttl.sh/${CURRENT_USER}/ekco:12h \
+		-f deploy/Dockerfile \
+		--build-arg git_sha=dev \
+		--build-arg version=dev \
+		.
+	docker push ttl.sh/${CURRENT_USER}/ekco:12h

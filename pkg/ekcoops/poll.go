@@ -11,6 +11,7 @@ import (
 func (o *Operator) Poll(ctx context.Context, interval time.Duration) {
 	ticker := time.NewTicker(interval)
 
+	i := 0
 	for {
 		select {
 		case <-ticker.C:
@@ -19,7 +20,8 @@ func (o *Operator) Poll(ctx context.Context, interval time.Duration) {
 				o.log.Infof("Skipping reconcile: failed to list nodes: %v", err)
 				continue
 			}
-			err = o.Reconcile(nodeList.Items)
+			doFullReconcile := i%60 == 0
+			err = o.Reconcile(nodeList.Items, doFullReconcile)
 			if err != nil {
 				o.log.Infof("Reconcile failed: %v", err)
 				continue
@@ -28,5 +30,6 @@ func (o *Operator) Poll(ctx context.Context, interval time.Duration) {
 			ticker.Stop()
 			return
 		}
+		i++
 	}
 }

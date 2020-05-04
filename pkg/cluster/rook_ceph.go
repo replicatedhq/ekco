@@ -109,8 +109,8 @@ func (c *Controller) deleteK8sDeploymentOSD(name string) (string, error) {
 	return osdID, nil
 }
 
-// SetPoolReplicationLevel ignores NotFound errors.
-func (c *Controller) SetPoolReplication(name string, level int) error {
+// SetBlockPoolReplicationLevel ignores NotFound errors.
+func (c *Controller) SetBlockPoolReplication(name string, level int, doFullReconcile bool) error {
 	if name == "" {
 		return nil
 	}
@@ -123,8 +123,12 @@ func (c *Controller) SetPoolReplication(name string, level int) error {
 		return errors.Wrapf(err, "get CephBlockPool %s", name)
 	}
 	current := int(pool.Spec.Replicated.Size)
-	if current != level {
-		c.Log.Infof("Changing CephBlockPool replication level from %d to %d", current, level)
+	if current != level || doFullReconcile {
+		if current != level {
+			c.Log.Infof("Changing CephBlockPool replication level from %d to %d", current, level)
+		} else {
+			c.Log.Debugf("Ensuring CephBlockPool replication level is %d", level)
+		}
 		pool.Spec.Replicated.Size = uint(level)
 		_, err := c.Config.CephV1.CephBlockPools(RookCephNS).Update(pool)
 		if err != nil {
@@ -154,7 +158,7 @@ func (c *Controller) SetPoolReplication(name string, level int) error {
 }
 
 // SetSharedFilesystemReplication ignores NotFound errors.
-func (c *Controller) SetFilesystemReplication(name string, level int) error {
+func (c *Controller) SetFilesystemReplication(name string, level int, doFullReconcile bool) error {
 	if name == "" {
 		return nil
 	}
@@ -180,8 +184,12 @@ func (c *Controller) SetFilesystemReplication(name string, level int) error {
 		changed = true
 	}
 
-	if changed {
-		c.Log.Infof("Changing CephFilesystem pool replication level from %d to %d", current, level)
+	if changed || doFullReconcile {
+		if changed {
+			c.Log.Infof("Changing CephFilesystem pool replication level from %d to %d", current, level)
+		} else {
+			c.Log.Debugf("Ensuring CephFilesystem pool replication level is %d", level)
+		}
 		_, err := c.Config.CephV1.CephFilesystems("rook-ceph").Update(fs)
 		if err != nil {
 			return errors.Wrapf(err, "update Filesystem %s", name)
@@ -214,7 +222,7 @@ func (c *Controller) SetFilesystemReplication(name string, level int) error {
 }
 
 // SetObjectStoreReplication ignores NotFound errors.
-func (c *Controller) SetObjectStoreReplication(name string, level int) error {
+func (c *Controller) SetObjectStoreReplication(name string, level int, doFullReconcile bool) error {
 	if name == "" {
 		return nil
 	}
@@ -240,12 +248,16 @@ func (c *Controller) SetObjectStoreReplication(name string, level int) error {
 		changed = true
 	}
 
-	if changed {
+	if changed || doFullReconcile {
 		minSize := 1
 		if level > 1 {
 			minSize = 2
 		}
-		c.Log.Infof("Changing CephObjectStore pool replication level from %d to %d", current, level)
+		if changed {
+			c.Log.Infof("Changing CephObjectStore pool replication level from %d to %d", current, level)
+		} else {
+			c.Log.Debugf("Ensuring CephOjbectStore pool replication level is %d", level)
+		}
 		_, err := c.Config.CephV1.CephObjectStores(RookCephNS).Update(os)
 		if err != nil {
 			return errors.Wrapf(err, "update CephObjectStore %s", name)
