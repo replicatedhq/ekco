@@ -16,6 +16,7 @@ var (
 		"rgw.meta",
 		"rgw.log",
 		"rgw.buckets.index",
+		"rgw.buckets.non-ec",
 	}
 	RookCephObjectStoreDataPools = []string{
 		"rgw.buckets.data",

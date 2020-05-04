@@ -17,6 +17,8 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 )
 
+var cephErrENOENT = errors.New("Ceph ENOENT")
+
 // returns the number of nodes used for storage, which may be higher than the number of names passed in
 // if a node is currenlty not ready but has not been purged
 func (c *Controller) UseNodesForStorage(names []string) (int, error) {
@@ -260,6 +262,10 @@ func (c *Controller) SetObjectStoreReplication(name string, level int) error {
 		}
 		for _, pool := range RookCephObjectStoreMetadataPools {
 			err = c.rookCephOperatorExec("ceph", "osd", "pool", "set", objectStorePoolName(name, pool), "size", strconv.Itoa(level))
+			if err == cephErrENOENT {
+				// the non-ec metadata pool doesn't always exist
+				continue
+			}
 			if err != nil {
 				return errors.Wrapf(err, "scale ceph object store metadata pool %s size", pool)
 			}
@@ -299,6 +305,10 @@ func (c *Controller) rookCephOperatorExec(cmd ...string) error {
 	exitCode, stdout, stderr, err := k8s.SyncExec(c.Config.Client.CoreV1(), c.Config.ClientConfig, "rook-ceph", pods.Items[0].Name, "rook-ceph-operator", cmd...)
 	if err != nil {
 		return err
+	}
+	if exitCode == 2 {
+		c.Log.Debugf("Rook ceph operator exec %q exited with code %d and stderr: %s", cmd, exitCode, stderr)
+		return cephErrENOENT
 	}
 	if exitCode != 0 {
 		c.Log.Infof("Rook ceph operator exec %q exited with code %d and stderr: %s", cmd, exitCode, stderr)
