@@ -21,6 +21,8 @@ type Config struct {
 	// the replication factor of ceph pools, scaling up and down with the number of nodes in the
 	// cluster.
 	MaintainRookStorageNodes bool `mapstructure:"maintain_rook_storage_nodes"`
+	// when set, only nodes with this label will be added to the ceph cluster
+	RookStorageNodesLabel string `mapstructure:"rook_storage_nodes_label"`
 	// names and levels of ceph pools to maintain if MaintainRookStorageNodes is enabled
 	CephBlockPool          string `mapstructure:"ceph_block_pool"`
 	CephFilesystem         string `mapstructure:"ceph_filesystem"`
