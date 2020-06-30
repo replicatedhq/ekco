@@ -4,6 +4,7 @@ package ekcoops
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -99,7 +100,7 @@ func (o *Operator) ensureAllUsedForStorage(nodes []corev1.Node) (int, error) {
 	var names []string
 
 	for _, node := range nodes {
-		if util.NodeIsReady(node) {
+		if shouldUseNodeForStorage(node, o.config.RookStorageNodesLabel) {
 			names = append(names, node.Name)
 		}
 	}
@@ -134,4 +135,19 @@ func (o *Operator) adjustPoolReplicationLevels(numNodes int, doFullReconcile boo
 	}
 
 	return nil
+}
+
+func shouldUseNodeForStorage(node corev1.Node, rookStorageNodesLabel string) bool {
+	if !util.NodeIsReady(node) {
+		return false
+	}
+	if rookStorageNodesLabel == "" {
+		return true
+	}
+	for key, value := range node.Labels {
+		if rookStorageNodesLabel == fmt.Sprintf("%s=%s", key, value) {
+			return true
+		}
+	}
+	return false
 }
