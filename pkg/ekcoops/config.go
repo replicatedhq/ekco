@@ -14,6 +14,8 @@ type Config struct {
 
 	// whether to purge dead nodes from the cluster automatically
 	PurgeDeadNodes bool `mapstructure:"purge_dead_nodes"`
+	// whether to force delete terminating pods on dead nodes automatically
+	ClearDeadNodes bool `mapstructure:"clear_dead_nodes"`
 
 	// whether to maintain the list of nodes to use in the CephCluster config. With Rook 1.0
 	// Replicated maintains the list to obviate the need to restart the operator, but with
