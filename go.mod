@@ -6,6 +6,7 @@ require (
 	github.com/client9/misspell v0.3.4 // indirect
 	github.com/coreos/bbolt v1.3.3 // indirect
 	github.com/coreos/etcd v3.3.13+incompatible
+	github.com/docker/docker-credential-helpers v0.6.3
 	github.com/pkg/errors v0.8.1
 	github.com/rook/rook v1.0.3
 	github.com/spf13/cobra v0.0.5

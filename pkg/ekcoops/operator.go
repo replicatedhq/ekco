@@ -80,6 +80,13 @@ func (o *Operator) reconcile(node corev1.Node, readyMasters, readyWorkers int) e
 		}
 	}
 
+	if o.config.ClearDeadNodes && o.isDead(node) {
+		err := o.controller.ClearNode(context.TODO(), node.Name)
+		if err != nil {
+			return errors.Wrapf(err, "clear dead node %s", node.Name)
+		}
+	}
+
 	return nil
 }
 
