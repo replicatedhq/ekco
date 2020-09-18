@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"github.com/blang/semver"
 	"github.com/pkg/errors"
 	"github.com/replicatedhq/ekco/pkg/cluster"
 	"github.com/replicatedhq/ekco/pkg/ekcoops"
@@ -40,10 +41,16 @@ func initClusterController(config *ekcoops.Config, log *zap.SugaredLogger) (*clu
 		return nil, errors.Wrap(err, "initialize ceph client")
 	}
 
+	rookVersion, err := semver.Parse(config.RookVersion)
+	if err != nil {
+		return nil, errors.Wrap(err, "parse rook version")
+	}
+
 	return cluster.NewController(cluster.ControllerConfig{
 		Client:          client,
 		ClientConfig:    clientConfig,
 		CephV1:          rookcephclient,
 		CertificatesDir: config.CertificatesDir,
+		RookVersion:     rookVersion,
 	}, log), nil
 }

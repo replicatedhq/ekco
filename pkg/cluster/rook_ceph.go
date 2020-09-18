@@ -11,8 +11,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/replicatedhq/ekco/pkg/k8s"
 	"github.com/replicatedhq/ekco/pkg/util"
-	"github.com/rook/rook/pkg/apis/rook.io/v1alpha2"
-	rookv1alpha2 "github.com/rook/rook/pkg/apis/rook.io/v1alpha2"
+	rookv1 "github.com/rook/rook/pkg/apis/rook.io/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
@@ -34,7 +33,7 @@ func (c *Controller) UseNodesForStorage(names []string) (int, error) {
 	for _, name := range names {
 		if !storageNodes[name] {
 			c.Log.Infof("Adding node %q to CephCluster node storage list", name)
-			cluster.Spec.Storage.Nodes = append(cluster.Spec.Storage.Nodes, rookv1alpha2.Node{
+			cluster.Spec.Storage.Nodes = append(cluster.Spec.Storage.Nodes, rookv1.Node{
 				Name: name,
 			})
 			changed = true
@@ -56,7 +55,7 @@ func (c *Controller) removeCephClusterStorageNode(name string) error {
 	if err != nil {
 		return errors.Wrapf(err, "get CephCluster config")
 	}
-	var keep []v1alpha2.Node
+	var keep []rookv1.Node
 	for _, node := range cluster.Spec.Storage.Nodes {
 		if node.Name == name {
 			c.Log.Infof("Removing node %q from CephCluster storage list", name)
@@ -134,24 +133,86 @@ func (c *Controller) SetBlockPoolReplication(name string, level int, doFullRecon
 		if err != nil {
 			return errors.Wrapf(err, "update CephBlockPool %s", name)
 		}
-		// Changing the replicated size of the pool in the CephBlockPool does not set the min_size on
-		// the pool. The min_size remains at 1, which allows I/O in a degraded state and can lead to
-		// data loss. https://github.com/rook/rook/issues/4718
-		minSize := 1
-		if level > 1 {
-			minSize = 2
+		if c.Config.RookVersion.LT(Rookv14) {
+			// Changing the replicated size of the pool in the CephBlockPool does not set the min_size on
+			// the pool. The min_size remains at 1, which allows I/O in a degraded state and can lead to
+			// data loss. https://github.com/rook/rook/issues/4718
+			minSize := 1
+			if level > 1 {
+				minSize = 2
+			}
+			// Rook will also run this command but there is a race condition: if the next command that
+			// sets the min_size runs before Rook has increased the size, then the min_size command will
+			// fail. This command is idempotent.
+			err = c.rookCephExec("ceph", "osd", "pool", "set", name, "size", strconv.Itoa(level))
+			if err != nil {
+				return errors.Wrapf(err, "set block pool %q size to %d", name, minSize)
+			}
+			err = c.rookCephExec("ceph", "osd", "pool", "set", name, "min_size", strconv.Itoa(minSize))
+			if err != nil {
+				return errors.Wrapf(err, "set block pool %q min_size to %d", name, minSize)
+			}
 		}
-		// Rook will also run this command but there is a race condition: if the next command that
-		// sets the min_size runs before Rook has increased the size, then the min_size command will
-		// fail. This command is idempotent.
-		err = c.rookCephToolsExec("ceph", "osd", "pool", "set", name, "size", strconv.Itoa(level))
-		if err != nil {
-			return errors.Wrapf(err, "set block pool %q size to %d", name, minSize)
-		}
-		err = c.rookCephToolsExec("ceph", "osd", "pool", "set", name, "min_size", strconv.Itoa(minSize))
-		if err != nil {
-			return errors.Wrapf(err, "set block pool %q min_size to %d", name, minSize)
-		}
+	}
+
+	return nil
+}
+
+func (c *Controller) SetDeviceHealthMetricsReplication(level int, doFullReconcile bool) error {
+	if c.Config.RookVersion.LT(Rookv14) {
+		return nil
+	}
+	// There's no CR to compare the desired and current level
+	if !doFullReconcile {
+		return nil
+	}
+
+	minSize := 1
+	if level > 1 {
+		minSize = 2
+	}
+
+	c.Log.Debugf("Ensuring %s replication level is %d", CephDeviceHealthMetricsPool, level)
+
+	err := c.rookCephExec("ceph", "osd", "pool", "set", CephDeviceHealthMetricsPool, "size", strconv.Itoa(level))
+	if err != nil {
+		return errors.Wrapf(err, "scale %s pool size", CephDeviceHealthMetricsPool)
+	}
+	err = c.rookCephExec("ceph", "osd", "pool", "set", CephDeviceHealthMetricsPool, "min_size", strconv.Itoa(minSize))
+	if err != nil {
+		return errors.Wrapf(err, "scale %s pool min_size", CephDeviceHealthMetricsPool)
+	}
+
+	return nil
+}
+
+func (c *Controller) ReconcileMonCount(count int) error {
+	// Previously we were able to set a preferred mon count and rook would scale up as nodes joined
+	if c.Config.RookVersion.LT(Rookv14) {
+		return nil
+	}
+
+	// single mon for 1 or 2 node cluster, 3 mons for all other clusters
+	if count < 3 {
+		count = 1
+	} else {
+		count = 3
+	}
+
+	cluster, err := c.Config.CephV1.CephClusters(RookCephNS).Get(CephClusterName, metav1.GetOptions{})
+	if err != nil {
+		return errors.Wrapf(err, "get CephCluster config")
+	}
+
+	if cluster.Spec.Mon.Count == count {
+		return nil
+	}
+
+	c.Log.Infof("Changing mon count from %d to %d", cluster.Spec.Mon.Count, count)
+	cluster.Spec.Mon.Count = count
+	_, err = c.Config.CephV1.CephClusters("rook-ceph").Update(cluster)
+	if err != nil {
+		return errors.Wrap(err, "update CephCluster with new mon count")
 	}
 
 	return nil
@@ -194,27 +255,29 @@ func (c *Controller) SetFilesystemReplication(name string, level int, doFullReco
 		if err != nil {
 			return errors.Wrapf(err, "update Filesystem %s", name)
 		}
-		minSize := 1
-		if level > 1 {
-			minSize = 2
-		}
-		// Changing the size in the CephFilesystem has no effect so it needs to be set manually
-		// https://github.com/rook/rook/issues/3144
-		err = c.rookCephToolsExec("ceph", "osd", "pool", "set", RookCephSharedFSMetadataPool, "size", strconv.Itoa(level))
-		if err != nil {
-			return errors.Wrapf(err, "scale shared fs metadata pool size")
-		}
-		err = c.rookCephToolsExec("ceph", "osd", "pool", "set", RookCephSharedFSMetadataPool, "min_size", strconv.Itoa(minSize))
-		if err != nil {
-			return errors.Wrapf(err, "scale shared fs metadata pool min_size")
-		}
-		err = c.rookCephToolsExec("ceph", "osd", "pool", "set", RookCephSharedFSDataPool, "size", strconv.Itoa(level))
-		if err != nil {
-			return errors.Wrapf(err, "scale shared fs data pool size")
-		}
-		err = c.rookCephToolsExec("ceph", "osd", "pool", "set", RookCephSharedFSDataPool, "min_size", strconv.Itoa(minSize))
-		if err != nil {
-			return errors.Wrapf(err, "scale shared fs data pool min_size")
+		if c.Config.RookVersion.LT(Rookv14) {
+			minSize := 1
+			if level > 1 {
+				minSize = 2
+			}
+			// Changing the size in the CephFilesystem has no effect so it needs to be set manually
+			// https://github.com/rook/rook/issues/3144
+			err = c.rookCephExec("ceph", "osd", "pool", "set", RookCephSharedFSMetadataPool, "size", strconv.Itoa(level))
+			if err != nil {
+				return errors.Wrapf(err, "scale shared fs metadata pool size")
+			}
+			err = c.rookCephExec("ceph", "osd", "pool", "set", RookCephSharedFSMetadataPool, "min_size", strconv.Itoa(minSize))
+			if err != nil {
+				return errors.Wrapf(err, "scale shared fs metadata pool min_size")
+			}
+			err = c.rookCephExec("ceph", "osd", "pool", "set", RookCephSharedFSDataPool, "size", strconv.Itoa(level))
+			if err != nil {
+				return errors.Wrapf(err, "scale shared fs data pool size")
+			}
+			err = c.rookCephExec("ceph", "osd", "pool", "set", RookCephSharedFSDataPool, "min_size", strconv.Itoa(minSize))
+			if err != nil {
+				return errors.Wrapf(err, "scale shared fs data pool min_size")
+			}
 		}
 	}
 
@@ -262,38 +325,40 @@ func (c *Controller) SetObjectStoreReplication(name string, level int, doFullRec
 		if err != nil {
 			return errors.Wrapf(err, "update CephObjectStore %s", name)
 		}
-		// Changing the size in the CephObjectStore has no effect so it needs to be set manually
-		// https://github.com/rook/rook/issues/4341
-		err = c.rookCephToolsExec("ceph", "osd", "pool", "set", objectStorePoolName(name, RookCephObjectStoreRootPool), "size", strconv.Itoa(level))
-		if err != nil {
-			return errors.Wrap(err, "scale ceph object store root pool size")
-		}
-		err = c.rookCephToolsExec("ceph", "osd", "pool", "set", objectStorePoolName(name, RookCephObjectStoreRootPool), "min_size", strconv.Itoa(minSize))
-		if err != nil {
-			return errors.Wrap(err, "scale ceph object store root pool min_size")
-		}
-		for _, pool := range RookCephObjectStoreMetadataPools {
-			err = c.rookCephToolsExec("ceph", "osd", "pool", "set", objectStorePoolName(name, pool), "size", strconv.Itoa(level))
-			if err == cephErrENOENT {
-				// the non-ec metadata pool doesn't always exist
-				continue
-			}
+		// Changing the size in the CephObjectStore has no effect in Rook 1.0 so it needs to be set
+		// manually https://github.com/rook/rook/issues/4341
+		if c.Config.RookVersion.LT(Rookv14) {
+			err = c.rookCephExec("ceph", "osd", "pool", "set", objectStorePoolName(name, RookCephObjectStoreRootPool), "size", strconv.Itoa(level))
 			if err != nil {
-				return errors.Wrapf(err, "scale ceph object store metadata pool %s size", pool)
+				return errors.Wrap(err, "scale ceph object store root pool size")
 			}
-			err = c.rookCephToolsExec("ceph", "osd", "pool", "set", objectStorePoolName(name, pool), "min_size", strconv.Itoa(minSize))
+			err = c.rookCephExec("ceph", "osd", "pool", "set", objectStorePoolName(name, RookCephObjectStoreRootPool), "min_size", strconv.Itoa(minSize))
 			if err != nil {
-				return errors.Wrapf(err, "scale ceph object store metadata pool %s min_size", pool)
+				return errors.Wrap(err, "scale ceph object store root pool min_size")
 			}
-		}
-		for _, pool := range RookCephObjectStoreDataPools {
-			err = c.rookCephToolsExec("ceph", "osd", "pool", "set", objectStorePoolName(name, pool), "size", strconv.Itoa(level))
-			if err != nil {
-				return errors.Wrapf(err, "scale ceph object store data pool %s size", pool)
+			for _, pool := range RookCephObjectStoreMetadataPools {
+				err = c.rookCephExec("ceph", "osd", "pool", "set", objectStorePoolName(name, pool), "size", strconv.Itoa(level))
+				if err == cephErrENOENT {
+					// the non-ec metadata pool doesn't always exist
+					continue
+				}
+				if err != nil {
+					return errors.Wrapf(err, "scale ceph object store metadata pool %s size", pool)
+				}
+				err = c.rookCephExec("ceph", "osd", "pool", "set", objectStorePoolName(name, pool), "min_size", strconv.Itoa(minSize))
+				if err != nil {
+					return errors.Wrapf(err, "scale ceph object store metadata pool %s min_size", pool)
+				}
 			}
-			err = c.rookCephToolsExec("ceph", "osd", "pool", "set", objectStorePoolName(name, pool), "min_size", strconv.Itoa(minSize))
-			if err != nil {
-				return errors.Wrapf(err, "scale ceph object store data pool %s min_size", pool)
+			for _, pool := range RookCephObjectStoreDataPools {
+				err = c.rookCephExec("ceph", "osd", "pool", "set", objectStorePoolName(name, pool), "size", strconv.Itoa(level))
+				if err != nil {
+					return errors.Wrapf(err, "scale ceph object store data pool %s size", pool)
+				}
+				err = c.rookCephExec("ceph", "osd", "pool", "set", objectStorePoolName(name, pool), "min_size", strconv.Itoa(minSize))
+				if err != nil {
+					return errors.Wrapf(err, "scale ceph object store data pool %s min_size", pool)
+				}
 			}
 		}
 	}
@@ -301,65 +366,80 @@ func (c *Controller) SetObjectStoreReplication(name string, level int, doFullRec
 	return nil
 }
 
-func (c *Controller) rookCephToolsExec(cmd ...string) error {
-	rookToolsLabels := map[string]string{"app": "rook-ceph-tools"}
+// Toolbox is deployed with Rook 1.4 since ceph commands can't be executed in operator
+func (c *Controller) rookCephExec(cmd ...string) error {
+	container, rookLabels := c.rookCephExecTarget()
 	opts := metav1.ListOptions{
-		LabelSelector: labels.SelectorFromSet(rookToolsLabels).String(),
+		LabelSelector: rookLabels,
 	}
 	pods, err := c.Config.Client.CoreV1().Pods("rook-ceph").List(opts)
 	if err != nil {
-		return errors.Wrap(err, "list Rook tools pods")
+		return errors.Wrap(err, "list Rook pods")
 	}
-	if len(pods.Items) != 1 {
-		return errors.Wrapf(err, "found %d Rook tools pods", len(pods.Items))
+	if len(pods.Items) == 0 {
+		return errors.Wrap(err, "found no Rook pods for executing ceph commands")
 	}
 
-	exitCode, stdout, stderr, err := k8s.SyncExec(c.Config.Client.CoreV1(), c.Config.ClientConfig, "rook-ceph", pods.Items[0].Name, "rook-ceph-tools", cmd...)
+	exitCode, stdout, stderr, err := k8s.SyncExec(c.Config.Client.CoreV1(), c.Config.ClientConfig, "rook-ceph", pods.Items[0].Name, container, cmd...)
 	if err != nil {
 		return err
 	}
 	if exitCode == 2 {
-		c.Log.Debugf("Rook ceph tools exec %q exited with code %d and stderr: %s", cmd, exitCode, stderr)
+		c.Log.Debugf("Rook ceph exec %q exited with code %d and stderr: %s", cmd, exitCode, stderr)
 		return cephErrENOENT
 	}
 	if exitCode != 0 {
-		c.Log.Infof("Rook ceph tools exec %q exited with code %d and stderr: %s", cmd, exitCode, stderr)
+		c.Log.Infof("Rook ceph exec %q exited with code %d and stderr: %s", cmd, exitCode, stderr)
 
 		return fmt.Errorf("exec %q: %d", cmd, exitCode)
 	}
 
-	c.Log.Debugf("Exec Rook ceph tools %q exited with code %d and stdout: %s", cmd, exitCode, stdout)
+	c.Log.Debugf("Exec Rook ceph %q exited with code %d and stdout: %s", cmd, exitCode, stdout)
 
 	return nil
 }
 
-func (c *Controller) execCephOSDPurge(osdID string) error {
-	rookToolsLabels := map[string]string{"app": "rook-ceph-tools"}
+func (c *Controller) execCephOSDPurge(osdID string, hostname string) error {
+	container, rookLabels := c.rookCephExecTarget()
 	opts := metav1.ListOptions{
-		LabelSelector: labels.SelectorFromSet(rookToolsLabels).String(),
+		LabelSelector: rookLabels,
 	}
 	pods, err := c.Config.Client.CoreV1().Pods("rook-ceph").List(opts)
 	if err != nil {
 		return errors.Wrap(err, "list Rook tools pods")
 	}
-	if len(pods.Items) != 1 {
-		return errors.Wrapf(err, "found %d Rook tools pods", len(pods.Items))
+	if len(pods.Items) == 0 {
+		return errors.Wrapf(err, "found no Rook pods for executing ceph commands")
 	}
-	// ignore error
-	k8s.SyncExec(c.Config.Client.CoreV1(), c.Config.ClientConfig, "rook-ceph", pods.Items[0].Name, "rook-ceph-tools", "ceph", "osd", "down", osdID)
-	exitCode, stdout, stderr, err := k8s.SyncExec(c.Config.Client.CoreV1(), c.Config.ClientConfig, "rook-ceph", pods.Items[0].Name, "rook-ceph-tools", "ceph", "osd", "purge", osdID, "--yes-i-really-mean-it")
+	// ignore error - OSD is probably already down
+	k8s.SyncExec(c.Config.Client.CoreV1(), c.Config.ClientConfig, "rook-ceph", pods.Items[0].Name, container, "ceph", "osd", "down", osdID)
+
+	exitCode, stdout, stderr, err := k8s.SyncExec(c.Config.Client.CoreV1(), c.Config.ClientConfig, "rook-ceph", pods.Items[0].Name, container, "ceph", "osd", "purge", osdID, "--yes-i-really-mean-it")
 	if exitCode != 0 {
 		c.Log.Debugf("`ceph osd purge %s` stdout: %s", osdID, stdout)
 		return fmt.Errorf("Failed to purge OSD: %s", stderr)
+	}
+	if err != nil {
+		return errors.Wrap(err, "ceph osd purge")
+	}
+
+	// This removes the phantom OSD from the output of `ceph osd tree`
+	exitCode, stdout, stderr, err = k8s.SyncExec(c.Config.Client.CoreV1(), c.Config.ClientConfig, "rook-ceph", pods.Items[0].Name, container, "ceph", "osd", "crush", "rm", hostname)
+	if exitCode != 0 {
+		c.Log.Debugf("`ceph osd crush rm %s` stdout: %s", hostname, stdout)
+		return fmt.Errorf("Failed to rm %s from crush map: %s", hostname, stderr)
+	}
+	if err != nil {
+		return errors.Wrap(err, "ceph osd purge")
 	}
 
 	return nil
 }
 
 func (c *Controller) CephFilesystemOK(name string) (bool, error) {
-	rookToolsLabels := map[string]string{"app": "rook-ceph-tools"}
+	container, rookLabels := c.rookCephExecTarget()
 	opts := metav1.ListOptions{
-		LabelSelector: labels.SelectorFromSet(rookToolsLabels).String(),
+		LabelSelector: rookLabels,
 	}
 	pods, err := c.Config.Client.CoreV1().Pods("rook-ceph").List(opts)
 	if err != nil {
@@ -370,7 +450,7 @@ func (c *Controller) CephFilesystemOK(name string) (bool, error) {
 	}
 	// The filesystem will appear in `ceph fs ls` before it's ready to use. `ceph mds metadata` is
 	// better because it waits for the mds daemons to be running
-	exitCode, stdout, stderr, err := k8s.SyncExec(c.Config.Client.CoreV1(), c.Config.ClientConfig, "rook-ceph", pods.Items[0].Name, "rook-ceph-tools", "ceph", "mds", "metadata")
+	exitCode, stdout, stderr, err := k8s.SyncExec(c.Config.Client.CoreV1(), c.Config.ClientConfig, "rook-ceph", pods.Items[0].Name, container, "ceph", "mds", "metadata")
 	if exitCode != 0 {
 		c.Log.Debugf("`ceph fs ls` stdout: %s", stdout)
 		return false, fmt.Errorf("Failed to list ceph filesystems: %s", stderr)
@@ -416,4 +496,14 @@ func objectStorePoolName(storeName, poolName string) string {
 	}
 	// the name of the pool is <instance>.<name>, except for the pool ".rgw.root" that spans object stores
 	return fmt.Sprintf("%s.%s", storeName, poolName)
+}
+
+// returns labelSelector, containerName
+func (c *Controller) rookCephExecTarget() (string, string) {
+	if c.Config.RookVersion.LT(Rookv14) {
+		selector := labels.SelectorFromSet(map[string]string{"app": "rook-ceph-operator"})
+		return "rook-ceph-operator", selector.String()
+	}
+	selector := labels.SelectorFromSet(map[string]string{"app": "rook-ceph-tools"})
+	return "rook-ceph-tools", selector.String()
 }
