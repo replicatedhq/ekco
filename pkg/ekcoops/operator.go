@@ -59,6 +59,10 @@ func (o *Operator) Reconcile(nodes []corev1.Node, doFullReconcile bool) error {
 		if err != nil {
 			return errors.Wrapf(err, "adjust pool replication levels")
 		}
+		err = o.controller.ReconcileMonCount(readyCount)
+		if err != nil {
+			return errors.Wrapf(err, "reconcile mon count")
+		}
 	}
 
 	return nil
@@ -139,6 +143,11 @@ func (o *Operator) adjustPoolReplicationLevels(numNodes int, doFullReconcile boo
 	err = o.controller.SetObjectStoreReplication(o.config.CephObjectStore, factor, doFullReconcile)
 	if err != nil {
 		return errors.Wrapf(err, "set object store %s replication to %d", o.config.CephObjectStore, factor)
+	}
+
+	err = o.controller.SetDeviceHealthMetricsReplication(factor, doFullReconcile)
+	if err != nil {
+		return errors.Wrapf(err, "set health_device_metrics replication to %d", factor)
 	}
 
 	return nil

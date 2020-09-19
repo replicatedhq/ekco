@@ -46,6 +46,7 @@ func PurgeNodeCmd(v *viper.Viper) *cobra.Command {
 	cmd.Flags().Int("min_ready_master_nodes", 2, "Minimum number of ready master nodes required for auto-purge")
 	cmd.Flags().Int("min_ready_worker_nodes", 0, "Minimum number of ready worker nodes required for auto-purge")
 	cmd.Flags().Bool("maintain_rook_storage_nodes", false, "Add and remove nodes to the ceph cluster and scale replication of pools")
+	cmd.Flags().String("rook_version", "1.4.3", "Version of Rook to manage")
 	cmd.Flags().String("certificates_dir", "/etc/kubernetes/pki", "Kubernetes certificates directory")
 
 	return cmd

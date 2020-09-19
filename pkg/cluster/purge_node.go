@@ -36,7 +36,7 @@ func (c *Controller) PurgeNode(ctx context.Context, name string, rook bool) erro
 		}
 
 		if osdID != "" {
-			if err := c.execCephOSDPurge(osdID); err != nil {
+			if err := c.execCephOSDPurge(osdID, name); err != nil {
 				return err
 			}
 			c.Log.Infof("Purge node %q: ceph osd purge command executed", node.Name)

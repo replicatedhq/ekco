@@ -31,6 +31,7 @@ type Config struct {
 	CephObjectStore        string `mapstructure:"ceph_object_store"`
 	MinCephPoolReplication int    `mapstructure:"min_ceph_pool_replication"`
 	MaxCephPoolReplication int    `mapstructure:"max_ceph_pool_replication"`
+	RookVersion            string `mapstructure:"rook_version"`
 
 	// kubernetes certificates directory
 	CertificatesDir string `mapstructure:"certificates_dir"`

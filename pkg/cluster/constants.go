@@ -5,6 +5,7 @@ const (
 	CephClusterName              = "rook-ceph"
 	RookCephSharedFSMetadataPool = "rook-shared-fs-metadata"
 	RookCephSharedFSDataPool     = "rook-shared-fs-data0"
+	CephDeviceHealthMetricsPool  = "device_health_metrics"
 
 	RookCephObjectStoreRootPool = ".rgw.root"
 )
