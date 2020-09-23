@@ -1,9 +1,13 @@
 package cluster
 
 import (
+	"bufio"
+	"bytes"
 	"context"
 	"fmt"
+	"log"
 	"reflect"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -17,6 +21,7 @@ import (
 )
 
 var cephErrENOENT = errors.New("Ceph ENOENT")
+var cephOSDStatusRX = regexp.MustCompile(`^\s*\d\s+(?P<host>\S+)`)
 
 // returns the number of nodes used for storage, which may be higher than the number of names passed in
 // if a node is currenlty not ready but has not been purged
@@ -47,7 +52,7 @@ func (c *Controller) UseNodesForStorage(names []string) (int, error) {
 		}
 	}
 
-	return len(cluster.Spec.Storage.Nodes), nil
+	return c.countUniqueHostsWithOSD()
 }
 
 func (c *Controller) removeCephClusterStorageNode(name string) error {
@@ -506,4 +511,57 @@ func (c *Controller) rookCephExecTarget() (string, string) {
 	}
 	selector := labels.SelectorFromSet(map[string]string{"app": "rook-ceph-tools"})
 	return "rook-ceph-tools", selector.String()
+}
+
+func (c *Controller) countUniqueHostsWithOSD() (int, error) {
+	container, rookLabels := c.rookCephExecTarget()
+	opts := metav1.ListOptions{
+		LabelSelector: rookLabels,
+	}
+	pods, err := c.Config.Client.CoreV1().Pods("rook-ceph").List(opts)
+	if err != nil {
+		return 0, errors.Wrap(err, "list Rook pods")
+	}
+	if len(pods.Items) == 0 {
+		return 0, errors.New("found no Rook pods for executing ceph commands")
+	}
+
+	cmd := []string{"ceph", "osd", "status"}
+	exitCode, stdout, stderr, err := k8s.SyncExec(c.Config.Client.CoreV1(), c.Config.ClientConfig, "rook-ceph", pods.Items[0].Name, container, cmd...)
+	if err != nil {
+		return 0, errors.Wrap(err, "exec ceph osd status")
+	}
+	if exitCode != 0 {
+		return 0, fmt.Errorf("Exec `ceph osd status` exit code %d stderr: %s", exitCode, stderr)
+	}
+
+	hosts, err := parseCephOSDStatusHosts(stdout)
+	if err != nil {
+		log.Printf("Failed to parse `ceph osd status` stdout: %s", stdout)
+		return 0, err
+	}
+
+	return len(hosts), nil
+}
+
+func parseCephOSDStatusHosts(s string) ([]string, error) {
+	buf := bytes.NewBufferString(s)
+	scanner := bufio.NewScanner(buf)
+
+	hosts := map[string]bool{}
+
+	for scanner.Scan() {
+		matches := cephOSDStatusRX.FindStringSubmatch(scanner.Text())
+		if len(matches) < 2 {
+			continue
+		}
+		hosts[matches[1]] = true
+	}
+
+	var ret []string
+	for host := range hosts {
+		ret = append(ret, host)
+	}
+
+	return ret, nil
 }
