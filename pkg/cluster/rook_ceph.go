@@ -551,7 +551,8 @@ func parseCephOSDStatusHosts(s string) ([]string, error) {
 	hosts := map[string]bool{}
 
 	for scanner.Scan() {
-		matches := cephOSDStatusRX.FindStringSubmatch(scanner.Text())
+		text := strings.Replace(scanner.Text(), "|", " ", -1)
+		matches := cephOSDStatusRX.FindStringSubmatch(text)
 		if len(matches) < 2 {
 			continue
 		}
