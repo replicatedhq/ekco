@@ -38,6 +38,17 @@ ID  HOST             USED  AVAIL  WR OPS  WR DATA  RD OPS  RD DATA  STATE
 10  areed-aka-36xk  9.77G   190G      0      123k      6      304   exists,up`,
 			count: 5,
 		},
+		{
+			name: "Rook 1.0",
+			s: `
++----+----------------+-------+-------+--------+---------+--------+---------+-----------+
+| id |      host      |  used | avail | wr ops | wr data | rd ops | rd data |   state   |
++----+----------------+-------+-------+--------+---------+--------+---------+-----------+
+| 0  | areed-aka-81k8 | 14.6G |  179G |    0   |     0   |    1   |     0   | exists,up |
+| 1  | areed-aka-942c | 14.3G |  179G |    1   |  7372   |    1   |     0   | exists,up |
++----+----------------+-------+-------+--------+---------+--------+---------+-----------+`,
+			count: 2,
+		},
 	}
 
 	for _, test := range tests {
