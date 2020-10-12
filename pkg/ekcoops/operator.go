@@ -42,6 +42,10 @@ func (o *Operator) Reconcile(nodes []corev1.Node, doFullReconcile bool) error {
 	o.mtx.Lock()
 	defer o.mtx.Unlock()
 
+	if doFullReconcile {
+		o.log.Debugf("Performing full reconcile")
+	}
+
 	readyMasters, readyWorkers := util.NodeReadyCounts(nodes)
 	for _, node := range nodes {
 		err := o.reconcile(node, readyMasters, readyWorkers)
@@ -62,6 +66,20 @@ func (o *Operator) Reconcile(nodes []corev1.Node, doFullReconcile bool) error {
 		err = o.controller.ReconcileMonCount(readyCount)
 		if err != nil {
 			return errors.Wrapf(err, "reconcile mon count")
+		}
+	}
+
+	if doFullReconcile && o.config.RotateCerts {
+		due, err := o.controller.CheckRotateCertsDue()
+		if err != nil {
+			return errors.Wrapf(err, "check if it's time to run cert rotation jobs")
+		}
+		if due {
+			if err := o.controller.RotateAllCerts(context.Background()); err != nil {
+				return errors.Wrap(err, "rotate certs on primaries")
+			}
+		} else {
+			o.log.Debugf("Not yet time to rotate certs")
 		}
 	}
 

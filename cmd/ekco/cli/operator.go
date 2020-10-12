@@ -70,6 +70,11 @@ func OperatorCmd(v *viper.Viper) *cobra.Command {
 	cmd.Flags().Int("max_ceph_pool_replication", 3, "Maximum replication factor of ceph_block_pool and ceph_filesystem pools")
 	cmd.Flags().String("certificates_dir", "/etc/kubernetes/pki", "Kubernetes certificates directory")
 	cmd.Flags().Duration("reconcile_interval", time.Minute, "Frequency to run the operator's control loop")
+	cmd.Flags().String("rotate_certs_namespace", "kurl", "Namespace where certificate rotation pods will run")
+	cmd.Flags().String("rotate_certs_image", "replicated/ekco:latest", "Image to use in certificate rotation pods")
+	cmd.Flags().Duration("rotate_certs_check_interval", time.Hour*24, "How often to check for certs that need to be rotated")
+	cmd.Flags().Duration("rotate_certs_ttl", time.Hour*24*30, "Rotate any certificates expiring within this timeframe")
+	cmd.Flags().Bool("rotate_certs", true, "Enable automatic certificate rotation")
 
 	return cmd
 }

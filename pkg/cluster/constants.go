@@ -1,5 +1,7 @@
 package cluster
 
+import "k8s.io/apimachinery/pkg/labels"
+
 const (
 	RookCephNS                   = "rook-ceph"
 	CephClusterName              = "rook-ceph"
@@ -8,7 +10,14 @@ const (
 	CephDeviceHealthMetricsPool  = "device_health_metrics"
 
 	RookCephObjectStoreRootPool = ".rgw.root"
+
+	PrimaryRoleLabel         = "node-role.kubernetes.io/master"
+	RotateCertsLabel         = "kurl.sh/task"
+	RotateCertsValue         = "rotate-certs"
+	RotateCertsLastAttempted = "rotate-certs-last-attempted"
 )
+
+var RotateCertsSelector = labels.SelectorFromSet(labels.Set{RotateCertsLabel: RotateCertsValue})
 
 var (
 	RookCephObjectStoreMetadataPools = []string{

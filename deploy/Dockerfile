@@ -13,6 +13,7 @@ COPY pkg pkg
 
 RUN make build GIT_SHA=$git_sha VERSION=$version
 
+
 FROM debian:buster-slim
 
 COPY --from=build /go/src/github.com/replicatedhq/ekco/bin/* /usr/bin/

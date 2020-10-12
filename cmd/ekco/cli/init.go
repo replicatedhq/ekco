@@ -47,10 +47,15 @@ func initClusterController(config *ekcoops.Config, log *zap.SugaredLogger) (*clu
 	}
 
 	return cluster.NewController(cluster.ControllerConfig{
-		Client:          client,
-		ClientConfig:    clientConfig,
-		CephV1:          rookcephclient,
-		CertificatesDir: config.CertificatesDir,
-		RookVersion:     rookVersion,
+		Client:                   client,
+		ClientConfig:             clientConfig,
+		CephV1:                   rookcephclient,
+		CertificatesDir:          config.CertificatesDir,
+		RookVersion:              rookVersion,
+		RotateCerts:              config.RotateCerts,
+		RotateCertsImage:         config.RotateCertsImage,
+		RotateCertsNamespace:     config.RotateCertsNamespace,
+		RotateCertsCheckInterval: config.RotateCertsCheckInterval,
+		RotateCertsTTL:           config.RotateCertsTTL,
 	}, log), nil
 }

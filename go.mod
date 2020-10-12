@@ -6,12 +6,14 @@ require (
 	github.com/blang/semver v3.5.1+incompatible
 	github.com/coreos/bbolt v1.3.3 // indirect
 	github.com/coreos/etcd v3.3.13+incompatible
+	github.com/golang/gddo v0.0.0-20200831202555-721e228c7686
 	github.com/pkg/errors v0.9.1
 	github.com/rook/rook v1.4.3
 	github.com/spf13/cobra v1.0.0
 	github.com/spf13/viper v1.4.0
 	go.uber.org/zap v1.10.0
 	go.undefinedlabs.com/scopeagent v0.1.12
+	google.golang.org/appengine v1.6.5
 	k8s.io/api v0.17.2
 	k8s.io/apimachinery v0.17.2
 	k8s.io/client-go v12.0.0+incompatible
