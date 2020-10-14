@@ -75,6 +75,8 @@ func OperatorCmd(v *viper.Viper) *cobra.Command {
 	cmd.Flags().Duration("rotate_certs_check_interval", time.Hour*24, "How often to check for certs that need to be rotated")
 	cmd.Flags().Duration("rotate_certs_ttl", time.Hour*24*30, "Rotate any certificates expiring within this timeframe")
 	cmd.Flags().Bool("rotate_certs", true, "Enable automatic certificate rotation")
+	cmd.Flags().String("registry_cert_namespace", "kurl", "Namespace where the registry is running")
+	cmd.Flags().String("registry_cert_secret", "registry-pki", "Name of the secret that holds the registry certificate key pair")
 
 	return cmd
 }

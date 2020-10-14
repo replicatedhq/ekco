@@ -28,6 +28,8 @@ type ControllerConfig struct {
 	RotateCertsNamespace     string
 	RotateCertsCheckInterval time.Duration
 	RotateCertsTTL           time.Duration
+	RegistryCertNamespace    string
+	RegistryCertSecret       string
 }
 
 type Controller struct {

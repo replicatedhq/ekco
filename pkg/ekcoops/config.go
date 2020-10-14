@@ -43,4 +43,6 @@ type Config struct {
 	RotateCertsNamespace     string        `mapstructure:"rotate_certs_namespace"`
 	RotateCertsCheckInterval time.Duration `mapstructure:"rotate_certs_check_interval"`
 	RotateCertsTTL           time.Duration `mapstructure:"rotate_certs_ttl"`
+	RegistryCertNamespace    string        `mapstructure:"registry_cert_namespace"`
+	RegistryCertSecret       string        `mapstructure:"registry_cert_secret"`
 }
