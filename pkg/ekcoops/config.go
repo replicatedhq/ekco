@@ -37,4 +37,10 @@ type Config struct {
 	CertificatesDir string `mapstructure:"certificates_dir"`
 
 	ReconcileInterval time.Duration `mapstructure:"reconcile_interval"`
+
+	RotateCerts              bool          `mapstructure:"rotate_certs"`
+	RotateCertsImage         string        `mapstructure:"rotate_certs_image"`
+	RotateCertsNamespace     string        `mapstructure:"rotate_certs_namespace"`
+	RotateCertsCheckInterval time.Duration `mapstructure:"rotate_certs_check_interval"`
+	RotateCertsTTL           time.Duration `mapstructure:"rotate_certs_ttl"`
 }

@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"sync"
+	"time"
 
 	"github.com/blang/semver"
 	cephv1 "github.com/rook/rook/pkg/client/clientset/versioned/typed/ceph.rook.io/v1"
@@ -17,11 +18,16 @@ const (
 var Rookv14 = semver.MustParse("1.4.0")
 
 type ControllerConfig struct {
-	Client          kubernetes.Interface
-	ClientConfig    *restclient.Config
-	CephV1          *cephv1.CephV1Client
-	CertificatesDir string
-	RookVersion     semver.Version
+	Client                   kubernetes.Interface
+	ClientConfig             *restclient.Config
+	CephV1                   *cephv1.CephV1Client
+	CertificatesDir          string
+	RookVersion              semver.Version
+	RotateCerts              bool
+	RotateCertsImage         string
+	RotateCertsNamespace     string
+	RotateCertsCheckInterval time.Duration
+	RotateCertsTTL           time.Duration
 }
 
 type Controller struct {
