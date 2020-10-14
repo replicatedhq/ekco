@@ -57,5 +57,7 @@ func initClusterController(config *ekcoops.Config, log *zap.SugaredLogger) (*clu
 		RotateCertsNamespace:     config.RotateCertsNamespace,
 		RotateCertsCheckInterval: config.RotateCertsCheckInterval,
 		RotateCertsTTL:           config.RotateCertsTTL,
+		RegistryCertNamespace:    config.RegistryCertNamespace,
+		RegistryCertSecret:       config.RegistryCertSecret,
 	}, log), nil
 }
