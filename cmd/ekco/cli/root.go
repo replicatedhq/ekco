@@ -32,6 +32,7 @@ func RootCmd(v *viper.Viper) *cobra.Command {
 	cmd.AddCommand(OperatorCmd(v))
 	cmd.AddCommand(PurgeNodeCmd(v))
 	cmd.AddCommand(RotateCertsCmd(v))
+	cmd.AddCommand(RegenCertCmd(v))
 
 	cobra.OnInitialize(initConfig(v, cfgFile))
 	v.AutomaticEnv()
