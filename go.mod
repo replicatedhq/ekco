@@ -7,6 +7,7 @@ require (
 	github.com/coreos/bbolt v1.3.3 // indirect
 	github.com/coreos/etcd v3.3.13+incompatible
 	github.com/golang/gddo v0.0.0-20200831202555-721e228c7686
+	github.com/google/martian v2.1.0+incompatible
 	github.com/pkg/errors v0.9.1
 	github.com/rook/rook v1.4.3
 	github.com/spf13/cobra v1.0.0

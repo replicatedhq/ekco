@@ -38,11 +38,15 @@ type Config struct {
 
 	ReconcileInterval time.Duration `mapstructure:"reconcile_interval"`
 
-	RotateCerts              bool          `mapstructure:"rotate_certs"`
-	RotateCertsImage         string        `mapstructure:"rotate_certs_image"`
-	RotateCertsNamespace     string        `mapstructure:"rotate_certs_namespace"`
-	RotateCertsCheckInterval time.Duration `mapstructure:"rotate_certs_check_interval"`
-	RotateCertsTTL           time.Duration `mapstructure:"rotate_certs_ttl"`
-	RegistryCertNamespace    string        `mapstructure:"registry_cert_namespace"`
-	RegistryCertSecret       string        `mapstructure:"registry_cert_secret"`
+	RotateCerts                 bool          `mapstructure:"rotate_certs"`
+	RotateCertsImage            string        `mapstructure:"rotate_certs_image"`
+	RotateCertsNamespace        string        `mapstructure:"rotate_certs_namespace"`
+	RotateCertsCheckInterval    time.Duration `mapstructure:"rotate_certs_check_interval"`
+	RotateCertsTTL              time.Duration `mapstructure:"rotate_certs_ttl"`
+	RegistryCertNamespace       string        `mapstructure:"registry_cert_namespace"`
+	RegistryCertSecret          string        `mapstructure:"registry_cert_secret"`
+	KurlProxyCertNamespace      string        `mapstructure:"kurl_proxy_cert_namespace"`
+	KurlProxyCertSecret         string        `mapstructure:"kurl_proxy_cert_secret"`
+	KotsadmKubeletCertNamespace string        `mapstructure:"kotsadm_kubelet_cert_namespace"`
+	KotsadmKubeletCertSecret    string        `mapstructure:"kotsadm_kubelet_cert_secret"`
 }
