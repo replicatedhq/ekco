@@ -51,18 +51,16 @@ func (c *Controller) RotateKurlProxyCert() error {
 		return nil
 	}
 	if !strings.HasPrefix(cert.Subject.CommonName, "kotsadm.default.svc.cluster.local") {
-		c.Log.Debugf("Custom cert subject detected in kurl proxy secret tls.crt (Subject), skipping renewal")
+		c.Log.Debugf("Custom cert subject detected in kurl proxy secret tls.crt, skipping renewal")
 		return nil
 	}
 
-	// 4. Generate a new self-signed cert
 	c.Log.Infof("Kurl proxy cert has %s until expiration, renewing", duration.ShortHumanDuration(ttl))
 	certData, keyData, err := certutil.GenerateSelfSignedCertKey("kotsadm.default.svc.cluster.local", cert.IPAddresses, cert.DNSNames)
 	if err != nil {
 		return errors.Wrapf(err, "generate self-signed cert")
 	}
 
-	// 5. Update the secret
 	secret.Data["tls.crt"] = certData
 	secret.Data["tls.key"] = keyData
 	if _, err := c.Config.Client.CoreV1().Secrets(ns).Update(secret); err != nil {
