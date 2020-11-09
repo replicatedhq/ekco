@@ -77,6 +77,10 @@ func OperatorCmd(v *viper.Viper) *cobra.Command {
 	cmd.Flags().Bool("rotate_certs", true, "Enable automatic certificate rotation")
 	cmd.Flags().String("registry_cert_namespace", "kurl", "Namespace where the registry is running")
 	cmd.Flags().String("registry_cert_secret", "registry-pki", "Name of the secret that holds the registry certificate key pair")
+	cmd.Flags().String("kurl_proxy_cert_namespace", "default", "Namespace where kurl proxy is running")
+	cmd.Flags().String("kurl_proxy_cert_secret", "kotsadm-tls", "Name of the secret that holds the kurl proxy key pair")
+	cmd.Flags().String("kotsadm_kubelet_cert_namespace", "default", "Namespace where kotsadm is running")
+	cmd.Flags().String("kotsadm_kubelet_cert_secret", "default", "Name of the secret that holds the kubelet client certificate used by kotsadm")
 
 	return cmd
 }

@@ -18,18 +18,22 @@ const (
 var Rookv14 = semver.MustParse("1.4.0")
 
 type ControllerConfig struct {
-	Client                   kubernetes.Interface
-	ClientConfig             *restclient.Config
-	CephV1                   *cephv1.CephV1Client
-	CertificatesDir          string
-	RookVersion              semver.Version
-	RotateCerts              bool
-	RotateCertsImage         string
-	RotateCertsNamespace     string
-	RotateCertsCheckInterval time.Duration
-	RotateCertsTTL           time.Duration
-	RegistryCertNamespace    string
-	RegistryCertSecret       string
+	Client                      kubernetes.Interface
+	ClientConfig                *restclient.Config
+	CephV1                      *cephv1.CephV1Client
+	CertificatesDir             string
+	RookVersion                 semver.Version
+	RotateCerts                 bool
+	RotateCertsImage            string
+	RotateCertsNamespace        string
+	RotateCertsCheckInterval    time.Duration
+	RotateCertsTTL              time.Duration
+	RegistryCertNamespace       string
+	RegistryCertSecret          string
+	KurlProxyCertNamespace      string
+	KurlProxyCertSecret         string
+	KotsadmKubeletCertNamespace string
+	KotsadmKubeletCertSecret    string
 }
 
 type Controller struct {

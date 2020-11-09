@@ -78,6 +78,12 @@ func (o *Operator) Reconcile(nodes []corev1.Node, doFullReconcile bool) error {
 			if err := o.controller.RotateRegistryCert(); err != nil {
 				return errors.Wrap(err, "rotate registry cert")
 			}
+			if err := o.controller.RotateKurlProxyCert(); err != nil {
+				return errors.Wrap(err, "rotate kurl proxy cert")
+			}
+			if err := o.controller.UpdateKubeletClientCertSecret(); err != nil {
+				return errors.Wrap(err, "update kotsadm kubelet client cert secret")
+			}
 			if err := o.controller.RotateAllCerts(context.Background()); err != nil {
 				return errors.Wrap(err, "rotate certs on primaries")
 			}
