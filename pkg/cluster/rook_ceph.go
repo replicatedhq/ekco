@@ -566,3 +566,74 @@ func parseCephOSDStatusHosts(s string) ([]string, error) {
 
 	return ret, nil
 }
+
+func (c *Controller) PrioritizeRook() error {
+	if err := c.prioritizeRookAgent(); err != nil {
+		return err
+	}
+
+	// cluster (rook-ceph) namespace resources
+	selectors := []string{
+		"app=rook-ceph-osd",
+		"app=rook-ceph-mds",
+		"app=rook-ceph-mgr",
+		"app=rook-ceph-mon",
+	}
+	for _, selector := range selectors {
+		c.Log.Debugf("Setting priority class for rook-ceph deployments with label %s", selector)
+		if err := c.prioritizeRookDeployments("rook-ceph", selector); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (c *Controller) prioritizeRookAgent() error {
+	dsClient := c.Config.Client.AppsV1().DaemonSets("rook-ceph")
+	agentDS, err := dsClient.Get("rook-ceph-agent", metav1.GetOptions{})
+	if err != nil {
+		if util.IsNotFoundErr(err) {
+			c.Log.Debugf("rook-ceph-agent daemonset not found")
+			return nil
+		}
+		return errors.Wrap(err, "get rook-ceph-agent daemonset")
+	}
+	if agentDS.Spec.Template.Spec.PriorityClassName != "" {
+		c.Log.Debugf("rook-ceph-agent daemonset has priority class %s", agentDS.Spec.Template.Spec.PriorityClassName)
+		return nil
+	}
+
+	c.Log.Infof("Setting rook-ceph-agent priorityclass %s", c.Config.RookPriorityClass)
+	agentDS.Spec.Template.Spec.PriorityClassName = c.Config.RookPriorityClass
+	_, err = dsClient.Update(agentDS)
+	if err != nil {
+		return errors.Wrap(err, "update rook-ceph-agent priority")
+	}
+	return nil
+}
+
+func (c *Controller) prioritizeRookDeployments(namespace, selector string) error {
+	opts := metav1.ListOptions{
+		LabelSelector: selector,
+	}
+	deployments, err := c.Config.Client.AppsV1().Deployments(namespace).List(opts)
+	if err != nil {
+		return errors.Wrapf(err, "list deployments %q", selector)
+	}
+	for _, deployment := range deployments.Items {
+		if deployment.Spec.Template.Spec.PriorityClassName != "" {
+			c.Log.Debugf("Deployment %s has priority class %s", deployment.Name, deployment.Spec.Template.Spec.PriorityClassName)
+			continue
+		}
+		deployment.Spec.Template.Spec.PriorityClassName = c.Config.RookPriorityClass
+		c.Log.Infof("Setting %s priority class %s", deployment.Name, c.Config.RookPriorityClass)
+		if _, err := c.Config.Client.AppsV1().Deployments(namespace).Update(&deployment); err != nil {
+			return errors.Wrapf(err, "update %s priority class", deployment.Name)
+		}
+		// Change at most 1 deployment per reconcile to prevent disruptions
+		break
+	}
+
+	return nil
+}
