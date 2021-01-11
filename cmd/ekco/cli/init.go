@@ -52,6 +52,7 @@ func initClusterController(config *ekcoops.Config, log *zap.SugaredLogger) (*clu
 		CephV1:                      rookcephclient,
 		CertificatesDir:             config.CertificatesDir,
 		RookVersion:                 rookVersion,
+		RookPriorityClass:           config.RookPriorityClass,
 		RotateCerts:                 config.RotateCerts,
 		RotateCertsImage:            config.RotateCertsImage,
 		RotateCertsNamespace:        config.RotateCertsNamespace,

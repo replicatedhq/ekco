@@ -69,6 +69,12 @@ func (o *Operator) Reconcile(nodes []corev1.Node, doFullReconcile bool) error {
 		}
 	}
 
+	if o.config.RookPriorityClass != "" {
+		if err := o.controller.PrioritizeRook(); err != nil {
+			return errors.Wrap(err, "set rook priority class")
+		}
+	}
+
 	if doFullReconcile && o.config.RotateCerts {
 		due, err := o.controller.CheckRotateCertsDue()
 		if err != nil {

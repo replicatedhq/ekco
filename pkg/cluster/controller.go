@@ -23,6 +23,7 @@ type ControllerConfig struct {
 	CephV1                      *cephv1.CephV1Client
 	CertificatesDir             string
 	RookVersion                 semver.Version
+	RookPriorityClass           string
 	RotateCerts                 bool
 	RotateCertsImage            string
 	RotateCertsNamespace        string

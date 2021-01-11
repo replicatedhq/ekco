@@ -10,6 +10,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/replicatedhq/ekco/pkg/ekcoops"
 	"github.com/replicatedhq/ekco/pkg/logger"
+	"github.com/replicatedhq/ekco/pkg/webhook"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -36,6 +37,18 @@ func OperatorCmd(v *viper.Viper) *cobra.Command {
 			clusterController, err := initClusterController(config, log)
 			if err != nil {
 				return errors.Wrap(err, "failed to initialize cluster controller")
+			}
+
+			if config.RookPriorityClass != "" {
+				webhookServer, err := webhook.NewServer(clusterController.Config.Client, "kurl", config.RookPriorityClass, log)
+				if err != nil {
+					return errors.Wrap(err, "initialize webhook server")
+				}
+				go webhookServer.Run()
+			} else {
+				if err := webhook.Remove(clusterController.Config.Client); err != nil {
+					return errors.Wrap(err, "delete webhook config")
+				}
 			}
 
 			operator := ekcoops.New(*config, clusterController.Config.Client, clusterController, log)
@@ -66,6 +79,7 @@ func OperatorCmd(v *viper.Viper) *cobra.Command {
 	cmd.Flags().String("ceph_filesystem", "rook-shared-fs", "Name of CephFilesystem to manage if maintain_rook_storage_nodes is enabled")
 	cmd.Flags().String("ceph_object_store", "replicated", "Name of CephObjectStore to manage if maintain_rook_storage_nodes is enabled")
 	cmd.Flags().String("rook_version", "1.4.3", "Version of Rook to manage")
+	cmd.Flags().String("rook_priority_class", "node-critical", "Priority class to add to Rook 1.0 Deployments and DaemonSets. Will be created if not found")
 	cmd.Flags().Int("min_ceph_pool_replication", 1, "Minimum replication factor of ceph_block_pool and ceph_filesystem pools")
 	cmd.Flags().Int("max_ceph_pool_replication", 3, "Maximum replication factor of ceph_block_pool and ceph_filesystem pools")
 	cmd.Flags().String("certificates_dir", "/etc/kubernetes/pki", "Kubernetes certificates directory")
