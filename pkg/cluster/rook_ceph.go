@@ -127,7 +127,7 @@ func (c *Controller) SetBlockPoolReplication(name string, level int, doFullRecon
 		return errors.Wrapf(err, "get CephBlockPool %s", name)
 	}
 	current := int(pool.Spec.Replicated.Size)
-	if current != level || doFullReconcile {
+	if current < level || doFullReconcile {
 		if current != level {
 			c.Log.Infof("Changing CephBlockPool replication level from %d to %d", current, level)
 		} else {
@@ -192,11 +192,6 @@ func (c *Controller) SetDeviceHealthMetricsReplication(level int, doFullReconcil
 }
 
 func (c *Controller) ReconcileMonCount(count int) error {
-	// Previously we were able to set a preferred mon count and rook would scale up as nodes joined
-	if c.Config.RookVersion.LT(Rookv14) {
-		return nil
-	}
-
 	// single mon for 1 or 2 node cluster, 3 mons for all other clusters
 	if count < 3 {
 		count = 1
@@ -210,6 +205,10 @@ func (c *Controller) ReconcileMonCount(count int) error {
 	}
 
 	if cluster.Spec.Mon.Count == count {
+		return nil
+	}
+	if cluster.Spec.Mon.Count > count {
+		c.Log.Debugf("Will not reduce mon count from %s to %s", cluster.Spec.Mon.Count, count)
 		return nil
 	}
 
@@ -239,13 +238,13 @@ func (c *Controller) SetFilesystemReplication(name string, level int, doFullReco
 	changed := false
 	for i, pool := range fs.Spec.DataPools {
 		current := int(pool.Replicated.Size)
-		if current != level {
+		if current < level {
 			fs.Spec.DataPools[i].Replicated.Size = uint(level)
 			changed = true
 		}
 	}
 	current := int(fs.Spec.MetadataPool.Replicated.Size)
-	if current != level {
+	if current < level {
 		fs.Spec.MetadataPool.Replicated.Size = uint(level)
 		changed = true
 	}
@@ -305,13 +304,13 @@ func (c *Controller) SetObjectStoreReplication(name string, level int, doFullRec
 	changed := false
 
 	current := int(os.Spec.DataPool.Replicated.Size)
-	if current != level {
+	if current < level {
 		os.Spec.DataPool.Replicated.Size = uint(level)
 		changed = true
 	}
 
 	current = int(os.Spec.MetadataPool.Replicated.Size)
-	if current != level {
+	if current < level {
 		os.Spec.MetadataPool.Replicated.Size = uint(level)
 		changed = true
 	}

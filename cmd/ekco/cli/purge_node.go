@@ -61,14 +61,14 @@ func purgeNode(nodeName string, config *ekcoops.Config, clusterController *clust
 	readyMasters, readyWorkers := util.NodeReadyCounts(nodeList.Items)
 	if readyMasters <= config.MinReadyMasterNodes {
 		for _, node := range nodeList.Items {
-			if node.Name == nodeName && util.NodeIsMaster(node) {
+			if node.Name == nodeName && util.NodeIsMaster(node) && util.NodeIsReady(node) {
 				return fmt.Errorf("cannot purge master: %d ready masters", readyMasters)
 			}
 		}
 	}
 	if readyWorkers <= config.MinReadyWorkerNodes {
 		for _, node := range nodeList.Items {
-			if node.Name == nodeName && !util.NodeIsMaster(node) {
+			if node.Name == nodeName && !util.NodeIsMaster(node) && util.NodeIsReady(node) {
 				return fmt.Errorf("cannot purge worker: %d ready workers", readyWorkers)
 			}
 		}
