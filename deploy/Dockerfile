@@ -1,4 +1,4 @@
-FROM golang:1.13-buster AS build
+FROM golang:1.16-buster AS build
 
 ARG git_sha=unknown
 ARG version=alpha
@@ -15,6 +15,10 @@ RUN make build GIT_SHA=$git_sha VERSION=$version
 
 
 FROM debian:buster-slim
+
+RUN DEBIAN_FRONTEND=noninteractive apt-get update -qq && apt-get install -y --no-install-recommends \
+    libzstd1 \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY --from=build /go/src/github.com/replicatedhq/ekco/bin/* /usr/bin/
 
