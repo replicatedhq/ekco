@@ -17,7 +17,11 @@ RUN make build GIT_SHA=$git_sha VERSION=$version
 FROM debian:buster-slim
 
 RUN DEBIAN_FRONTEND=noninteractive apt-get update -qq && apt-get install -y --no-install-recommends \
-    libzstd1 \
+    libgcrypt20 \
+    libgnutls30 \
+    libhogweed4 \
+    liblz4-1 \
+    libnettle6 \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=build /go/src/github.com/replicatedhq/ekco/bin/* /usr/bin/
