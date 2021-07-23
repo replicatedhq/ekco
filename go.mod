@@ -16,6 +16,7 @@ require (
 	github.com/stretchr/testify v1.7.0 // indirect
 	go.uber.org/zap v1.10.0
 	go.undefinedlabs.com/scopeagent v0.1.12
+	golang.org/x/lint v0.0.0-20210508222113-6edffad5e616 // indirect
 	k8s.io/api v0.17.2
 	k8s.io/apimachinery v0.17.2
 	k8s.io/client-go v12.0.0+incompatible
