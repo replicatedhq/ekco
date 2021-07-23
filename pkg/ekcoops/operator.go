@@ -98,6 +98,12 @@ func (o *Operator) Reconcile(nodes []corev1.Node, doFullReconcile bool) error {
 		}
 	}
 
+	if o.config.EnableInternalLoadBalancer {
+		if err := o.controller.ReconcileInternalLB(context.Background(), nodes); err != nil {
+			return errors.Wrap(err, "update internal loadbalancer")
+		}
+	}
+
 	return nil
 }
 

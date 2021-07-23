@@ -64,5 +64,9 @@ func initClusterController(config *ekcoops.Config, log *zap.SugaredLogger) (*clu
 		KurlProxyCertSecret:         config.KurlProxyCertSecret,
 		KotsadmKubeletCertNamespace: config.KotsadmKubeletCertNamespace,
 		KotsadmKubeletCertSecret:    config.KotsadmKubeletCertSecret,
+		EnableInternalLoadBalancer:  config.EnableInternalLoadBalancer,
+		InternalLoadBalancerPort:    config.InternalLoadBalancerPort,
+		HostTaskImage:               config.HostTaskImage,
+		HostTaskNamespace:           config.HostTaskNamespace,
 	}, log), nil
 }

@@ -15,9 +15,14 @@ const (
 	RotateCertsLabel         = "kurl.sh/task"
 	RotateCertsValue         = "rotate-certs"
 	RotateCertsLastAttempted = "rotate-certs-last-attempted"
+
+	TaskLabel             = "kurl.sh/task"
+	UpdateInternalLBValue = "update-internallb"
 )
 
 var RotateCertsSelector = labels.SelectorFromSet(labels.Set{RotateCertsLabel: RotateCertsValue})
+
+var UpdateInternalLBSelector = labels.SelectorFromSet(labels.Set{TaskLabel: UpdateInternalLBValue})
 
 var (
 	RookCephObjectStoreMetadataPools = []string{

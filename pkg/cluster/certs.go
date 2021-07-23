@@ -11,6 +11,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 )
 
 var podFailedErr error = errors.New("pod failed")
@@ -61,7 +62,7 @@ func (c *Controller) CheckRotateCertsDue() (bool, error) {
 // This launches a pod on each primary to mount /etc/kubernetes and rotate the certs.
 // It leaves the pods up if any fail.
 func (c *Controller) RotateAllCerts(ctx context.Context) error {
-	if err := c.deleteRotatePods(); err != nil {
+	if err := c.deletePods(RotateCertsSelector); err != nil {
 		c.Log.Warnf("Failed to delete rotate pods: %v", err)
 	}
 	opts := metav1.ListOptions{
@@ -84,29 +85,29 @@ func (c *Controller) RotateAllCerts(ctx context.Context) error {
 		if err != nil {
 			return errors.Wrapf(err, "create rotate pod for node %s", node.Name)
 		}
-		err = c.pollForPodCompleted(ctx, pod.Name)
+		err = c.pollForPodCompleted(ctx, c.Config.RotateCertsNamespace, pod.Name)
 		if err != nil {
 			if err == podFailedErr {
-				c.logPodResults(pod.Name)
+				c.logPodResults(c.Config.RotateCertsNamespace, pod.Name)
 			}
 			return errors.Wrapf(err, "rotate certs pod for node %s", node.Name)
 		}
-		c.logPodResults(pod.Name)
+		c.logPodResults(c.Config.RotateCertsNamespace, pod.Name)
 	}
 
-	if err := c.deleteRotatePods(); err != nil {
+	if err := c.deletePods(RotateCertsSelector); err != nil {
 		c.Log.Warnf("Failed to delete rotate pods: %v", err)
 	}
 
 	return nil
 }
 
-func (c *Controller) deleteRotatePods() error {
-	selector := metav1.ListOptions{
-		LabelSelector: RotateCertsSelector.String(),
+func (c *Controller) deletePods(selector labels.Selector) error {
+	options := metav1.ListOptions{
+		LabelSelector: selector.String(),
 	}
 
-	return c.Config.Client.CoreV1().Pods(c.Config.RotateCertsNamespace).DeleteCollection(&metav1.DeleteOptions{}, selector)
+	return c.Config.Client.CoreV1().Pods(c.Config.RotateCertsNamespace).DeleteCollection(&metav1.DeleteOptions{}, options)
 }
 
 func (c *Controller) getRotateCertsPodConfig(nodeName string) *corev1.Pod {
@@ -174,7 +175,7 @@ func (c *Controller) getRotateCertsPodConfig(nodeName string) *corev1.Pod {
 }
 
 // Polling is resilient to restarts of the K8s API server, which is expected when rotating certs
-func (c *Controller) pollForPodCompleted(ctx context.Context, name string) error {
+func (c *Controller) pollForPodCompleted(ctx context.Context, namespace, name string) error {
 	ticker := time.NewTicker(time.Second * 2)
 	defer ticker.Stop()
 
@@ -183,7 +184,7 @@ func (c *Controller) pollForPodCompleted(ctx context.Context, name string) error
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-ticker.C:
-			pod, err := c.Config.Client.CoreV1().Pods(c.Config.RotateCertsNamespace).Get(name, metav1.GetOptions{})
+			pod, err := c.Config.Client.CoreV1().Pods(namespace).Get(name, metav1.GetOptions{})
 			if err != nil {
 				c.Log.Debugf("Poll for pod completed: get pod %s: %v", name, err)
 				continue
@@ -198,8 +199,8 @@ func (c *Controller) pollForPodCompleted(ctx context.Context, name string) error
 	}
 }
 
-func (c *Controller) logPodResults(name string) {
-	req := c.Config.Client.CoreV1().Pods(c.Config.RotateCertsNamespace).GetLogs(name, &corev1.PodLogOptions{})
+func (c *Controller) logPodResults(namespace, name string) {
+	req := c.Config.Client.CoreV1().Pods(namespace).GetLogs(name, &corev1.PodLogOptions{})
 	logs, err := req.Stream()
 	if err != nil {
 		c.Log.Warnf("Failed to get pod %s logs: %v", name, err)
