@@ -4,8 +4,11 @@ import (
 	"bytes"
 	"crypto/sha256"
 	_ "embed"
+	"errors"
 	"fmt"
 	"html/template"
+	"io/ioutil"
+	"os"
 )
 
 //go:embed haproxy.cfg
@@ -31,23 +34,41 @@ func GenerateHAProxyConfig(loadBalancerPort int, primaries ...string) ([]byte, e
 	return buf.Bytes(), nil
 }
 
-func GenerateHAProxyManifest(loadBalancerPort int, primaries ...string) ([]byte, error) {
+// GenerateHAProxyManifest writes the generated manifest to the file only if it does not have the
+// correct hash. This avoids a few seconds of downtime when the pod is restarted unnecessarily.
+func GenerateHAProxyManifest(loadBalancerPort int, filename string, primaries ...string) error {
 	config, err := GenerateHAProxyConfig(loadBalancerPort, primaries...)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	sum := sha256.Sum256(config)
-	data := map[string]string{
-		"ConfigHash": fmt.Sprintf("%x", sum)[0:7],
+	hash := fmt.Sprintf("%x", sum)[0:7]
+
+	current, err := ioutil.ReadFile(filename)
+	if err != nil {
+		if !errors.Is(err, os.ErrNotExist) {
+			return err
+		}
+	} else {
+		if bytes.Contains(current, []byte(hash)) {
+			return nil
+		}
 	}
 
 	var buf bytes.Buffer
+	data := map[string]string{
+		"ConfigHash": hash,
+	}
 
 	err = haproxyManifestTmpl.Execute(&buf, data)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return buf.Bytes(), nil
+	if err := ioutil.WriteFile(filename, buf.Bytes(), 0644); err != nil {
+		return err
+	}
+
+	return nil
 }

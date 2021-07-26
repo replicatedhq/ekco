@@ -160,7 +160,7 @@ func (c *Controller) getUpdateInternalLBPod(nodeName string, primaries ...string
 					Command: []string{
 						"/bin/bash",
 						"-c",
-						fmt.Sprintf("/usr/bin/ekco generate-haproxy-manifest --primary-host=%s --load-balancer-port=%d > /host/etc/kubernetes/manifests/haproxy.yaml", hosts, loadBalancerPort),
+						fmt.Sprintf("/usr/bin/ekco generate-haproxy-manifest --primary-host=%s --load-balancer-port=%d --file /host/etc/kubernetes/manifests/haproxy.yaml", hosts, loadBalancerPort),
 					},
 					VolumeMounts: []corev1.VolumeMount{
 						{
