@@ -56,19 +56,25 @@ func GenerateHAProxyManifest(loadBalancerPort int, filename string, primaries ..
 		}
 	}
 
-	var buf bytes.Buffer
-	data := map[string]string{
-		"ConfigHash": hash,
-	}
+	manifest, err := generateHAProxyManifest(hash)
 
-	err = haproxyManifestTmpl.Execute(&buf, data)
-	if err != nil {
-		return err
-	}
-
-	if err := ioutil.WriteFile(filename, buf.Bytes(), 0644); err != nil {
+	if err := ioutil.WriteFile(filename, manifest, 0644); err != nil {
 		return err
 	}
 
 	return nil
+}
+
+func generateHAProxyManifest(configHash string) ([]byte, error) {
+	var buf bytes.Buffer
+	data := map[string]string{
+		"ConfigHash": configHash,
+	}
+
+	err := haproxyManifestTmpl.Execute(&buf, data)
+	if err != nil {
+		return nil, err
+	}
+
+	return buf.Bytes(), nil
 }

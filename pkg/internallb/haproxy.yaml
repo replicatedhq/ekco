@@ -5,7 +5,7 @@ metadata:
   namespace: kube-system
 spec:
   containers:
-  - image: haproxy:2.1.4
+  - image: haproxy:2.4.2
     name: haproxy
     env:
     - name: HAPROXY_CONFIG_HASH
