@@ -38,7 +38,6 @@ type ControllerConfig struct {
 	HostTaskImage               string
 	HostTaskNamespace           string
 	EnableInternalLoadBalancer  bool
-	InternalLoadBalancerPort    int
 }
 
 type Controller struct {

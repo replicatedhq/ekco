@@ -9,6 +9,7 @@ import (
 	"html/template"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 )
 
 //go:embed haproxy.cfg
@@ -19,12 +20,11 @@ var haproxyConfigTmpl = template.Must(template.New("").Parse(haproxyCfg))
 var haproxyManifest string
 var haproxyManifestTmpl = template.Must(template.New("").Parse(haproxyManifest))
 
-func GenerateHAProxyConfig(loadBalancerPort int, primaries ...string) ([]byte, error) {
+func GenerateHAProxyConfig(primaries ...string) ([]byte, error) {
 	var buf bytes.Buffer
 
 	data := map[string]interface{}{
-		"LoadBalancerPort": loadBalancerPort,
-		"Primaries":        primaries,
+		"Primaries": primaries,
 	}
 	err := haproxyConfigTmpl.Execute(&buf, data)
 	if err != nil {
@@ -36,8 +36,8 @@ func GenerateHAProxyConfig(loadBalancerPort int, primaries ...string) ([]byte, e
 
 // GenerateHAProxyManifest writes the generated manifest to the file only if it does not have the
 // correct hash. This avoids a few seconds of downtime when the pod is restarted unnecessarily.
-func GenerateHAProxyManifest(loadBalancerPort int, filename string, primaries ...string) error {
-	config, err := GenerateHAProxyConfig(loadBalancerPort, primaries...)
+func GenerateHAProxyManifest(filename string, primaries ...string) error {
+	config, err := GenerateHAProxyConfig(primaries...)
 	if err != nil {
 		return err
 	}
@@ -58,7 +58,10 @@ func GenerateHAProxyManifest(loadBalancerPort int, filename string, primaries ..
 
 	manifest, err := generateHAProxyManifest(hash)
 
-	if err := ioutil.WriteFile(filename, manifest, 0644); err != nil {
+	if err := os.MkdirAll(filepath.Dir(filename), 0755); err != nil {
+		return err
+	}
+	if err := os.WriteFile(filename, manifest, 0644); err != nil {
 		return err
 	}
 

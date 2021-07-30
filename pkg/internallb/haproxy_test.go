@@ -11,7 +11,7 @@ func TestGenerateHAProxyConfig(t *testing.T) {
 		"10.128.0.3",
 		"10.128.0.4",
 	}
-	out, err := GenerateHAProxyConfig(6444, primaries...)
+	out, err := GenerateHAProxyConfig(primaries...)
 	assert.NoError(t, err)
 
 	expect := `# /etc/haproxy/haproxy.cfg

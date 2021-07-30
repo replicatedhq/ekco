@@ -36,6 +36,8 @@ func RootCmd(v *viper.Viper) *cobra.Command {
 	cmd.AddCommand(RotateKotsadmCertsCmd(v))
 	cmd.AddCommand(GenerateHAProxyConfigCmd(v))
 	cmd.AddCommand(GenerateHAProxyManifestCmd(v))
+	cmd.AddCommand(ChangeLoadBalancerCmd(v))
+	cmd.AddCommand(SetKubeconfigServerCmd(v))
 
 	cobra.OnInitialize(initConfig(v, cfgFile))
 	v.AutomaticEnv()

@@ -10,7 +10,6 @@ import (
 
 func GenerateHAProxyConfigCmd(v *viper.Viper) *cobra.Command {
 	primaries := &[]string{}
-	var loadBalancerPort int
 
 	cmd := &cobra.Command{
 		Use:   "generate-haproxy-config",
@@ -21,7 +20,7 @@ func GenerateHAProxyConfigCmd(v *viper.Viper) *cobra.Command {
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 
-			out, err := internallb.GenerateHAProxyConfig(loadBalancerPort, *primaries...)
+			out, err := internallb.GenerateHAProxyConfig(*primaries...)
 			if err != nil {
 				return err
 			}
@@ -32,7 +31,6 @@ func GenerateHAProxyConfigCmd(v *viper.Viper) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().IntVar(&loadBalancerPort, "load-balancer-port", 6444, "Load balancer port")
 	cmd.Flags().StringSliceVar(primaries, "primary-host", []string{}, "Kubernetes API server IP or hostname")
 
 	return cmd

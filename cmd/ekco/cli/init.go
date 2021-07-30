@@ -41,7 +41,11 @@ func initClusterController(config *ekcoops.Config, log *zap.SugaredLogger) (*clu
 		return nil, errors.Wrap(err, "initialize ceph client")
 	}
 
-	rookVersion, err := semver.Parse(config.RookVersion)
+	rv := config.RookVersion
+	if rv == "" {
+		rv = "1.4.3"
+	}
+	rookVersion, err := semver.Parse(rv)
 	if err != nil {
 		return nil, errors.Wrap(err, "parse rook version")
 	}
@@ -65,7 +69,6 @@ func initClusterController(config *ekcoops.Config, log *zap.SugaredLogger) (*clu
 		KotsadmKubeletCertNamespace: config.KotsadmKubeletCertNamespace,
 		KotsadmKubeletCertSecret:    config.KotsadmKubeletCertSecret,
 		EnableInternalLoadBalancer:  config.EnableInternalLoadBalancer,
-		InternalLoadBalancerPort:    config.InternalLoadBalancerPort,
 		HostTaskImage:               config.HostTaskImage,
 		HostTaskNamespace:           config.HostTaskNamespace,
 	}, log), nil

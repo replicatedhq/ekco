@@ -111,7 +111,6 @@ func (c *Controller) UpdateInternalLB(ctx context.Context, nodes []corev1.Node) 
 func (c *Controller) getUpdateInternalLBPod(nodeName string, primaries ...string) *corev1.Pod {
 	namespace := c.Config.HostTaskNamespace
 	image := c.Config.HostTaskImage
-	loadBalancerPort := c.Config.InternalLoadBalancerPort
 
 	hosts := strings.Join(primaries, ",")
 
@@ -142,7 +141,7 @@ func (c *Controller) getUpdateInternalLBPod(nodeName string, primaries ...string
 					Command: []string{
 						"/bin/bash",
 						"-c",
-						fmt.Sprintf("/usr/bin/ekco generate-haproxy-config --primary-host=%s --load-balancer-port=%d > /host/etc/haproxy/haproxy.cfg", hosts, loadBalancerPort),
+						fmt.Sprintf("mkdir -p /host/etc/haproxy && /usr/bin/ekco generate-haproxy-config --primary-host=%s > /host/etc/haproxy/haproxy.cfg", hosts),
 					},
 					VolumeMounts: []corev1.VolumeMount{
 						{
@@ -160,7 +159,7 @@ func (c *Controller) getUpdateInternalLBPod(nodeName string, primaries ...string
 					Command: []string{
 						"/bin/bash",
 						"-c",
-						fmt.Sprintf("/usr/bin/ekco generate-haproxy-manifest --primary-host=%s --load-balancer-port=%d --file /host/etc/kubernetes/manifests/haproxy.yaml", hosts, loadBalancerPort),
+						fmt.Sprintf("/usr/bin/ekco generate-haproxy-manifest --primary-host=%s --file /host/etc/kubernetes/manifests/haproxy.yaml", hosts),
 					},
 					VolumeMounts: []corev1.VolumeMount{
 						{

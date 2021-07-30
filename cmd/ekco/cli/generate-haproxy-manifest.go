@@ -8,7 +8,6 @@ import (
 
 func GenerateHAProxyManifestCmd(v *viper.Viper) *cobra.Command {
 	primaries := &[]string{}
-	var loadBalancerPort int
 	var filename string
 
 	cmd := &cobra.Command{
@@ -20,7 +19,7 @@ func GenerateHAProxyManifestCmd(v *viper.Viper) *cobra.Command {
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 
-			err := internallb.GenerateHAProxyManifest(loadBalancerPort, filename, *primaries...)
+			err := internallb.GenerateHAProxyManifest(filename, *primaries...)
 			if err != nil {
 				return err
 			}
@@ -29,7 +28,6 @@ func GenerateHAProxyManifestCmd(v *viper.Viper) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().IntVar(&loadBalancerPort, "load-balancer-port", 6444, "Load balancer port")
 	cmd.Flags().StringSliceVar(primaries, "primary-host", []string{}, "Kubernetes API server IP or hostname")
 	cmd.Flags().StringVar(&filename, "file", "/etc/kubernetes/manifests/haproxy", "Filename for the haproxy static pod manifest")
 
