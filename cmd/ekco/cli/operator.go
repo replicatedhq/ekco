@@ -98,7 +98,6 @@ func OperatorCmd(v *viper.Viper) *cobra.Command {
 	cmd.Flags().String("host_task_namespace", "kurl", "Namespace where pods performing host tasks will run")
 	cmd.Flags().String("host_task_image", "replicated/ekco:latest", "Image to use in host task pods")
 	cmd.Flags().Bool("enable_internal_load_balancer", false, "Run haproxy on localhost forwarding to all in-cluster Kubernetes API servers")
-	cmd.Flags().Int("internal_load_balancer_port", 6444, "Host port the internal load balancer will listen on")
 
 	return cmd
 }
