@@ -48,3 +48,12 @@ func NodeReadyCounts(nodes []v1.Node) (int, int) {
 
 	return masters, workers
 }
+
+func NodeInternalIP(node v1.Node) string {
+	for _, addr := range node.Status.Addresses {
+		if addr.Type == v1.NodeInternalIP {
+			return addr.Address
+		}
+	}
+	return ""
+}

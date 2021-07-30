@@ -4,7 +4,7 @@ steps:
     plugins:
       - docker#v3.5.0:
           always-pull: true
-          image: replicated/gitops-builder:buildkite-go13
+          image: replicated/gitops-builder:buildkite-go16
           workdir: /go/src/github.com/replicatedhq/ekco
 
   - wait

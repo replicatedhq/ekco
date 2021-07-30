@@ -51,4 +51,8 @@ type Config struct {
 	KurlProxyCertSecret         string        `mapstructure:"kurl_proxy_cert_secret"`
 	KotsadmKubeletCertNamespace string        `mapstructure:"kotsadm_kubelet_cert_namespace"`
 	KotsadmKubeletCertSecret    string        `mapstructure:"kotsadm_kubelet_cert_secret"`
+	EnableInternalLoadBalancer  bool          `mapstructure:"enable_internal_load_balancer"`
+	InternalLoadBalancerPort    int           `mapstructure:"internal_load_balancer_port"`
+	HostTaskImage               string        `mapstructure:"host_task_image"`
+	HostTaskNamespace           string        `mapstructure:"host_task_namespace"`
 }

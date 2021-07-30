@@ -35,6 +35,9 @@ type ControllerConfig struct {
 	KurlProxyCertSecret         string
 	KotsadmKubeletCertNamespace string
 	KotsadmKubeletCertSecret    string
+	HostTaskImage               string
+	HostTaskNamespace           string
+	EnableInternalLoadBalancer  bool
 }
 
 type Controller struct {
