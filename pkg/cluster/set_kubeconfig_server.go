@@ -61,11 +61,9 @@ func (c *Controller) setKubeconfigServerPod(nodeName string, server string, admi
 			},
 			Containers: []corev1.Container{
 				corev1.Container{
-					Name:  "set-kubeconfig-server",
-					Image: c.Config.HostTaskImage,
-					// ImagePullPolicy: corev1.PullIfNotPresent,
-					// TODO
-					ImagePullPolicy: corev1.PullAlways,
+					Name:            "set-kubeconfig-server",
+					Image:           c.Config.HostTaskImage,
+					ImagePullPolicy: corev1.PullIfNotPresent,
 					Command: []string{
 						"ekco",
 						"set-kubeconfig-server",
