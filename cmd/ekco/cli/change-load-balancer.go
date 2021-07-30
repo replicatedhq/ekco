@@ -44,7 +44,7 @@ func ChangeLoadBalancerCmd(v *viper.Viper) *cobra.Command {
 
 			nodeList, err := clusterController.Config.Client.CoreV1().Nodes().List(metav1.ListOptions{})
 			if err != nil {
-				log.Fatalf("Result: Failed to initialize cluster controller: %v", err)
+				log.Fatalf("Result: Failed to list nodes: %v", err)
 			}
 
 			if internal {
