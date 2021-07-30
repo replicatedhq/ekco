@@ -26,7 +26,7 @@ func (c *Controller) ReconcileInternalLB(ctx context.Context, nodes []corev1.Nod
 	if err != nil && !k8serrors.IsNotFound(err) {
 		return errors.Wrapf(err, "get configmap %s/%s", c.Config.HostTaskNamespace, UpdateInternalLBValue)
 	}
-	if err != nil && k8serrors.IsNotFound(err) {
+	if k8serrors.IsNotFound(err) {
 		// create the configmap the first time
 		cm = &corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{

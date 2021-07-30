@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"fmt"
 	"path/filepath"
 
 	"github.com/replicatedhq/ekco/pkg/kubeconfig"
@@ -26,18 +27,18 @@ func SetKubeconfigServerCmd(v *viper.Viper) *cobra.Command {
 
 			kubeletConf := filepath.Join(hostEtcDir, "kubernetes/kubelet.conf")
 			if err := kubeconfig.SetServer(kubeletConf, server); err != nil {
-				return err
+				return fmt.Errorf("update kubelet.conf: %v", err)
 			}
 
 			if admin {
 				adminConf := filepath.Join(hostEtcDir, "kubernetes/admin.conf")
 				if err := kubeconfig.SetServer(adminConf, server); err != nil {
-					return err
+					return fmt.Errorf("update admin.conf: %v", err)
 				}
 			}
 
 			if err := kubeconfig.RestartKubelet(ctx); err != nil {
-				return err
+				return fmt.Errorf("restart kubelet: %v", err)
 			}
 
 			return nil
