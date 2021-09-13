@@ -2,8 +2,10 @@ package cli
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -39,14 +41,28 @@ func OperatorCmd(v *viper.Viper) *cobra.Command {
 				return errors.Wrap(err, "failed to initialize cluster controller")
 			}
 
-			if config.RookPriorityClass != "" {
-				webhookServer, err := webhook.NewServer(clusterController.Config.Client, "kurl", config.RookPriorityClass, log)
+			if config.RookPriorityClass != "" || len(config.PodImageOverrides) > 0 {
+				podImageOverrides := map[string]string{}
+				for _, override := range config.PodImageOverrides {
+					parts := strings.Split(override, "=")
+					if len(parts) != 2 {
+						return fmt.Errorf("Cannot parse pod image override %q", override)
+					}
+					podImageOverrides[parts[0]] = parts[1]
+				}
+				webhookServer, err := webhook.NewServer(clusterController.Config.Client, "kurl", config.RookPriorityClass, podImageOverrides, log)
 				if err != nil {
 					return errors.Wrap(err, "initialize webhook server")
 				}
 				go webhookServer.Run()
-			} else {
-				if err := webhook.Remove(clusterController.Config.Client); err != nil {
+			}
+			if config.RookPriorityClass == "" {
+				if err := webhook.RemoveRookPriority(clusterController.Config.Client); err != nil {
+					return errors.Wrap(err, "delete webhook config")
+				}
+			}
+			if len(config.PodImageOverrides) == 0 {
+				if err := webhook.RemovePodImageOverrides(clusterController.Config.Client); err != nil {
 					return errors.Wrap(err, "delete webhook config")
 				}
 			}
@@ -98,6 +114,7 @@ func OperatorCmd(v *viper.Viper) *cobra.Command {
 	cmd.Flags().String("host_task_namespace", "kurl", "Namespace where pods performing host tasks will run")
 	cmd.Flags().String("host_task_image", "replicated/ekco:latest", "Image to use in host task pods")
 	cmd.Flags().Bool("enable_internal_load_balancer", false, "Run haproxy on localhost forwarding to all in-cluster Kubernetes API servers")
+	cmd.Flags().StringSlice("pod_image_overrides", nil, "Image to override in pods")
 
 	return cmd
 }

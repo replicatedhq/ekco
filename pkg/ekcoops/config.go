@@ -55,4 +55,6 @@ type Config struct {
 	InternalLoadBalancerPort    int           `mapstructure:"internal_load_balancer_port"`
 	HostTaskImage               string        `mapstructure:"host_task_image"`
 	HostTaskNamespace           string        `mapstructure:"host_task_namespace"`
+
+	PodImageOverrides []string `mapstructure:"pod_image_overrides"`
 }
