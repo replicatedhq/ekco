@@ -10,17 +10,7 @@ import (
 	"k8s.io/api/admission/v1beta1"
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 )
-
-var scheme = runtime.NewScheme()
-var codecs = serializer.NewCodecFactory(scheme)
-
-func init() {
-	utilruntime.Must(admissionv1beta1.AddToScheme(scheme))
-}
 
 func (s *Server) rookPriority(c *gin.Context) {
 	request := v1beta1.AdmissionReview{}
@@ -51,7 +41,7 @@ func (s *Server) rookPriority(c *gin.Context) {
 		response.Response.Allowed = true
 		pt := v1beta1.PatchTypeJSONPatch
 		response.Response.PatchType = &pt
-		patch := fmt.Sprintf(`[{"op":"replace","path":"/spec/template/spec/priorityClassName","value":"%s"}]`, s.priorityClass)
+		patch := fmt.Sprintf(`[{"op":"replace","path":"/spec/template/spec/priorityClassName","value":"%s"}]`, s.rookPriorityClass)
 		response.Response.Patch = []byte(patch)
 	} else {
 		log.Debugf("Admission webhook ignoring %s/%s", request.Request.Namespace, request.Request.Name)
