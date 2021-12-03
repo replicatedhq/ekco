@@ -3,16 +3,6 @@ package cli
 import (
 	"context"
 	"fmt"
-	"go.uber.org/zap"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/json"
-	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/kubernetes"
-	restclient "k8s.io/client-go/rest"
 	"os"
 	"os/signal"
 	"strings"
@@ -49,11 +39,6 @@ func OperatorCmd(v *viper.Viper) *cobra.Command {
 			clusterController, err := initClusterController(config, log)
 			if err != nil {
 				return errors.Wrap(err, "failed to initialize cluster controller")
-			}
-
-			err = startPrometheusAutoscaler(clusterController.Config.Client, clusterController.Config.ClientConfig, log)
-			if err != nil {
-				log.Error("Unable to start prometheus autoscaler.", err)
 			}
 
 			if config.RookPriorityClass != "" || len(config.PodImageOverrides) > 0 {
@@ -132,113 +117,4 @@ func OperatorCmd(v *viper.Viper) *cobra.Command {
 	cmd.Flags().StringSlice("pod_image_overrides", nil, "Image to override in pods")
 
 	return cmd
-}
-
-type patchUInt32Value struct {
-	Op    string `json:"op"`
-	Path  string `json:"path"`
-	Value uint32 `json:"value"`
-}
-
-func startPrometheusAutoscaler(kubeClient kubernetes.Interface, restClientConfig *restclient.Config, logger *zap.SugaredLogger) error {
-	dynamicClient, err := dynamic.NewForConfig(restClientConfig)
-	if err != nil {
-		return err
-	}
-
-	installerList, err := dynamicClient.Resource(schema.GroupVersionResource{
-		Group:    "cluster.kurl.sh",
-		Version:  "v1beta1",
-		Resource: "installers",
-	}).
-		List(metav1.ListOptions{})
-	if err != nil {
-		return err
-	}
-
-	if len(installerList.Items) == 0 {
-		return nil
-	}
-
-	var currentInstaller unstructured.Unstructured
-	for _, installer := range installerList.Items {
-		selectedInstallerTimestamp := currentInstaller.GetCreationTimestamp()
-		nextInstallerTimestamp := installer.GetCreationTimestamp()
-		if (&selectedInstallerTimestamp).Before(&nextInstallerTimestamp) {
-			currentInstaller = installer
-		}
-	}
-
-	spec := currentInstaller.Object["spec"].(map[string]interface{})
-	if _, ok := spec["prometheus"]; !ok {
-		logger.Info("Prometheus autoscaler disabled: Prometheus not detected in kurl install.")
-		return nil
-	} else {
-		logger.Info("Prometheus autoscaler enabled: Prometheus was detected in kurl install.")
-	}
-
-	nodeWatcher, err := kubeClient.CoreV1().Nodes().Watch(metav1.ListOptions{})
-	if err != nil {
-		return err
-	}
-
-	go func() {
-		for {
-			event := <-nodeWatcher.ResultChan()
-			if event.Type != watch.Added && event.Type != watch.Deleted {
-				continue
-			}
-			nodeList, err := kubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
-			if err != nil {
-				logger.Error("Unable to list nodes.", err)
-				return
-			}
-			nodeCount := uint32(len(nodeList.Items))
-
-			alertManagersPatch := []patchUInt32Value{{
-				Op:    "replace",
-				Path:  "/spec/replicas",
-				Value: min(3, nodeCount),
-			}}
-			alertManagersPayload, err := json.Marshal(alertManagersPatch)
-			_, err = dynamicClient.Resource(schema.GroupVersionResource{
-				Group:    "monitoring.coreos.com",
-				Version:  "v1",
-				Resource: "alertmanagers",
-			}).
-				Namespace("monitoring").
-				Patch("prometheus-alertmanager", types.JSONPatchType, alertManagersPayload, metav1.PatchOptions{})
-			if err != nil {
-				logger.Error(err, "Unable to scale AlertManager in response to node watch event.", err)
-				return
-			}
-
-			prometheusPatch := []patchUInt32Value{{
-				Op:    "replace",
-				Path:  "/spec/replicas",
-				Value: min(2, nodeCount),
-			}}
-			prometheusPayload, err := json.Marshal(prometheusPatch)
-			_, err = dynamicClient.Resource(schema.GroupVersionResource{
-				Group:    "monitoring.coreos.com",
-				Version:  "v1",
-				Resource: "prometheuses",
-			}).
-				Namespace("monitoring").
-				Patch("k8s", types.JSONPatchType, prometheusPayload, metav1.PatchOptions{})
-			if err != nil {
-				logger.Error("Unable to scale Prometheus in response to watch node event.", err)
-				return
-			}
-		}
-	}()
-
-	return nil
-}
-
-func min(a, b uint32) uint32 {
-	if a <= b {
-		return a
-	}
-	return b
 }
