@@ -2,25 +2,9 @@ package ekcoops
 
 import (
 	"github.com/pkg/errors"
-	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/json"
-	"k8s.io/client-go/dynamic"
-)
-
-var (
-	alertManagerGvr = schema.GroupVersionResource{
-		Group:    "monitoring.coreos.com",
-		Version:  "v1",
-		Resource: "alertmanagers",
-	}
-	prometheusGvr = schema.GroupVersionResource{
-		Group:    "monitoring.coreos.com",
-		Version:  "v1",
-		Resource: "prometheuses",
-	}
 )
 
 type patchUInt32Value struct {
@@ -29,16 +13,23 @@ type patchUInt32Value struct {
 	Value uint32 `json:"value"`
 }
 
-func prometheusAutoscaler(nodeList *v1.NodeList, prometheusClient, alertManagerClient dynamic.ResourceInterface) error {
-	nodeCount := uint32(len(nodeList.Items))
+func (o *Operator) prometheusAutoscaler(currentNodeCount, previousNodeCount int) error {
+	if currentNodeCount == previousNodeCount {
+		return nil
+	}
+	prometheus, _ := o.controller.Config.PrometheusV1.Namespace("monitoring").Get("k8s", metav1.GetOptions{})
+	alertManager, _ := o.controller.Config.AlertManagerV1.Namespace("monitoring").Get("prometheus-alertmanager", metav1.GetOptions{})
+	if prometheus == nil || alertManager == nil {
+		return nil
+	}
 
 	alertManagersPatch := []patchUInt32Value{{
 		Op:    "replace",
 		Path:  "/spec/replicas",
-		Value: min(3, nodeCount),
+		Value: min(3, uint32(currentNodeCount)),
 	}}
 	alertManagersPayload, err := json.Marshal(alertManagersPatch)
-	_, err = alertManagerClient.Patch("prometheus-alertmanager", types.JSONPatchType, alertManagersPayload, metav1.PatchOptions{})
+	_, err = o.controller.Config.AlertManagerV1.Namespace("monitoring").Patch("prometheus-alertmanager", types.JSONPatchType, alertManagersPayload, metav1.PatchOptions{})
 	if err != nil {
 		return errors.Wrap(err, "unable to scale AlertManager in response to node watch event")
 	}
@@ -46,10 +37,10 @@ func prometheusAutoscaler(nodeList *v1.NodeList, prometheusClient, alertManagerC
 	prometheusPatch := []patchUInt32Value{{
 		Op:    "replace",
 		Path:  "/spec/replicas",
-		Value: min(2, nodeCount),
+		Value: min(2, uint32(currentNodeCount)),
 	}}
 	prometheusPayload, err := json.Marshal(prometheusPatch)
-	_, err = prometheusClient.Patch("k8s", types.JSONPatchType, prometheusPayload, metav1.PatchOptions{})
+	_, err = o.controller.Config.PrometheusV1.Namespace("monitoring").Patch("k8s", types.JSONPatchType, prometheusPayload, metav1.PatchOptions{})
 	if err != nil {
 		return errors.Wrap(err, "Unable to scale Prometheus in response to watch node event.")
 	}

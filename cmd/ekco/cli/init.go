@@ -8,6 +8,8 @@ import (
 	cephv1 "github.com/rook/rook/pkg/client/clientset/versioned/typed/ceph.rook.io/v1"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 )
@@ -41,6 +43,22 @@ func initClusterController(config *ekcoops.Config, log *zap.SugaredLogger) (*clu
 		return nil, errors.Wrap(err, "initialize ceph client")
 	}
 
+	dynamicClient, err := dynamic.NewForConfig(clientConfig)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed creating Kubernetes client.")
+	}
+
+	prometheusClient := dynamicClient.Resource(schema.GroupVersionResource{
+		Group:    "monitoring.coreos.com",
+		Version:  "v1",
+		Resource: "prometheuses",
+	})
+	alertManagerClient := dynamicClient.Resource(schema.GroupVersionResource{
+		Group:    "monitoring.coreos.com",
+		Version:  "v1",
+		Resource: "alertmanagers",
+	})
+
 	rv := config.RookVersion
 	if rv == "" {
 		rv = "1.4.3"
@@ -56,6 +74,8 @@ func initClusterController(config *ekcoops.Config, log *zap.SugaredLogger) (*clu
 		CephV1:                      rookcephclient,
 		CertificatesDir:             config.CertificatesDir,
 		RookVersion:                 rookVersion,
+		AlertManagerV1:              alertManagerClient,
+		PrometheusV1:                prometheusClient,
 		RookPriorityClass:           config.RookPriorityClass,
 		RotateCerts:                 config.RotateCerts,
 		RotateCertsImage:            config.RotateCertsImage,

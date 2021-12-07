@@ -2,7 +2,6 @@ package ekcoops
 
 import (
 	"context"
-	"k8s.io/client-go/dynamic"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -13,15 +12,7 @@ func (o *Operator) Poll(ctx context.Context, interval time.Duration) {
 	logger := o.controller.Log
 	ticker := time.NewTicker(interval)
 
-	dynamicClient, err := dynamic.NewForConfig(o.controller.Config.ClientConfig)
-	if err != nil {
-		logger.Error("Failed creating Kubernetes client.", err)
-	}
-
-	prometheusClient := dynamicClient.Resource(prometheusGvr).Namespace("monitoring")
-	alertManagerClient := dynamicClient.Resource(alertManagerGvr).Namespace("monitoring")
-
-	lastNodeCount := 0
+	previousNodeCount := 0
 	i := 0
 	for {
 		select {
@@ -39,15 +30,9 @@ func (o *Operator) Poll(ctx context.Context, interval time.Duration) {
 			}
 
 			currentNodeCount := len(nodeList.Items)
-			if currentNodeCount != lastNodeCount {
-				prometheus, _ := prometheusClient.Get("k8s", metav1.GetOptions{})
-				alertManager, _ := alertManagerClient.Get("prometheus-alertmanager", metav1.GetOptions{})
-				if prometheus != nil && alertManager != nil {
-					err = prometheusAutoscaler(nodeList, prometheusClient, alertManagerClient)
-					if err != nil {
-						logger.Error("Failure running prometheus autoscaler.", err)
-					}
-				}
+			err = o.prometheusAutoscaler(currentNodeCount, previousNodeCount)
+			if err != nil {
+				logger.Error("Failure running prometheus autoscaler.", err)
 			}
 
 		case <-ctx.Done():
