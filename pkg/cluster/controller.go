@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"k8s.io/client-go/dynamic"
 	"sync"
 	"time"
 
@@ -21,6 +22,8 @@ type ControllerConfig struct {
 	Client                      kubernetes.Interface
 	ClientConfig                *restclient.Config
 	CephV1                      *cephv1.CephV1Client
+	AlertManagerV1              dynamic.NamespaceableResourceInterface
+	PrometheusV1                dynamic.NamespaceableResourceInterface
 	CertificatesDir             string
 	RookVersion                 semver.Version
 	RookPriorityClass           string

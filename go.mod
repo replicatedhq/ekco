@@ -6,9 +6,8 @@ require (
 	github.com/blang/semver v3.5.1+incompatible
 	github.com/coreos/bbolt v1.3.3 // indirect
 	github.com/coreos/etcd v3.3.13+incompatible
-	github.com/coreos/go-systemd/v22 v22.3.2 // indirect
+	github.com/coreos/go-systemd/v22 v22.3.2
 	github.com/gin-gonic/gin v1.6.3
-	github.com/godbus/dbus/v5 v5.0.4
 	github.com/google/martian v2.1.0+incompatible
 	github.com/kr/pretty v0.2.0 // indirect
 	github.com/pkg/errors v0.9.1
@@ -18,9 +17,8 @@ require (
 	github.com/stretchr/testify v1.7.0
 	go.uber.org/zap v1.10.0
 	go.undefinedlabs.com/scopeagent v0.1.12
-	gopkg.in/yaml.v2 v2.4.0
-	k8s.io/api v0.17.2
-	k8s.io/apimachinery v0.17.2
+	k8s.io/api v0.22.3
+	k8s.io/apimachinery v0.22.3
 	k8s.io/client-go v12.0.0+incompatible
 	k8s.io/kubernetes v1.17.2
 )

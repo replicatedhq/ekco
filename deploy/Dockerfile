@@ -4,14 +4,15 @@ ARG git_sha=unknown
 ARG version=alpha
 
 WORKDIR /go/src/github.com/replicatedhq/ekco
+COPY go.mod go.sum ./
+RUN go mod download
 COPY Makefile Makefile
 COPY LICENSE LICENSE
-COPY go.mod go.mod
-COPY go.sum go.sum
 COPY cmd cmd
 COPY pkg pkg
 
-RUN make build GIT_SHA=$git_sha VERSION=$version
+RUN --mount=type=cache,target=/root/.cache/go-build \
+    make build GIT_SHA=$git_sha VERSION=$version
 
 
 FROM debian:buster-slim
