@@ -2,9 +2,8 @@ steps:
   - label: "test"
     commands:
       - pwd
-      - ls
-      - cd ekco
-      - pwd
+      - ls -ltr
+      - whoami
       - make deps test
     plugins:
       - docker#v3.5.0:
