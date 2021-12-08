@@ -6,7 +6,7 @@ steps:
       - whoami
       - make deps test
     plugins:
-      - docker#v3.5.0:
+      - docker#v3.9.0:
           always-pull: true
           image: replicated/gitops-builder:buildkite-go16
           workdir: /home/builder/src/github.com/replicatedhq/ekco
