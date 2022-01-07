@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io/ioutil"
 	"strings"
@@ -11,7 +12,6 @@ import (
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/duration"
-	"k8s.io/client-go/util/cert"
 	certutil "k8s.io/client-go/util/cert"
 )
 
@@ -20,7 +20,7 @@ func (c *Controller) RotateKurlProxyCert() error {
 	secretName := c.Config.KurlProxyCertSecret
 
 	// 1. Parse current cert from secret
-	secret, err := c.Config.Client.CoreV1().Secrets(ns).Get(secretName, metav1.GetOptions{})
+	secret, err := c.Config.Client.CoreV1().Secrets(ns).Get(context.TODO(), secretName, metav1.GetOptions{})
 	if err != nil {
 		if k8serrors.IsNotFound(err) {
 			c.Log.Debugf("Kurl proxy cert secret does not exist, skipping renewal")
@@ -28,12 +28,12 @@ func (c *Controller) RotateKurlProxyCert() error {
 		}
 		return errors.Wrapf(err, "get kurl proxy secret")
 	}
-	certs, err := cert.ParseCertsPEM(secret.Data["tls.crt"])
+	certs, err := certutil.ParseCertsPEM(secret.Data["tls.crt"])
 	if err != nil {
 		return errors.Wrapf(err, "parse kurl proxy secret tls.crt")
 	}
 	if len(certs) == 0 {
-		return fmt.Errorf("No certs found in kurl proxy secret tls.crt")
+		return fmt.Errorf("no certs found in kurl proxy secret tls.crt")
 	}
 	cert := certs[0]
 
@@ -68,7 +68,7 @@ func (c *Controller) RotateKurlProxyCert() error {
 	// 5. Update the secret
 	secret.Data["tls.crt"] = certData
 	secret.Data["tls.key"] = keyData
-	if _, err := c.Config.Client.CoreV1().Secrets(ns).Update(secret); err != nil {
+	if _, err := c.Config.Client.CoreV1().Secrets(ns).Update(context.TODO(), secret, metav1.UpdateOptions{}); err != nil {
 		return errors.Wrapf(err, "update")
 	}
 
@@ -80,7 +80,7 @@ func (c *Controller) UpdateKubeletClientCertSecret() error {
 	ns := c.Config.KotsadmKubeletCertNamespace
 	secretName := c.Config.KotsadmKubeletCertSecret
 
-	secret, err := c.Config.Client.CoreV1().Secrets(ns).Get(secretName, metav1.GetOptions{})
+	secret, err := c.Config.Client.CoreV1().Secrets(ns).Get(context.TODO(), secretName, metav1.GetOptions{})
 	if err != nil {
 		if k8serrors.IsNotFound(err) {
 			c.Log.Debugf("Kubelet client secret does not exist, skipping update")
@@ -114,7 +114,7 @@ func (c *Controller) UpdateKubeletClientCertSecret() error {
 	}
 
 	c.Log.Info("Updating kubelet client cert")
-	if _, err := c.Config.Client.CoreV1().Secrets(ns).Update(secret); err != nil {
+	if _, err := c.Config.Client.CoreV1().Secrets(ns).Update(context.TODO(), secret, metav1.UpdateOptions{}); err != nil {
 		return errors.Wrapf(err, "update")
 	}
 

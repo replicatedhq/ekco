@@ -36,11 +36,15 @@ func RegenCertCmd(v *viper.Viper) *cobra.Command {
 				return fmt.Errorf("Expected exactly 1 cert in %s, got %d", certPath, len(certs))
 			}
 			cert := certs[0]
-			cfg := &certutil.Config{
-				CommonName:   cert.Subject.CommonName,
-				Organization: cert.Subject.Organization,
-				AltNames:     certutil.AltNames{},
-				Usages:       cert.ExtKeyUsage,
+			cfg := &pkiutil.CertConfig{
+				Config: certutil.Config{
+					CommonName:   cert.Subject.CommonName,
+					Organization: cert.Subject.Organization,
+					AltNames:     certutil.AltNames{},
+					Usages:       cert.ExtKeyUsage,
+				},
+				NotAfter:           &cert.NotAfter,
+				PublicKeyAlgorithm: cert.PublicKeyAlgorithm,
 			}
 
 			newCertIPs := map[string]net.IP{}

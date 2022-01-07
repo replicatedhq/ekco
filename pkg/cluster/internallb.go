@@ -22,7 +22,7 @@ func (c *Controller) ReconcileInternalLB(ctx context.Context, nodes []corev1.Nod
 	nextInternalLB := strings.Join(nodeProps, ",")
 
 	client := c.Config.Client.CoreV1().ConfigMaps(c.Config.HostTaskNamespace)
-	cm, err := client.Get(UpdateInternalLBValue, metav1.GetOptions{})
+	cm, err := client.Get(context.TODO(), UpdateInternalLBValue, metav1.GetOptions{})
 	if err != nil && !k8serrors.IsNotFound(err) {
 		return errors.Wrapf(err, "get configmap %s/%s", c.Config.HostTaskNamespace, UpdateInternalLBValue)
 	}
@@ -37,7 +37,7 @@ func (c *Controller) ReconcileInternalLB(ctx context.Context, nodes []corev1.Nod
 				UpdateInternalLBValue: "", // hasn't yet been successful
 			},
 		}
-		if _, err := client.Create(cm); err != nil {
+		if _, err := client.Create(context.TODO(), cm, metav1.CreateOptions{}); err != nil {
 			return errors.Wrapf(err, "create configmap %s/%s", c.Config.HostTaskNamespace, UpdateInternalLBValue)
 		}
 		return nil
@@ -52,7 +52,7 @@ func (c *Controller) ReconcileInternalLB(ctx context.Context, nodes []corev1.Nod
 	}
 	cm.Data[UpdateInternalLBValue] = nextInternalLB
 
-	if _, err := client.Update(cm); err != nil {
+	if _, err := client.Update(context.TODO(), cm, metav1.UpdateOptions{}); err != nil {
 		return errors.Wrapf(err, "update configmap %s/%s", c.Config.HostTaskNamespace, UpdateInternalLBValue)
 	}
 	return nil
@@ -85,14 +85,14 @@ func (c *Controller) UpdateInternalLB(ctx context.Context, nodes []corev1.Node) 
 
 		pod := c.getUpdateInternalLBPod(node.Name, primaryHosts...)
 
-		pod, err := c.Config.Client.CoreV1().Pods(c.Config.HostTaskNamespace).Create(pod)
+		pod, err := c.Config.Client.CoreV1().Pods(c.Config.HostTaskNamespace).Create(context.TODO(), pod, metav1.CreateOptions{})
 		if err != nil {
 			return errors.Wrapf(err, "create update internal loadbalancer pod for node %s", node.Name)
 		}
 
 		err = c.pollForPodCompleted(ctx, c.Config.HostTaskNamespace, pod.Name)
 		if err != nil {
-			if err == podFailedErr {
+			if err == errPodFailed {
 				c.logPodResults(c.Config.HostTaskNamespace, pod.Name)
 			}
 			return errors.Wrapf(err, "update internal loadbalancer pod for node %s", node.Name)
@@ -134,7 +134,7 @@ func (c *Controller) getUpdateInternalLBPod(nodeName string, primaries ...string
 				},
 			},
 			InitContainers: []corev1.Container{
-				corev1.Container{
+				{
 					Name:            "config",
 					Image:           image,
 					ImagePullPolicy: corev1.PullIfNotPresent,
@@ -152,7 +152,7 @@ func (c *Controller) getUpdateInternalLBPod(nodeName string, primaries ...string
 				},
 			},
 			Containers: []corev1.Container{
-				corev1.Container{
+				{
 					Name:            "manifest",
 					Image:           image,
 					ImagePullPolicy: corev1.PullIfNotPresent,

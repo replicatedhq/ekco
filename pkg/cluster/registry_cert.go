@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"context"
 	"crypto"
 	"crypto/x509"
 	"fmt"
@@ -15,6 +16,7 @@ import (
 	"k8s.io/client-go/util/keyutil"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs/renewal"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 )
 
 func (c *Controller) RotateRegistryCert() error {
@@ -62,7 +64,7 @@ func (c *Controller) RotateRegistryCert() error {
 	selector := metav1.ListOptions{
 		LabelSelector: labels.SelectorFromSet(labels.Set{"app": "registry"}).String(),
 	}
-	if err := c.Config.Client.CoreV1().Pods(ns).DeleteCollection(&metav1.DeleteOptions{}, selector); err != nil {
+	if err := c.Config.Client.CoreV1().Pods(ns).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, selector); err != nil {
 		return errors.Wrap(err, "restart registry")
 	}
 
@@ -72,7 +74,7 @@ func (c *Controller) RotateRegistryCert() error {
 }
 
 func (c *Controller) readRegistryCert(namespace, name string) (*x509.Certificate, error) {
-	secret, err := c.Config.Client.CoreV1().Secrets(namespace).Get(name, metav1.GetOptions{})
+	secret, err := c.Config.Client.CoreV1().Secrets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		if k8serrors.IsNotFound(err) {
 			return nil, nil
@@ -85,14 +87,14 @@ func (c *Controller) readRegistryCert(namespace, name string) (*x509.Certificate
 		return nil, errors.Wrapf(err, "parse registry.crt")
 	}
 	if len(certs) != 1 {
-		return nil, fmt.Errorf("Expected exactly 1 cert in registry.crt, got %d", len(certs))
+		return nil, fmt.Errorf("expected exactly 1 cert in registry.crt, got %d", len(certs))
 	}
 
 	return certs[0], nil
 }
 
 func (c *Controller) updateRegistryCert(namespace, name string, crt *x509.Certificate, key crypto.PrivateKey) error {
-	secret, err := c.Config.Client.CoreV1().Secrets(namespace).Get(name, metav1.GetOptions{})
+	secret, err := c.Config.Client.CoreV1().Secrets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return errors.Wrapf(err, "get secret %s/%s", namespace, name)
 	}
@@ -109,21 +111,25 @@ func (c *Controller) updateRegistryCert(namespace, name string, crt *x509.Certif
 	}
 	secret.Data["registry.key"] = keyData
 
-	if _, err := c.Config.Client.CoreV1().Secrets(namespace).Update(secret); err != nil {
+	if _, err := c.Config.Client.CoreV1().Secrets(namespace).Update(context.TODO(), secret, metav1.UpdateOptions{}); err != nil {
 		return errors.Wrapf(err, "update secret %s/%s", namespace, name)
 	}
 
 	return nil
 }
 
-func certToConfig(crt *x509.Certificate) *cert.Config {
-	return &cert.Config{
-		CommonName:   crt.Subject.CommonName,
-		Organization: crt.Subject.Organization,
-		AltNames: cert.AltNames{
-			IPs:      crt.IPAddresses,
-			DNSNames: crt.DNSNames,
+func certToConfig(crt *x509.Certificate) *pkiutil.CertConfig {
+	return &pkiutil.CertConfig{
+		Config: cert.Config{
+			CommonName:   crt.Subject.CommonName,
+			Organization: crt.Subject.Organization,
+			AltNames: cert.AltNames{
+				IPs:      crt.IPAddresses,
+				DNSNames: crt.DNSNames,
+			},
+			Usages: crt.ExtKeyUsage,
 		},
-		Usages: crt.ExtKeyUsage,
+		NotAfter:           &crt.NotAfter,
+		PublicKeyAlgorithm: crt.PublicKeyAlgorithm,
 	}
 }

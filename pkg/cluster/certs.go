@@ -14,12 +14,12 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 )
 
-var podFailedErr error = errors.New("pod failed")
+var errPodFailed error = errors.New("pod failed")
 
 // Any time this returns true it updates the last attempted timestamp
 func (c *Controller) CheckRotateCertsDue() (bool, error) {
 	client := c.Config.Client.CoreV1().ConfigMaps(c.Config.RotateCertsNamespace)
-	cm, err := client.Get(RotateCertsValue, metav1.GetOptions{})
+	cm, err := client.Get(context.TODO(), RotateCertsValue, metav1.GetOptions{})
 	if err != nil && !k8serrors.IsNotFound(err) {
 		return false, errors.Wrapf(err, "get configmap %s/%s", c.Config.RotateCertsNamespace, RotateCertsValue)
 	}
@@ -34,7 +34,7 @@ func (c *Controller) CheckRotateCertsDue() (bool, error) {
 				RotateCertsLastAttempted: time.Now().Format(time.RFC3339),
 			},
 		}
-		if _, err := client.Create(cm); err != nil {
+		if _, err := client.Create(context.TODO(), cm, metav1.CreateOptions{}); err != nil {
 			return false, errors.Wrapf(err, "create configmap %s/%s", c.Config.RotateCertsNamespace, RotateCertsValue)
 		}
 		return true, nil
@@ -52,7 +52,7 @@ func (c *Controller) CheckRotateCertsDue() (bool, error) {
 
 	cm.Data[RotateCertsLastAttempted] = time.Now().Format(time.RFC3339)
 
-	if _, err := client.Update(cm); err != nil {
+	if _, err := client.Update(context.TODO(), cm, metav1.UpdateOptions{}); err != nil {
 		return false, errors.Wrapf(err, "update configmap %s/%s", c.Config.RotateCertsNamespace, RotateCertsValue)
 	}
 
@@ -68,7 +68,7 @@ func (c *Controller) RotateAllCerts(ctx context.Context) error {
 	opts := metav1.ListOptions{
 		LabelSelector: PrimaryRoleLabel,
 	}
-	node, err := c.Config.Client.CoreV1().Nodes().List(opts)
+	node, err := c.Config.Client.CoreV1().Nodes().List(context.TODO(), opts)
 	if err != nil {
 		return errors.Wrap(err, "list primary nodes")
 	}
@@ -81,13 +81,13 @@ func (c *Controller) RotateAllCerts(ctx context.Context) error {
 			time.Sleep(time.Second * 5)
 		}
 		pod := c.getRotateCertsPodConfig(node.Name)
-		pod, err := c.Config.Client.CoreV1().Pods(c.Config.RotateCertsNamespace).Create(pod)
+		pod, err := c.Config.Client.CoreV1().Pods(c.Config.RotateCertsNamespace).Create(context.TODO(), pod, metav1.CreateOptions{})
 		if err != nil {
 			return errors.Wrapf(err, "create rotate pod for node %s", node.Name)
 		}
 		err = c.pollForPodCompleted(ctx, c.Config.RotateCertsNamespace, pod.Name)
 		if err != nil {
-			if err == podFailedErr {
+			if err == errPodFailed {
 				c.logPodResults(c.Config.RotateCertsNamespace, pod.Name)
 			}
 			return errors.Wrapf(err, "rotate certs pod for node %s", node.Name)
@@ -107,7 +107,7 @@ func (c *Controller) deletePods(selector labels.Selector) error {
 		LabelSelector: selector.String(),
 	}
 
-	return c.Config.Client.CoreV1().Pods(c.Config.RotateCertsNamespace).DeleteCollection(&metav1.DeleteOptions{}, options)
+	return c.Config.Client.CoreV1().Pods(c.Config.RotateCertsNamespace).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, options)
 }
 
 func (c *Controller) getRotateCertsPodConfig(nodeName string) *corev1.Pod {
@@ -131,7 +131,7 @@ func (c *Controller) getRotateCertsPodConfig(nodeName string) *corev1.Pod {
 				},
 			},
 			Containers: []corev1.Container{
-				corev1.Container{
+				{
 					Name:            "rotate-certs",
 					Image:           c.Config.RotateCertsImage,
 					ImagePullPolicy: corev1.PullIfNotPresent,
@@ -184,7 +184,7 @@ func (c *Controller) pollForPodCompleted(ctx context.Context, namespace, name st
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-ticker.C:
-			pod, err := c.Config.Client.CoreV1().Pods(namespace).Get(name, metav1.GetOptions{})
+			pod, err := c.Config.Client.CoreV1().Pods(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 			if err != nil {
 				c.Log.Debugf("Poll for pod completed: get pod %s: %v", name, err)
 				continue
@@ -193,7 +193,7 @@ func (c *Controller) pollForPodCompleted(ctx context.Context, namespace, name st
 				return nil
 			}
 			if pod.Status.Phase == corev1.PodFailed {
-				return podFailedErr
+				return errPodFailed
 			}
 		}
 	}
@@ -201,7 +201,7 @@ func (c *Controller) pollForPodCompleted(ctx context.Context, namespace, name st
 
 func (c *Controller) logPodResults(namespace, name string) {
 	req := c.Config.Client.CoreV1().Pods(namespace).GetLogs(name, &corev1.PodLogOptions{})
-	logs, err := req.Stream()
+	logs, err := req.Stream(context.TODO())
 	if err != nil {
 		c.Log.Warnf("Failed to get pod %s logs: %v", name, err)
 		return
