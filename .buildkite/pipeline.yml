@@ -13,7 +13,7 @@ steps:
     commands:
       - make docker-image DOCKER_IMAGE=replicated/ekco:alpha
       - docker push replicated/ekco:alpha
-    branches: "master"
+    branches: "main"
 
   - label: "tagged release"
     commands:
