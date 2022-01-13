@@ -10,12 +10,12 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/coreos/etcd/clientv3"
 	"github.com/pkg/errors"
+	clientv3 "go.etcd.io/etcd/client/v3"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
-func (c *Controller) removeEtcdPeer(ctx context.Context, ip string, remainingIPs []string) error {
+func (c *Controller) removeEtcdPeer(ip string, remainingIPs []string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 

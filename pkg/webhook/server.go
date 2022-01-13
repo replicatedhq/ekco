@@ -1,6 +1,7 @@
 package webhook
 
 import (
+	"context"
 	"crypto/tls"
 	"fmt"
 	"log"
@@ -10,7 +11,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/replicatedhq/ekco/pkg/util"
 	"go.uber.org/zap"
-	admissionregistrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
+	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	corev1 "k8s.io/api/core/v1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -38,7 +39,7 @@ func NewServer(client kubernetes.Interface, namespace string, rookPriorityClass 
 	}
 
 	// Ensure ekco service exists
-	_, err := client.CoreV1().Services(namespace).Get(WebhookServiceName, metav1.GetOptions{})
+	_, err := client.CoreV1().Services(namespace).Get(context.TODO(), WebhookServiceName, metav1.GetOptions{})
 	if err != nil {
 		if !util.IsNotFoundErr(err) {
 			return nil, errors.Wrapf(err, "get %s service", WebhookServiceName)
@@ -58,7 +59,7 @@ func NewServer(client kubernetes.Interface, namespace string, rookPriorityClass 
 				},
 			},
 		}
-		_, err := client.CoreV1().Services(namespace).Create(service)
+		_, err := client.CoreV1().Services(namespace).Create(context.TODO(), service, metav1.CreateOptions{})
 		if err != nil {
 			return nil, errors.Wrapf(err, "create %s service", WebhookServiceName)
 		}
@@ -81,7 +82,7 @@ func NewServer(client kubernetes.Interface, namespace string, rookPriorityClass 
 	// Configure the rook priority class webhook
 	if rookPriorityClass != "" {
 		// Ensure the node-critical priority class exists
-		_, err := client.SchedulingV1().PriorityClasses().Get(rookPriorityClass, metav1.GetOptions{})
+		_, err := client.SchedulingV1().PriorityClasses().Get(context.TODO(), rookPriorityClass, metav1.GetOptions{})
 		if err != nil {
 			if !util.IsNotFoundErr(err) {
 				return nil, errors.Wrapf(err, "get priorityclass %s", rookPriorityClass)
@@ -93,7 +94,7 @@ func NewServer(client kubernetes.Interface, namespace string, rookPriorityClass 
 				Value:       1000000000,
 				Description: "Used for pods that provide critical services to their node",
 			}
-			_, err = client.SchedulingV1().PriorityClasses().Create(pc)
+			_, err = client.SchedulingV1().PriorityClasses().Create(context.TODO(), pc, metav1.CreateOptions{})
 			if err != nil {
 				return nil, errors.Wrapf(err, "create priorityclass %s", rookPriorityClass)
 			}
@@ -102,17 +103,18 @@ func NewServer(client kubernetes.Interface, namespace string, rookPriorityClass 
 		// Ensure the mutating webhook config exists
 		port := int32(443)
 		path := "/rook-priority"
-		equivalent := admissionregistrationv1beta1.Equivalent
-		ignore := admissionregistrationv1beta1.Ignore
-		none := admissionregistrationv1beta1.SideEffectClassNone
+		equivalent := admissionregistrationv1.Equivalent
+		ignore := admissionregistrationv1.Ignore
+		none := admissionregistrationv1.SideEffectClassNone
 		timeout := int32(10)
 
-		webhook := admissionregistrationv1beta1.MutatingWebhook{
-			Name:           RookPriorityAdmissionWebhookName,
-			MatchPolicy:    &equivalent,
-			FailurePolicy:  &ignore,
-			SideEffects:    &none,
-			TimeoutSeconds: &timeout,
+		webhook := admissionregistrationv1.MutatingWebhook{
+			Name:                    RookPriorityAdmissionWebhookName,
+			MatchPolicy:             &equivalent,
+			FailurePolicy:           &ignore,
+			SideEffects:             &none,
+			TimeoutSeconds:          &timeout,
+			AdmissionReviewVersions: []string{"v1"},
 			NamespaceSelector: &metav1.LabelSelector{
 				MatchExpressions: []metav1.LabelSelectorRequirement{
 					{
@@ -121,21 +123,21 @@ func NewServer(client kubernetes.Interface, namespace string, rookPriorityClass 
 					},
 				},
 			},
-			Rules: []admissionregistrationv1beta1.RuleWithOperations{
+			Rules: []admissionregistrationv1.RuleWithOperations{
 				{
-					Rule: admissionregistrationv1beta1.Rule{
+					Rule: admissionregistrationv1.Rule{
 						APIGroups:   []string{"apps"},
 						APIVersions: []string{"v1"},
 						Resources:   []string{"deployments", "daemonsets"},
 					},
-					Operations: []admissionregistrationv1beta1.OperationType{
-						admissionregistrationv1beta1.Create,
-						admissionregistrationv1beta1.Update,
+					Operations: []admissionregistrationv1.OperationType{
+						admissionregistrationv1.Create,
+						admissionregistrationv1.Update,
 					},
 				},
 			},
-			ClientConfig: admissionregistrationv1beta1.WebhookClientConfig{
-				Service: &admissionregistrationv1beta1.ServiceReference{
+			ClientConfig: admissionregistrationv1.WebhookClientConfig{
+				Service: &admissionregistrationv1.ServiceReference{
 					Namespace: namespace,
 					Name:      WebhookServiceName,
 					Path:      &path,
@@ -145,23 +147,23 @@ func NewServer(client kubernetes.Interface, namespace string, rookPriorityClass 
 			},
 		}
 
-		hook, err := client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Get(RookPriorityAdmissionWebhookName, metav1.GetOptions{})
+		hook, err := client.AdmissionregistrationV1().MutatingWebhookConfigurations().Get(context.TODO(), RookPriorityAdmissionWebhookName, metav1.GetOptions{})
 		if err != nil {
 			if !util.IsNotFoundErr(err) {
 				return nil, errors.Wrap(err, "get rook-priority mutating admission webhook")
 			}
-			hook := &admissionregistrationv1beta1.MutatingWebhookConfiguration{
+			hook := &admissionregistrationv1.MutatingWebhookConfiguration{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: RookPriorityAdmissionWebhookName,
 				},
-				Webhooks: []admissionregistrationv1beta1.MutatingWebhook{webhook},
+				Webhooks: []admissionregistrationv1.MutatingWebhook{webhook},
 			}
-			if _, err := client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Create(hook); err != nil {
+			if _, err := client.AdmissionregistrationV1().MutatingWebhookConfigurations().Create(context.TODO(), hook, metav1.CreateOptions{}); err != nil {
 				return nil, errors.Wrap(err, "create rook-priority mutating admission webhook")
 			}
 		} else {
-			hook.Webhooks = []admissionregistrationv1beta1.MutatingWebhook{webhook}
-			if _, err := client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Update(hook); err != nil {
+			hook.Webhooks = []admissionregistrationv1.MutatingWebhook{webhook}
+			if _, err := client.AdmissionregistrationV1().MutatingWebhookConfigurations().Update(context.TODO(), hook, metav1.UpdateOptions{}); err != nil {
 				return nil, errors.Wrap(err, "update rook-priority mutating admission webhook")
 			}
 		}
@@ -170,32 +172,33 @@ func NewServer(client kubernetes.Interface, namespace string, rookPriorityClass 
 	if len(podImageOverrides) > 0 {
 		port := int32(443)
 		path := "/pod-image-overrides"
-		equivalent := admissionregistrationv1beta1.Equivalent
-		ignore := admissionregistrationv1beta1.Ignore
-		none := admissionregistrationv1beta1.SideEffectClassNone
+		equivalent := admissionregistrationv1.Equivalent
+		ignore := admissionregistrationv1.Ignore
+		none := admissionregistrationv1.SideEffectClassNone
 		timeout := int32(10)
 
-		webhook := admissionregistrationv1beta1.MutatingWebhook{
-			Name:           PodImageOverridesAdmissionWebhookName,
-			MatchPolicy:    &equivalent,
-			FailurePolicy:  &ignore,
-			SideEffects:    &none,
-			TimeoutSeconds: &timeout,
-			Rules: []admissionregistrationv1beta1.RuleWithOperations{
+		webhook := admissionregistrationv1.MutatingWebhook{
+			Name:                    PodImageOverridesAdmissionWebhookName,
+			MatchPolicy:             &equivalent,
+			FailurePolicy:           &ignore,
+			SideEffects:             &none,
+			TimeoutSeconds:          &timeout,
+			AdmissionReviewVersions: []string{"v1"},
+			Rules: []admissionregistrationv1.RuleWithOperations{
 				{
-					Rule: admissionregistrationv1beta1.Rule{
+					Rule: admissionregistrationv1.Rule{
 						APIGroups:   []string{""},
 						APIVersions: []string{"v1"},
 						Resources:   []string{"pods"},
 					},
-					Operations: []admissionregistrationv1beta1.OperationType{
-						admissionregistrationv1beta1.Create,
-						admissionregistrationv1beta1.Update,
+					Operations: []admissionregistrationv1.OperationType{
+						admissionregistrationv1.Create,
+						admissionregistrationv1.Update,
 					},
 				},
 			},
-			ClientConfig: admissionregistrationv1beta1.WebhookClientConfig{
-				Service: &admissionregistrationv1beta1.ServiceReference{
+			ClientConfig: admissionregistrationv1.WebhookClientConfig{
+				Service: &admissionregistrationv1.ServiceReference{
 					Namespace: namespace,
 					Name:      WebhookServiceName,
 					Path:      &path,
@@ -205,23 +208,23 @@ func NewServer(client kubernetes.Interface, namespace string, rookPriorityClass 
 			},
 		}
 
-		hook, err := client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Get(PodImageOverridesAdmissionWebhookName, metav1.GetOptions{})
+		hook, err := client.AdmissionregistrationV1().MutatingWebhookConfigurations().Get(context.TODO(), PodImageOverridesAdmissionWebhookName, metav1.GetOptions{})
 		if err != nil {
 			if !util.IsNotFoundErr(err) {
 				return nil, errors.Wrap(err, "get pod-image-overrides mutating admission webhook")
 			}
-			hook := &admissionregistrationv1beta1.MutatingWebhookConfiguration{
+			hook := &admissionregistrationv1.MutatingWebhookConfiguration{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: PodImageOverridesAdmissionWebhookName,
 				},
-				Webhooks: []admissionregistrationv1beta1.MutatingWebhook{webhook},
+				Webhooks: []admissionregistrationv1.MutatingWebhook{webhook},
 			}
-			if _, err := client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Create(hook); err != nil {
+			if _, err := client.AdmissionregistrationV1().MutatingWebhookConfigurations().Create(context.TODO(), hook, metav1.CreateOptions{}); err != nil {
 				return nil, errors.Wrap(err, "create pod-image-overrides mutating admission webhook")
 			}
 		} else {
-			hook.Webhooks = []admissionregistrationv1beta1.MutatingWebhook{webhook}
-			if _, err := client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Update(hook); err != nil {
+			hook.Webhooks = []admissionregistrationv1.MutatingWebhook{webhook}
+			if _, err := client.AdmissionregistrationV1().MutatingWebhookConfigurations().Update(context.TODO(), hook, metav1.UpdateOptions{}); err != nil {
 				return nil, errors.Wrap(err, "update pod-image-overrides mutating admission webhook")
 			}
 		}
@@ -251,8 +254,9 @@ func (s *Server) Run() {
 	log.Panic(err)
 }
 
+// RemoveRookPriority removes a legacy webhook used with Rook 1.0.4 and KURL to adjust the priority class.
 func RemoveRookPriority(client kubernetes.Interface) error {
-	err := client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Delete(RookPriorityAdmissionWebhookName, &metav1.DeleteOptions{})
+	err := client.AdmissionregistrationV1().MutatingWebhookConfigurations().Delete(context.TODO(), RookPriorityAdmissionWebhookName, metav1.DeleteOptions{})
 	if err != nil && !util.IsNotFoundErr(err) {
 		return errors.Wrapf(err, "failed to delete mutating webhook config %s", RookPriorityAdmissionWebhookName)
 	}
@@ -260,7 +264,7 @@ func RemoveRookPriority(client kubernetes.Interface) error {
 }
 
 func RemovePodImageOverrides(client kubernetes.Interface) error {
-	err := client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Delete(PodImageOverridesAdmissionWebhookName, &metav1.DeleteOptions{})
+	err := client.AdmissionregistrationV1().MutatingWebhookConfigurations().Delete(context.TODO(), PodImageOverridesAdmissionWebhookName, metav1.DeleteOptions{})
 	if err != nil && !util.IsNotFoundErr(err) {
 		return errors.Wrapf(err, "failed to delete mutating webhook config %s", PodImageOverridesAdmissionWebhookName)
 	}

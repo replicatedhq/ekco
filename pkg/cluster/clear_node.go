@@ -16,7 +16,7 @@ func (c *Controller) ClearNode(ctx context.Context, nodeName string) error {
 	opts := metav1.ListOptions{
 		FieldSelector: fmt.Sprintf("spec.nodeName=%s", nodeName),
 	}
-	pods, err := c.Config.Client.CoreV1().Pods("").List(opts)
+	pods, err := c.Config.Client.CoreV1().Pods("").List(context.TODO(), opts)
 	if err != nil {
 		return errors.Wrapf(err, "list all pods on node %s", nodeName)
 	}
@@ -32,7 +32,7 @@ func (c *Controller) ClearNode(ctx context.Context, nodeName string) error {
 		}
 		c.Log.Infof("Force deleting pod %s/%s on node %s", pod.Namespace, pod.Name, nodeName)
 		var grace int64 = 0
-		err := c.Config.Client.CoreV1().Pods(pod.Namespace).Delete(pod.Name, &metav1.DeleteOptions{
+		err := c.Config.Client.CoreV1().Pods(pod.Namespace).Delete(context.TODO(), pod.Name, metav1.DeleteOptions{
 			GracePeriodSeconds: &grace,
 		})
 		if err != nil {

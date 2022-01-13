@@ -16,14 +16,14 @@ func (c *Controller) SetKubeconfigServer(ctx context.Context, node corev1.Node, 
 	admin := util.NodeIsMaster(node)
 	pod := c.setKubeconfigServerPod(node.Name, server, admin)
 
-	pod, err := c.Config.Client.CoreV1().Pods(c.Config.HostTaskNamespace).Create(pod)
+	pod, err := c.Config.Client.CoreV1().Pods(c.Config.HostTaskNamespace).Create(context.TODO(), pod, metav1.CreateOptions{})
 	if err != nil {
 		return errors.Wrapf(err, "create set-kubeconfig-server pod on node %s", node.Name)
 	}
 
 	err = c.pollForPodCompleted(ctx, c.Config.HostTaskNamespace, pod.Name)
 	if err != nil {
-		if err == podFailedErr {
+		if err == errPodFailed {
 			c.logPodResults(c.Config.HostTaskNamespace, pod.Name)
 		}
 		return errors.Wrapf(err, "run set-kubeconfig-server pod on node %s", node.Name)
@@ -60,7 +60,7 @@ func (c *Controller) setKubeconfigServerPod(nodeName string, server string, admi
 				},
 			},
 			Containers: []corev1.Container{
-				corev1.Container{
+				{
 					Name:            "set-kubeconfig-server",
 					Image:           c.Config.HostTaskImage,
 					ImagePullPolicy: corev1.PullIfNotPresent,
@@ -68,7 +68,7 @@ func (c *Controller) setKubeconfigServerPod(nodeName string, server string, admi
 						"ekco",
 						"set-kubeconfig-server",
 						fmt.Sprintf("--server=%s", server),
-						fmt.Sprintf("--host-etc-dir=/host/etc"),
+						"--host-etc-dir=/host/etc",
 						fmt.Sprintf("--admin=%t", admin),
 					},
 					VolumeMounts: []corev1.VolumeMount{

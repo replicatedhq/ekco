@@ -53,7 +53,7 @@ func PurgeNodeCmd(v *viper.Viper) *cobra.Command {
 }
 
 func purgeNode(nodeName string, config *ekcoops.Config, clusterController *cluster.Controller) error {
-	nodeList, err := clusterController.Config.Client.CoreV1().Nodes().List(metav1.ListOptions{})
+	nodeList, err := clusterController.Config.Client.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return errors.Wrap(err, "failed to list nodes")
 	}

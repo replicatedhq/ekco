@@ -1,6 +1,8 @@
 package ekcoops
 
 import (
+	"context"
+
 	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -17,8 +19,8 @@ func (o *Operator) prometheusAutoscaler(currentNodeCount, previousNodeCount int)
 	if currentNodeCount == previousNodeCount {
 		return nil
 	}
-	prometheus, _ := o.controller.Config.PrometheusV1.Namespace("monitoring").Get("k8s", metav1.GetOptions{})
-	alertManager, _ := o.controller.Config.AlertManagerV1.Namespace("monitoring").Get("prometheus-alertmanager", metav1.GetOptions{})
+	prometheus, _ := o.controller.Config.PrometheusV1.Namespace("monitoring").Get(context.TODO(), "k8s", metav1.GetOptions{})
+	alertManager, _ := o.controller.Config.AlertManagerV1.Namespace("monitoring").Get(context.TODO(), "prometheus-alertmanager", metav1.GetOptions{})
 	if prometheus == nil || alertManager == nil {
 		return nil
 	}
@@ -29,7 +31,7 @@ func (o *Operator) prometheusAutoscaler(currentNodeCount, previousNodeCount int)
 		Value: min(3, uint32(currentNodeCount)),
 	}}
 	alertManagersPayload, err := json.Marshal(alertManagersPatch)
-	_, err = o.controller.Config.AlertManagerV1.Namespace("monitoring").Patch("prometheus-alertmanager", types.JSONPatchType, alertManagersPayload, metav1.PatchOptions{})
+	_, err = o.controller.Config.AlertManagerV1.Namespace("monitoring").Patch(context.TODO(), "prometheus-alertmanager", types.JSONPatchType, alertManagersPayload, metav1.PatchOptions{})
 	if err != nil {
 		return errors.Wrap(err, "unable to scale AlertManager in response to node watch event")
 	}
@@ -40,7 +42,7 @@ func (o *Operator) prometheusAutoscaler(currentNodeCount, previousNodeCount int)
 		Value: min(2, uint32(currentNodeCount)),
 	}}
 	prometheusPayload, err := json.Marshal(prometheusPatch)
-	_, err = o.controller.Config.PrometheusV1.Namespace("monitoring").Patch("k8s", types.JSONPatchType, prometheusPayload, metav1.PatchOptions{})
+	_, err = o.controller.Config.PrometheusV1.Namespace("monitoring").Patch(context.TODO(), "k8s", types.JSONPatchType, prometheusPayload, metav1.PatchOptions{})
 	if err != nil {
 		return errors.Wrap(err, "Unable to scale Prometheus in response to watch node event.")
 	}
