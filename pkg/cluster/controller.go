@@ -1,9 +1,10 @@
 package cluster
 
 import (
-	"k8s.io/client-go/dynamic"
 	"sync"
 	"time"
+
+	"k8s.io/client-go/dynamic"
 
 	"github.com/blang/semver"
 	cephv1 "github.com/rook/rook/pkg/client/clientset/versioned/typed/ceph.rook.io/v1"
@@ -38,6 +39,9 @@ type ControllerConfig struct {
 	KurlProxyCertSecret         string
 	KotsadmKubeletCertNamespace string
 	KotsadmKubeletCertSecret    string
+	ContourCertNamespace        string
+	ContourCertSecret           string
+	EnvoyCertSecret             string
 	HostTaskImage               string
 	HostTaskNamespace           string
 	EnableInternalLoadBalancer  bool

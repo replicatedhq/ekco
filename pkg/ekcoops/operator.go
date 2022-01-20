@@ -81,6 +81,9 @@ func (o *Operator) Reconcile(nodes []corev1.Node, doFullReconcile bool) error {
 			return errors.Wrapf(err, "check if it's time to run cert rotation jobs")
 		}
 		if due {
+			if err := o.controller.RotateContourCerts(); err != nil {
+				return errors.Wrap(err, "rotate contour certs")
+			}
 			if err := o.controller.RotateRegistryCert(); err != nil {
 				return errors.Wrap(err, "rotate registry cert")
 			}
