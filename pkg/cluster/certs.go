@@ -17,7 +17,7 @@ import (
 var errPodFailed error = errors.New("pod failed")
 
 // Any time this returns true it updates the last attempted timestamp
-func (c *Controller) CheckRotateCertsDue() (bool, error) {
+func (c *Controller) CheckRotateCertsDue(reset bool) (bool, error) {
 	client := c.Config.Client.CoreV1().ConfigMaps(c.Config.RotateCertsNamespace)
 	cm, err := client.Get(context.TODO(), RotateCertsValue, metav1.GetOptions{})
 	if err != nil && !k8serrors.IsNotFound(err) {
@@ -46,7 +46,7 @@ func (c *Controller) CheckRotateCertsDue() (bool, error) {
 		return false, errors.Wrap(err, "parse last attempted rotation timestamp")
 	}
 
-	if time.Since(t) < c.Config.RotateCertsCheckInterval {
+	if time.Since(t) < c.Config.RotateCertsCheckInterval && !reset {
 		return false, nil
 	}
 

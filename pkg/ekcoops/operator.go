@@ -75,29 +75,10 @@ func (o *Operator) Reconcile(nodes []corev1.Node, doFullReconcile bool) error {
 		}
 	}
 
-	if doFullReconcile && o.config.RotateCerts {
-		due, err := o.controller.CheckRotateCertsDue()
+	if o.config.RotateCerts && doFullReconcile {
+		err := o.RotateCerts(false)
 		if err != nil {
-			return errors.Wrapf(err, "check if it's time to run cert rotation jobs")
-		}
-		if due {
-			if err := o.controller.RotateContourCerts(); err != nil {
-				return errors.Wrap(err, "rotate contour certs")
-			}
-			if err := o.controller.RotateRegistryCert(); err != nil {
-				return errors.Wrap(err, "rotate registry cert")
-			}
-			if err := o.controller.RotateKurlProxyCert(); err != nil {
-				return errors.Wrap(err, "rotate kurl proxy cert")
-			}
-			if err := o.controller.UpdateKubeletClientCertSecret(); err != nil {
-				return errors.Wrap(err, "update kotsadm kubelet client cert secret")
-			}
-			if err := o.controller.RotateAllCerts(context.Background()); err != nil {
-				return errors.Wrap(err, "rotate certs on primaries")
-			}
-		} else {
-			o.log.Debugf("Not yet time to rotate certs")
+			return errors.Wrap(err, "rotate certs")
 		}
 	}
 
@@ -105,6 +86,10 @@ func (o *Operator) Reconcile(nodes []corev1.Node, doFullReconcile bool) error {
 		if err := o.controller.ReconcileInternalLB(context.Background(), nodes); err != nil {
 			return errors.Wrap(err, "update internal loadbalancer")
 		}
+	}
+
+	if err := o.ReconcilePrometheus(len(nodes)); err != nil {
+		return errors.Wrap(err, "failed to reconcile prometheus")
 	}
 
 	return nil
@@ -192,6 +177,33 @@ func (o *Operator) adjustPoolReplicationLevels(numNodes int, doFullReconcile boo
 		return errors.Wrapf(err, "set health_device_metrics replication to %d", factor)
 	}
 
+	return nil
+}
+
+func (o *Operator) RotateCerts(force bool) error {
+	due, err := o.controller.CheckRotateCertsDue(force)
+	if err != nil {
+		return errors.Wrapf(err, "check if it's time to run cert rotation jobs")
+	}
+	if due {
+		if err := o.controller.RotateContourCerts(); err != nil {
+			return errors.Wrap(err, "rotate contour certs")
+		}
+		if err := o.controller.RotateRegistryCert(); err != nil {
+			return errors.Wrap(err, "rotate registry cert")
+		}
+		if err := o.controller.RotateKurlProxyCert(); err != nil {
+			return errors.Wrap(err, "rotate kurl proxy cert")
+		}
+		if err := o.controller.UpdateKubeletClientCertSecret(); err != nil {
+			return errors.Wrap(err, "update kotsadm kubelet client cert secret")
+		}
+		if err := o.controller.RotateAllCerts(context.Background()); err != nil {
+			return errors.Wrap(err, "rotate certs on primaries")
+		}
+	} else {
+		o.log.Debugf("Not yet time to rotate certs")
+	}
 	return nil
 }
 
