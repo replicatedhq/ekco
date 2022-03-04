@@ -44,6 +44,8 @@ func (s *Server) overridePodImages(c *gin.Context) {
 	}
 
 	if request.Request != nil && request.Request.Resource.Resource == "pods" {
+		s.log.Debugf("Admission webhook checking for image overrides for pod %s/%s", request.Request.Namespace, request.Request.Name)
+
 		raw := request.Request.Object.Raw
 		pod := corev1.Pod{}
 		deserializer := codecs.UniversalDeserializer()
@@ -54,8 +56,6 @@ func (s *Server) overridePodImages(c *gin.Context) {
 			}
 			return
 		}
-
-		s.log.Debugf("Admission webhook checking for image overrides for pod %s/%s", pod.Namespace, pod.Name)
 
 		var patches []string
 		for i, container := range pod.Spec.InitContainers {
