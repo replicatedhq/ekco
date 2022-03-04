@@ -7,15 +7,14 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/martian/log"
-	"k8s.io/api/admission/v1beta1"
-	admissionv1beta1 "k8s.io/api/admission/v1beta1"
+	admissionv1 "k8s.io/api/admission/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func (s *Server) rookPriority(c *gin.Context) {
-	request := v1beta1.AdmissionReview{}
-	response := v1beta1.AdmissionReview{
-		Response: &admissionv1beta1.AdmissionResponse{},
+	request := admissionv1.AdmissionReview{}
+	response := admissionv1.AdmissionReview{
+		Response: &admissionv1.AdmissionResponse{},
 	}
 	if request.Request != nil {
 		response.Response.UID = request.Request.UID
@@ -39,7 +38,7 @@ func (s *Server) rookPriority(c *gin.Context) {
 
 		log.Infof("Admission webhook mutating priority class for %s/%s", request.Request.Namespace, request.Request.Name)
 		response.Response.Allowed = true
-		pt := v1beta1.PatchTypeJSONPatch
+		pt := admissionv1.PatchTypeJSONPatch
 		response.Response.PatchType = &pt
 		patch := fmt.Sprintf(`[{"op":"replace","path":"/spec/template/spec/priorityClassName","value":"%s"}]`, s.rookPriorityClass)
 		response.Response.Patch = []byte(patch)
