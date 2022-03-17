@@ -12,7 +12,10 @@ import (
 	"github.com/replicatedhq/ekco/pkg/cluster"
 	"github.com/replicatedhq/ekco/pkg/util"
 	"go.uber.org/zap"
+	certificatesv1 "k8s.io/api/certificates/v1"
 	corev1 "k8s.io/api/core/v1"
+	kuberneteserrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
 
@@ -90,6 +93,10 @@ func (o *Operator) Reconcile(nodes []corev1.Node, doFullReconcile bool) error {
 
 	if err := o.ReconcilePrometheus(len(nodes)); err != nil {
 		return errors.Wrap(err, "failed to reconcile prometheus")
+	}
+
+	if err := o.reconcileCertificateSigningRequests(); err != nil {
+		return errors.Wrap(err, "failed to reconcile csrs")
 	}
 
 	return nil
@@ -220,4 +227,32 @@ func shouldUseNodeForStorage(node corev1.Node, rookStorageNodesLabel string) boo
 		}
 	}
 	return false
+}
+
+//TODO approve the csrs if the SIGNERNAME is kubernetes.io/kubelet-serving
+
+func (o *Operator) reconcileCertificateSigningRequests() error {
+	csrList, err := o.client.CertificatesV1().CertificateSigningRequests().List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		if !kuberneteserrors.IsNotFound(err) {
+			return errors.Wrap(err, "csrs do not exist")
+		}
+		return errors.Wrap(err, "failed to get csr")
+	}
+	for _, csr := range csrList.Items {
+		if len(csr.Status.Conditions) == 0 && len(csr.Status.Certificate) == 0 {
+			csr.Status.Conditions = append(csr.Status.Conditions, certificatesv1.CertificateSigningRequestCondition{
+				Type:           certificatesv1.CertificateApproved,
+				Reason:         "ekcoApprove",
+				Message:        "automated ekco approval of kubelet csr request",
+				Status:         corev1.ConditionTrue,
+				LastUpdateTime: metav1.Now(),
+			})
+			_, err := o.client.CertificatesV1().CertificateSigningRequests().UpdateApproval(context.TODO(), csr.Name, &csr, metav1.UpdateOptions{})
+			if err != nil {
+				return errors.Wrap(err, "failed to approve csr")
+			}
+		}
+	}
+	return nil
 }
