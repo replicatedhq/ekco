@@ -94,7 +94,7 @@ func (o *Operator) Reconcile(nodes []corev1.Node, doFullReconcile bool) error {
 		return errors.Wrap(err, "failed to reconcile prometheus")
 	}
 
-	if o.config.AutoApproveKubeletCertSigningReqests {
+	if o.config.AutoApproveKubeletCertSigningRequests {
 		if err := o.reconcileCertificateSigningRequests(); err != nil {
 			return errors.Wrap(err, "reconcile csrs")
 		}
@@ -250,6 +250,7 @@ func (o *Operator) reconcileCertificateSigningRequests() error {
 			if err != nil {
 				return errors.Wrapf(err, "approve csr %s", csr.Name)
 			}
+			o.log.Infof("CSR approval is successful %s", csr.Name)
 		}
 	}
 	return nil
