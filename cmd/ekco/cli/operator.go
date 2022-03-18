@@ -118,6 +118,7 @@ func OperatorCmd(v *viper.Viper) *cobra.Command {
 	cmd.Flags().String("host_task_image", "replicated/ekco:latest", "Image to use in host task pods")
 	cmd.Flags().Bool("enable_internal_load_balancer", false, "Run haproxy on localhost forwarding to all in-cluster Kubernetes API servers")
 	cmd.Flags().StringSlice("pod_image_overrides", nil, "Image to override in pods")
+	cmd.Flags().Bool("auto_approve_kubelet_csrs", false, "Enable auto approval of kubelet Certificate Signing Requests")
 
 	return cmd
 }
