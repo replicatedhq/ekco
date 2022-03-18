@@ -234,8 +234,9 @@ func shouldUseNodeForStorage(node corev1.Node, rookStorageNodesLabel string) boo
 func (o *Operator) reconcileCertificateSigningRequests() error {
 	csrList, err := o.client.CertificatesV1().CertificateSigningRequests().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
-		if !kuberneteserrors.IsNotFound(err) {
-			return errors.Wrap(err, "csrs do not exist")
+		if kuberneteserrors.IsNotFound(err) {
+			o.log.Debugf("csrs not found, nothing to approve")
+			return nil
 		}
 		return errors.Wrap(err, "failed to get csr")
 	}
@@ -250,7 +251,7 @@ func (o *Operator) reconcileCertificateSigningRequests() error {
 			})
 			_, err := o.client.CertificatesV1().CertificateSigningRequests().UpdateApproval(context.TODO(), csr.Name, &csr, metav1.UpdateOptions{})
 			if err != nil {
-				return errors.Wrap(err, "failed to approve csr")
+				return errors.Wrapf(err, "failed to approve csr %s", csr.Name)
 			}
 		}
 	}
