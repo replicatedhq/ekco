@@ -229,8 +229,6 @@ func shouldUseNodeForStorage(node corev1.Node, rookStorageNodesLabel string) boo
 	return false
 }
 
-//TODO approve the csrs if the SIGNERNAME is kubernetes.io/kubelet-serving
-
 func (o *Operator) reconcileCertificateSigningRequests() error {
 	csrList, err := o.client.CertificatesV1().CertificateSigningRequests().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
@@ -241,6 +239,9 @@ func (o *Operator) reconcileCertificateSigningRequests() error {
 		return errors.Wrap(err, "failed to get csr")
 	}
 	for _, csr := range csrList.Items {
+		if csr.Spec.SignerName != "kubernetes.io/kubelet-serving" {
+			continue
+		}
 		if len(csr.Status.Conditions) == 0 && len(csr.Status.Certificate) == 0 {
 			csr.Status.Conditions = append(csr.Status.Conditions, certificatesv1.CertificateSigningRequestCondition{
 				Type:           certificatesv1.CertificateApproved,
