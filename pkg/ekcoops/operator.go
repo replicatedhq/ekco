@@ -5,7 +5,6 @@ package ekcoops
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"sync"
 	"time"
 
@@ -15,7 +14,6 @@ import (
 	"go.uber.org/zap"
 	certificatesv1 "k8s.io/api/certificates/v1"
 	corev1 "k8s.io/api/core/v1"
-	kuberneteserrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
@@ -96,8 +94,10 @@ func (o *Operator) Reconcile(nodes []corev1.Node, doFullReconcile bool) error {
 		return errors.Wrap(err, "failed to reconcile prometheus")
 	}
 
-	if err := o.reconcileCertificateSigningRequests(); err != nil {
-		return errors.Wrap(err, "reconcile csrs")
+	if o.config.AutoApproveKubeletCertSigningReqests {
+		if err := o.reconcileCertificateSigningRequests(); err != nil {
+			return errors.Wrap(err, "reconcile csrs")
+		}
 	}
 
 	return nil
@@ -231,24 +231,6 @@ func shouldUseNodeForStorage(node corev1.Node, rookStorageNodesLabel string) boo
 }
 
 func (o *Operator) reconcileCertificateSigningRequests() error {
-	kurlConfig, err := o.client.CoreV1().ConfigMaps("kube-system").Get(context.TODO(), "kurl-config", metav1.GetOptions{})
-	if err != nil {
-		if kuberneteserrors.IsNotFound(err) {
-			return nil
-		}
-		return errors.Wrap(err, "get kurl-config map")
-	}
-	var cisComplianceEnabled bool
-	if v, ok := kurlConfig.Data["kurl_cis_compliance"]; ok {
-		cisComplianceEnabled, err = strconv.ParseBool(v)
-		if err != nil {
-			return errors.Wrap(err, "parse kurl_cis_compliance from kurl-confg")
-		}
-	}
-	if !cisComplianceEnabled {
-		return nil
-	}
-
 	csrList, err := o.client.CertificatesV1().CertificateSigningRequests().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return errors.Wrap(err, "list csrs")
