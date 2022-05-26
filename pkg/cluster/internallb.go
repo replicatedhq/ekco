@@ -67,7 +67,9 @@ func (c *Controller) UpdateInternalLB(ctx context.Context, nodes []corev1.Node) 
 
 	for _, node := range nodes {
 		if _, ok := node.ObjectMeta.Labels[util.MasterRoleLabel]; !ok {
-			continue
+			if _, ok := node.ObjectMeta.Labels[util.ControlPlaneRoleLabel]; !ok {
+				continue
+			}
 		}
 		if host := util.NodeInternalIP(node); host != "" {
 			primaryHosts = append(primaryHosts, host)
