@@ -7,13 +7,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/blang/semver"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/kubernetes"
 )
 
 var errPodFailed error = errors.New("pod failed")
@@ -67,12 +65,8 @@ func (c *Controller) RotateAllCerts(ctx context.Context) error {
 	if err := c.deletePods(RotateCertsSelector); err != nil {
 		c.Log.Warnf("Failed to delete rotate pods: %v", err)
 	}
-	primaryRoleLabel, err := c.getPrimaryRoleLabel()
-	if err != nil {
-		return errors.Wrap(err, "unable to get primary role label")
-	}
 	opts := metav1.ListOptions{
-		LabelSelector: primaryRoleLabel,
+		LabelSelector: "node-role.kubernetes.io/master=,node-role.kubernetes.io/control-plane=",
 	}
 	node, err := c.Config.Client.CoreV1().Nodes().List(context.TODO(), opts)
 	if err != nil {
@@ -117,12 +111,6 @@ func (c *Controller) deletePods(selector labels.Selector) error {
 }
 
 func (c *Controller) getRotateCertsPodConfig(nodeName string) *corev1.Pod {
-
-	primaryRoleLabel, err := c.getPrimaryRoleLabel()
-	if err != nil {
-		//TODO add log
-		return nil
-	}
 	return &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "rotate-certs-",
@@ -137,7 +125,12 @@ func (c *Controller) getRotateCertsPodConfig(nodeName string) *corev1.Pod {
 			},
 			Tolerations: []corev1.Toleration{
 				{
-					Key:      primaryRoleLabel,
+					Key:      "node-role.kubernetes.io/control-plane",
+					Effect:   corev1.TaintEffectNoSchedule,
+					Operator: corev1.TolerationOpExists,
+				},
+				{
+					Key:      "node-role.kubernetes.io/master",
 					Effect:   corev1.TaintEffectNoSchedule,
 					Operator: corev1.TolerationOpExists,
 				},
@@ -231,31 +224,4 @@ func (c *Controller) logPodResults(namespace, name string) {
 			c.Log.Debug(line)
 		}
 	}
-}
-
-func (c *Controller) getPrimaryRoleLabel() (string, error) {
-	primaryRoleLabel := ""
-	clientset, err := kubernetes.NewForConfig(c.Config.ClientConfig)
-	if err != nil {
-		return primaryRoleLabel, errors.Wrap(err, "failed to create kubernetes clientset")
-	}
-	currentK8sVersion, err := clientset.ServerVersion()
-	if err != nil {
-		return primaryRoleLabel, errors.Wrap(err, "failed to get k8s version")
-	}
-	toleratedVersion, err := semver.ParseTolerant(currentK8sVersion.String())
-	if err != nil {
-		return primaryRoleLabel, errors.Wrap(err, "failed to parse k8s version")
-	}
-	compareK8sVersion, err := semver.Make("1.24.0")
-	if err != nil {
-		return primaryRoleLabel, errors.Wrap(err, "failed to make k8s version")
-	}
-	if toleratedVersion.GE(compareK8sVersion) {
-		primaryRoleLabel = "node-role.kubernetes.io/control-plane"
-	} else {
-		primaryRoleLabel = "node-role.kubernetes.io/master"
-	}
-	return primaryRoleLabel, nil
-
 }

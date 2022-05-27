@@ -54,7 +54,12 @@ func (c *Controller) setKubeconfigServerPod(nodeName string, server string, admi
 			},
 			Tolerations: []corev1.Toleration{
 				{
-					Key:      PrimaryRoleLabel,
+					Key:      "node-role.kubernetes.io/master",
+					Effect:   corev1.TaintEffectNoSchedule,
+					Operator: corev1.TolerationOpExists,
+				},
+				{
+					Key:      "node-role.kubernetes.io/control-plane",
 					Effect:   corev1.TaintEffectNoSchedule,
 					Operator: corev1.TolerationOpExists,
 				},

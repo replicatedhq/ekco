@@ -65,14 +65,8 @@ func (c *Controller) UpdateInternalLB(ctx context.Context, nodes []corev1.Node) 
 	}
 	var primaryHosts []string
 
-	primaryRoleLabel, err := c.getPrimaryRoleLabel()
-	if err != nil {
-		c.Log.Errorf("Failed to get primary role label: %v", err)
-		return nil
-	}
-
 	for _, node := range nodes {
-		if _, ok := node.ObjectMeta.Labels[primaryRoleLabel]; !ok {
+		if !util.NodeIsMaster(node) {
 			continue
 		}
 		if host := util.NodeInternalIP(node); host != "" {
@@ -120,12 +114,6 @@ func (c *Controller) getUpdateInternalLBPod(nodeName string, primaries ...string
 
 	hosts := strings.Join(primaries, ",")
 
-	primaryRoleLabel, err := c.getPrimaryRoleLabel()
-	if err != nil {
-		//TODO log error
-		return nil
-	}
-
 	return &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "update-haproxy-",
@@ -140,7 +128,12 @@ func (c *Controller) getUpdateInternalLBPod(nodeName string, primaries ...string
 			},
 			Tolerations: []corev1.Toleration{
 				{
-					Key:      primaryRoleLabel,
+					Key:      "node-role.kubernetes.io/master",
+					Effect:   corev1.TaintEffectNoSchedule,
+					Operator: corev1.TolerationOpExists,
+				},
+				{
+					Key:      "node-role.kubernetes.io/control-plane",
 					Effect:   corev1.TaintEffectNoSchedule,
 					Operator: corev1.TolerationOpExists,
 				},
