@@ -66,11 +66,20 @@ func (c *Controller) RotateAllCerts(ctx context.Context) error {
 		c.Log.Warnf("Failed to delete rotate pods: %v", err)
 	}
 	opts := metav1.ListOptions{
-		LabelSelector: "node-role.kubernetes.io/master=,node-role.kubernetes.io/control-plane=",
+		LabelSelector: "node-role.kubernetes.io/master=",
 	}
 	node, err := c.Config.Client.CoreV1().Nodes().List(context.TODO(), opts)
 	if err != nil {
 		return errors.Wrap(err, "list primary nodes")
+	}
+	if len(node.Items) == 0 {
+		opts = metav1.ListOptions{
+			LabelSelector: "node-role.kubernetes.io/control-plane=",
+		}
+		node, err = c.Config.Client.CoreV1().Nodes().List(context.TODO(), opts)
+		if err != nil {
+			return errors.Wrap(err, "list primary nodes")
+		}
 	}
 	for i, node := range node.Items {
 		c.Log.Debugf("Running certificate rotation task on node %s", node.Name)

@@ -11,7 +11,6 @@ const (
 
 	RookCephObjectStoreRootPool = ".rgw.root"
 
-	PrimaryRoleLabel         = "node-role.kubernetes.io/master"
 	RotateCertsLabel         = "kurl.sh/task"
 	RotateCertsValue         = "rotate-certs"
 	RotateCertsLastAttempted = "rotate-certs-last-attempted"
