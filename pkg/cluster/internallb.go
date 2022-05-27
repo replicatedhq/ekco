@@ -66,7 +66,7 @@ func (c *Controller) UpdateInternalLB(ctx context.Context, nodes []corev1.Node) 
 	var primaryHosts []string
 
 	for _, node := range nodes {
-		if _, ok := node.ObjectMeta.Labels[util.MasterRoleLabel]; !ok {
+		if !util.NodeIsMaster(node) {
 			continue
 		}
 		if host := util.NodeInternalIP(node); host != "" {
@@ -129,6 +129,11 @@ func (c *Controller) getUpdateInternalLBPod(nodeName string, primaries ...string
 			Tolerations: []corev1.Toleration{
 				{
 					Key:      "node-role.kubernetes.io/master",
+					Effect:   corev1.TaintEffectNoSchedule,
+					Operator: corev1.TolerationOpExists,
+				},
+				{
+					Key:      "node-role.kubernetes.io/control-plane",
 					Effect:   corev1.TaintEffectNoSchedule,
 					Operator: corev1.TolerationOpExists,
 				},

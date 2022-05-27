@@ -5,6 +5,7 @@ import (
 )
 
 const MasterRoleLabel = "node-role.kubernetes.io/master"
+const ControlPlaneRoleLabel = "node-role.kubernetes.io/control-plane"
 const UnreachableTaint = "node.kubernetes.io/unreachable"
 const NotReadyTaint = "node.kubernetes.io/not-ready"
 const NetworkUnavailableTaint = "node.kubernetes.io/network-unavailable"
@@ -27,7 +28,14 @@ func NodeIsReady(node v1.Node) bool {
 }
 
 func NodeIsMaster(node v1.Node) bool {
-	_, ok := node.ObjectMeta.Labels[MasterRoleLabel]
+	ok := false
+
+	if _, ok = node.ObjectMeta.Labels[MasterRoleLabel]; ok {
+		return ok
+	}
+	if _, ok = node.ObjectMeta.Labels[ControlPlaneRoleLabel]; ok {
+		return ok
+	}
 	return ok
 }
 
