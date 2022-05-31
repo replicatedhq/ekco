@@ -5,7 +5,7 @@ go 1.17
 require (
 	github.com/blang/semver v3.5.1+incompatible
 	github.com/coreos/go-systemd/v22 v22.3.2
-	github.com/gin-gonic/gin v1.6.3
+	github.com/gin-gonic/gin v1.7.0
 	github.com/google/martian v2.1.0+incompatible
 	github.com/pkg/errors v0.9.1
 	github.com/projectcontour/contour v1.19.1
@@ -39,7 +39,7 @@ require (
 	github.com/go-logr/logr v0.4.0 // indirect
 	github.com/go-playground/locales v0.13.0 // indirect
 	github.com/go-playground/universal-translator v0.17.0 // indirect
-	github.com/go-playground/validator/v10 v10.2.0 // indirect
+	github.com/go-playground/validator/v10 v10.4.1 // indirect
 	github.com/godbus/dbus/v5 v5.0.4 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
@@ -79,6 +79,7 @@ require (
 	go.etcd.io/etcd/client/pkg/v3 v3.5.1 // indirect
 	go.uber.org/atomic v1.7.0 // indirect
 	go.uber.org/multierr v1.6.0 // indirect
+	golang.org/x/crypto v0.0.0-20210817164053-32db794688a5 // indirect
 	golang.org/x/net v0.0.0-20211209124913-491a49abca63 // indirect
 	golang.org/x/oauth2 v0.0.0-20210628180205-a41e5a781914 // indirect
 	golang.org/x/sys v0.0.0-20210817190340-bfb29a6856f2 // indirect
