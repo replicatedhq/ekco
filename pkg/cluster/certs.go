@@ -17,7 +17,7 @@ import (
 var errPodFailed error = errors.New("pod failed")
 
 // Any time this returns true it updates the last attempted timestamp
-func (c *Controller) CheckRotateCertsDue() (bool, error) {
+func (c *Controller) CheckRotateCertsDue(reset bool) (bool, error) {
 	client := c.Config.Client.CoreV1().ConfigMaps(c.Config.RotateCertsNamespace)
 	cm, err := client.Get(context.TODO(), RotateCertsValue, metav1.GetOptions{})
 	if err != nil && !k8serrors.IsNotFound(err) {
@@ -46,7 +46,7 @@ func (c *Controller) CheckRotateCertsDue() (bool, error) {
 		return false, errors.Wrap(err, "parse last attempted rotation timestamp")
 	}
 
-	if time.Since(t) < c.Config.RotateCertsCheckInterval {
+	if time.Since(t) < c.Config.RotateCertsCheckInterval && !reset {
 		return false, nil
 	}
 
@@ -66,11 +66,20 @@ func (c *Controller) RotateAllCerts(ctx context.Context) error {
 		c.Log.Warnf("Failed to delete rotate pods: %v", err)
 	}
 	opts := metav1.ListOptions{
-		LabelSelector: PrimaryRoleLabel,
+		LabelSelector: "node-role.kubernetes.io/master=",
 	}
 	node, err := c.Config.Client.CoreV1().Nodes().List(context.TODO(), opts)
 	if err != nil {
 		return errors.Wrap(err, "list primary nodes")
+	}
+	if len(node.Items) == 0 {
+		opts = metav1.ListOptions{
+			LabelSelector: "node-role.kubernetes.io/control-plane=",
+		}
+		node, err = c.Config.Client.CoreV1().Nodes().List(context.TODO(), opts)
+		if err != nil {
+			return errors.Wrap(err, "list primary nodes")
+		}
 	}
 	for i, node := range node.Items {
 		c.Log.Debugf("Running certificate rotation task on node %s", node.Name)
@@ -125,7 +134,12 @@ func (c *Controller) getRotateCertsPodConfig(nodeName string) *corev1.Pod {
 			},
 			Tolerations: []corev1.Toleration{
 				{
-					Key:      PrimaryRoleLabel,
+					Key:      "node-role.kubernetes.io/control-plane",
+					Effect:   corev1.TaintEffectNoSchedule,
+					Operator: corev1.TolerationOpExists,
+				},
+				{
+					Key:      "node-role.kubernetes.io/master",
 					Effect:   corev1.TaintEffectNoSchedule,
 					Operator: corev1.TolerationOpExists,
 				},

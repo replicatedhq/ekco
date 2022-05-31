@@ -11,7 +11,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
+	k8stypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/duration"
 	"k8s.io/client-go/util/cert"
 )
@@ -54,14 +54,13 @@ func (c *Controller) RotateContourCerts() error {
 
 	c.Log.Infof("Renewed contour and envoy certs")
 
-	selector := metav1.ListOptions{
-		LabelSelector: labels.SelectorFromSet(labels.Set{"app": "envoy"}).String(),
-	}
-	if err := c.Config.Client.CoreV1().Pods(contourNamespace).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, selector); err != nil {
+	// rollout restart envoy pods
+	envoyPatchPayload := fmt.Sprintf(`{"spec":{"template":{"metadata":{"annotations":{"kubectl.kubernetes.io/restartedAt":"%s"}}}}}`, time.Now().Format(time.RFC3339))
+	if _, err := c.Config.Client.AppsV1().DaemonSets(contourNamespace).Patch(context.TODO(), "envoy", k8stypes.StrategicMergePatchType, []byte(envoyPatchPayload), metav1.PatchOptions{}); err != nil {
 		return errors.Wrap(err, "restart envoy")
 	}
 
-	c.Log.Infof("Restarted envoy pods")
+	c.Log.Infof("Restarting envoy pods")
 
 	return nil
 }
