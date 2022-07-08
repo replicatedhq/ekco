@@ -14,6 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/duration"
 	"k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/keyutil"
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs/renewal"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
@@ -119,6 +120,7 @@ func (c *Controller) updateRegistryCert(namespace, name string, crt *x509.Certif
 }
 
 func certToConfig(crt *x509.Certificate) *pkiutil.CertConfig {
+	notAfter := time.Now().Add(kubeadmconstants.CertificateValidity).UTC()
 	return &pkiutil.CertConfig{
 		Config: cert.Config{
 			CommonName:   crt.Subject.CommonName,
@@ -129,7 +131,7 @@ func certToConfig(crt *x509.Certificate) *pkiutil.CertConfig {
 			},
 			Usages: crt.ExtKeyUsage,
 		},
-		NotAfter:           &crt.NotAfter,
+		NotAfter:           &notAfter,
 		PublicKeyAlgorithm: crt.PublicKeyAlgorithm,
 	}
 }
