@@ -3,8 +3,12 @@ package cluster
 import (
 	"context"
 	"crypto"
+	cryptorand "crypto/rand"
 	"crypto/x509"
+	"crypto/x509/pkix"
 	"fmt"
+	"math"
+	"math/big"
 	"time"
 
 	"github.com/pkg/errors"
@@ -13,12 +17,19 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/duration"
 	"k8s.io/client-go/util/cert"
+	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/keyutil"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
-	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs/renewal"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 )
+
+type certConfig struct {
+	certutil.Config
+	NotBefore          *time.Time
+	NotAfter           *time.Time
+	PublicKeyAlgorithm x509.PublicKeyAlgorithm
+}
 
 func (c *Controller) RotateRegistryCert() error {
 	ns := c.Config.RegistryCertNamespace
@@ -51,7 +62,7 @@ func (c *Controller) RotateRegistryCert() error {
 
 	config := certToConfig(cert)
 
-	newCert, newKey, err := renewal.NewFileRenewer(caCert, caKey).Renew(config)
+	newCert, newKey, err := generateNewCertAndKey(caCert, caKey, config)
 	if err != nil {
 		return errors.Wrap(err, "generate new cert")
 	}
@@ -119,9 +130,10 @@ func (c *Controller) updateRegistryCert(namespace, name string, crt *x509.Certif
 	return nil
 }
 
-func certToConfig(crt *x509.Certificate) *pkiutil.CertConfig {
-	notAfter := time.Now().Add(kubeadmconstants.CertificateValidity).UTC()
-	return &pkiutil.CertConfig{
+func certToConfig(crt *x509.Certificate) *certConfig {
+	notBefore := time.Now().UTC()
+	notAfter := notBefore.Add(kubeadmconstants.CertificateValidity)
+	return &certConfig{
 		Config: cert.Config{
 			CommonName:   crt.Subject.CommonName,
 			Organization: crt.Subject.Organization,
@@ -131,7 +143,77 @@ func certToConfig(crt *x509.Certificate) *pkiutil.CertConfig {
 			},
 			Usages: crt.ExtKeyUsage,
 		},
+		NotBefore:          &notBefore,
 		NotAfter:           &notAfter,
 		PublicKeyAlgorithm: crt.PublicKeyAlgorithm,
 	}
+}
+
+// Copied from pkiutil.NewCertAndKey
+// This uses a slightly different implementation for NewSignedCert.
+// The notBefore date is Now() instead of caCert's notBefore.
+func generateNewCertAndKey(caCert *x509.Certificate, caKey crypto.Signer, config *certConfig) (*x509.Certificate, crypto.Signer, error) {
+	if len(config.Usages) == 0 {
+		return nil, nil, errors.New("must specify at least one ExtKeyUsage")
+	}
+
+	key, err := pkiutil.NewPrivateKey(config.PublicKeyAlgorithm)
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "unable to create private key")
+	}
+
+	cert, err := newSignedCert(config, key, caCert, caKey, false)
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "unable to sign certificate")
+	}
+
+	return cert, key, nil
+}
+
+func newSignedCert(cfg *certConfig, key crypto.Signer, caCert *x509.Certificate, caKey crypto.Signer, isCA bool) (*x509.Certificate, error) {
+	serial, err := cryptorand.Int(cryptorand.Reader, new(big.Int).SetInt64(math.MaxInt64))
+	if err != nil {
+		return nil, err
+	}
+	if len(cfg.CommonName) == 0 {
+		return nil, errors.New("must specify a CommonName")
+	}
+
+	keyUsage := x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature
+	if isCA {
+		keyUsage |= x509.KeyUsageCertSign
+	}
+
+	pkiutil.RemoveDuplicateAltNames(&cfg.AltNames)
+
+	notBefore := time.Now().UTC()
+	if cfg.NotBefore != nil {
+		notBefore = *cfg.NotBefore
+	}
+
+	notAfter := time.Now().Add(kubeadmconstants.CertificateValidity).UTC()
+	if cfg.NotAfter != nil {
+		notAfter = *cfg.NotAfter
+	}
+
+	certTmpl := x509.Certificate{
+		Subject: pkix.Name{
+			CommonName:   cfg.CommonName,
+			Organization: cfg.Organization,
+		},
+		DNSNames:              cfg.AltNames.DNSNames,
+		IPAddresses:           cfg.AltNames.IPs,
+		SerialNumber:          serial,
+		NotBefore:             notBefore, // this line is different in pkiutil.NewSignedCert
+		NotAfter:              notAfter,
+		KeyUsage:              keyUsage,
+		ExtKeyUsage:           cfg.Usages,
+		BasicConstraintsValid: true,
+		IsCA:                  isCA,
+	}
+	certDERBytes, err := x509.CreateCertificate(cryptorand.Reader, &certTmpl, caCert, key.Public(), caKey)
+	if err != nil {
+		return nil, err
+	}
+	return x509.ParseCertificate(certDERBytes)
 }
