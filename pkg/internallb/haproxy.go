@@ -36,7 +36,7 @@ func GenerateHAProxyConfig(primaries ...string) ([]byte, error) {
 
 // GenerateHAProxyManifest writes the generated manifest to the file only if it does not have the
 // correct hash. This avoids a few seconds of downtime when the pod is restarted unnecessarily.
-func GenerateHAProxyManifest(filename string, primaries ...string) error {
+func GenerateHAProxyManifest(filename, image string, primaries ...string) error {
 	config, err := GenerateHAProxyConfig(primaries...)
 	if err != nil {
 		return err
@@ -56,7 +56,10 @@ func GenerateHAProxyManifest(filename string, primaries ...string) error {
 		}
 	}
 
-	manifest, err := generateHAProxyManifest(hash)
+	manifest, err := generateHAProxyManifest(image, hash)
+	if err != nil {
+		return err
+	}
 
 	if err := os.MkdirAll(filepath.Dir(filename), 0755); err != nil {
 		return err
@@ -68,9 +71,10 @@ func GenerateHAProxyManifest(filename string, primaries ...string) error {
 	return nil
 }
 
-func generateHAProxyManifest(configHash string) ([]byte, error) {
+func generateHAProxyManifest(image, configHash string) ([]byte, error) {
 	var buf bytes.Buffer
 	data := map[string]string{
+		"Image":      image,
 		"ConfigHash": configHash,
 	}
 
