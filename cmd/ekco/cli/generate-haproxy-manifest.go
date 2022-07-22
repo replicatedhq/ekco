@@ -9,6 +9,7 @@ import (
 func GenerateHAProxyManifestCmd(v *viper.Viper) *cobra.Command {
 	primaries := &[]string{}
 	var filename string
+	var image string
 
 	cmd := &cobra.Command{
 		Use:   "generate-haproxy-manifest",
@@ -19,7 +20,7 @@ func GenerateHAProxyManifestCmd(v *viper.Viper) *cobra.Command {
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 
-			err := internallb.GenerateHAProxyManifest(filename, *primaries...)
+			err := internallb.GenerateHAProxyManifest(filename, image, *primaries...)
 			if err != nil {
 				return err
 			}
@@ -30,6 +31,7 @@ func GenerateHAProxyManifestCmd(v *viper.Viper) *cobra.Command {
 
 	cmd.Flags().StringSliceVar(primaries, "primary-host", []string{}, "Kubernetes API server IP or hostname")
 	cmd.Flags().StringVar(&filename, "file", "/etc/kubernetes/manifests/haproxy", "Filename for the haproxy static pod manifest")
+	cmd.Flags().StringVar(&image, "image", "haproxy:lts-alpine", "Container image for the haproxy static pod manifest")
 
 	return cmd
 }

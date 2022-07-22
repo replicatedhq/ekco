@@ -64,7 +64,7 @@ backend kubernetes-primaries
 }
 
 func TestGenerateHAProxyManifest(t *testing.T) {
-	out, err := generateHAProxyManifest("5b02714")
+	out, err := generateHAProxyManifest("haproxy:1.1.1", "5b02714")
 	assert.NoError(t, err)
 
 	expect := `apiVersion: v1
@@ -74,7 +74,7 @@ metadata:
   namespace: kube-system
 spec:
   containers:
-  - image: haproxy:2.4.10
+  - image: "haproxy:1.1.1"
     name: haproxy
     env:
     - name: HAPROXY_CONFIG_HASH
