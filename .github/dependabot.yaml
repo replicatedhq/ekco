@@ -1,0 +1,11 @@
+---
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    labels:
+      - "dependencies"
+      - "github-actions"
+      - "type::chore"
+    schedule:
+      interval: "weekly"
