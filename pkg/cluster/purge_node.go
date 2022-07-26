@@ -11,7 +11,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	kubeadmapiv121 "k8s.io/kubernetes/v121/cmd/kubeadm/app/apis/kubeadm"
 )
 
 const (
@@ -159,7 +158,7 @@ func (c *Controller) deleteK8sNode(ctx context.Context, name string) error {
 func (c *Controller) removeKubeadmEndpoint(ctx context.Context, name string) (string, []string, error) {
 	var ip string
 	var remainingIPs []string
-	var clusterStatus kubeadmapiv121.ClusterStatus
+	var clusterStatus k8s121ClusterStatus
 
 	cm, err := c.Config.Client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(ctx, kubeadmconstants.KubeadmConfigConfigMap, metav1.GetOptions{})
 	if err != nil {
@@ -171,14 +170,14 @@ func (c *Controller) removeKubeadmEndpoint(ctx context.Context, name string) (st
 		return "", nil, nil
 	}
 
-	clusterStatus = kubeadmapiv121.ClusterStatus{}
+	clusterStatus = k8s121ClusterStatus{}
 
 	if err := yaml.Unmarshal([]byte(cm.Data[clusterStatusConfigMapKey]), &clusterStatus); err != nil {
 		return "", nil, errors.Wrap(err, "unmarshal kubeadm-config ClusterStatus")
 	}
 
 	if clusterStatus.APIEndpoints == nil {
-		clusterStatus.APIEndpoints = map[string]kubeadmapiv121.APIEndpoint{}
+		clusterStatus.APIEndpoints = map[string]k8s121APIEndpoint{}
 	}
 	apiEndpoint, found := clusterStatus.APIEndpoints[name]
 	if found {
@@ -202,4 +201,14 @@ func (c *Controller) removeKubeadmEndpoint(ctx context.Context, name string) (st
 	}
 
 	return ip, remainingIPs, nil
+}
+
+type k8s121ClusterStatus struct {
+	metav1.TypeMeta
+	APIEndpoints map[string]k8s121APIEndpoint
+}
+
+type k8s121APIEndpoint struct {
+	AdvertiseAddress string
+	BindPort         int32
 }
