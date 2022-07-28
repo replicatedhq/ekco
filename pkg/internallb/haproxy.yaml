@@ -3,13 +3,13 @@ kind: Pod
 metadata:
   name: haproxy
   namespace: kube-system
+  labels:
+    app: kurl-haproxy
+    fileversion: "{{ .Fileversion }}"
 spec:
   containers:
   - image: "{{ .Image }}"
     name: haproxy
-    env:
-    - name: HAPROXY_CONFIG_HASH
-      value: "{{ .ConfigHash }}"
     livenessProbe:
       failureThreshold: 8
       httpGet:

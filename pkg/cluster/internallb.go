@@ -5,12 +5,16 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/pkg/errors"
+	"github.com/replicatedhq/ekco/pkg/k8s"
 	"github.com/replicatedhq/ekco/pkg/util"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 )
 
 func (c *Controller) ReconcileInternalLB(ctx context.Context, nodes []corev1.Node) error {
@@ -60,7 +64,7 @@ func (c *Controller) ReconcileInternalLB(ctx context.Context, nodes []corev1.Nod
 
 // Update /etc/haproxy/haproxy.cfg and /etc/kubernetes/manifests/haproxy.yaml on all nodes.
 func (c *Controller) UpdateInternalLB(ctx context.Context, nodes []corev1.Node) error {
-	if err := c.deletePods(UpdateInternalLBSelector); err != nil {
+	if err := c.deletePods(c.Config.HostTaskNamespace, UpdateInternalLBSelector); err != nil {
 		c.Log.Warnf("Failed to delete update internal loadbalancer pods: %v", err)
 	}
 	var primaryHosts []string
@@ -99,13 +103,75 @@ func (c *Controller) UpdateInternalLB(ctx context.Context, nodes []corev1.Node) 
 		}
 	}
 
-	if err := c.deletePods(UpdateInternalLBSelector); err != nil {
+	if err := c.deletePods(c.Config.HostTaskNamespace, UpdateInternalLBSelector); err != nil {
 		c.Log.Warnf("Failed to delete internal loadbalancer update pods: %v", err)
+	}
+
+	if err := c.sighupPods("kube-system", labels.SelectorFromSet(labels.Set{"app": "kurl-haproxy"}), "haproxy"); err != nil {
+		c.Log.Warnf("Failed to send SIGHUP to haproxy pods: %v", err)
+		return nil
 	}
 
 	c.Log.Info("Successfully completed internal loadbalancer update task on all nodes")
 
 	return nil
+}
+
+func (c *Controller) sighupPods(namespace string, selector labels.Selector, container string) error {
+	options := metav1.ListOptions{
+		LabelSelector: selector.String(),
+	}
+
+	pods, err := c.Config.Client.CoreV1().Pods(namespace).List(context.TODO(), options)
+	if err != nil {
+		return errors.Wrap(err, "list pods")
+	}
+	if len(pods.Items) == 0 {
+		return errors.New("found no pods")
+	}
+
+	cmd := []string{"/bin/kill", "-HUP", "1"}
+
+	errs := make(chan error, len(pods.Items))
+
+	wg := sync.WaitGroup{}
+	wg.Add(len(pods.Items))
+	go func() {
+		wg.Wait()
+		close(errs)
+	}()
+
+	for _, pod := range pods.Items {
+		pod := pod
+		go func() {
+			defer wg.Done()
+			exitCode, _, stderr, err := k8s.SyncExec(c.Config.Client.CoreV1(), c.Config.ClientConfig, namespace, pod.Name, container, cmd...)
+			if err != nil {
+				errs <- errors.Wrapf(err, "exec pod %s", pod.Name)
+			} else if exitCode != 0 {
+				errs <- errors.Errorf("exec pod %s: exitcode=%d, stderr=%q", pod.Name, exitCode, stderr)
+			} else {
+				errs <- nil
+			}
+		}()
+	}
+
+	timeout := time.After(time.Minute)
+	for {
+		select {
+		case <-timeout:
+			return errors.New("timeout")
+		case err, ok := <-errs:
+			if !ok {
+				// all returned with no errors
+				return nil
+			}
+			if err != nil {
+				// short circuit on first error
+				return err
+			}
+		}
+	}
 }
 
 func (c *Controller) getUpdateInternalLBPod(nodeName string, primaries ...string) *corev1.Pod {

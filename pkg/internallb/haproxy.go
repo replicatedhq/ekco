@@ -2,14 +2,14 @@ package internallb
 
 import (
 	"bytes"
-	"crypto/sha256"
 	_ "embed"
 	"errors"
-	"fmt"
 	"html/template"
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strconv"
 )
 
 //go:embed haproxy.cfg
@@ -34,16 +34,13 @@ func GenerateHAProxyConfig(primaries ...string) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-// GenerateHAProxyManifest writes the generated manifest to the file only if it does not have the
-// correct hash. This avoids a few seconds of downtime when the pod is restarted unnecessarily.
-func GenerateHAProxyManifest(filename, image string, primaries ...string) error {
-	config, err := GenerateHAProxyConfig(primaries...)
-	if err != nil {
-		return err
-	}
-
-	sum := sha256.Sum256(config)
-	hash := fmt.Sprintf("%x", sum)[0:7]
+// GenerateHAProxyManifest writes the generated manifest to the file only if it does not exist or
+// the fileversion has changed. This avoids a few seconds of downtime when the pod is restarted
+// unnecessarily.
+func GenerateHAProxyManifest(filename, image string) error {
+	// When making changes to the manifest file that need to be synchronized, increment the
+	// fileversion number here.
+	fileversion := 0
 
 	current, err := ioutil.ReadFile(filename)
 	if err != nil {
@@ -51,12 +48,13 @@ func GenerateHAProxyManifest(filename, image string, primaries ...string) error 
 			return err
 		}
 	} else {
-		if bytes.Contains(current, []byte(hash)) {
+		currentFileversion := getFileversion(current)
+		if currentFileversion == fileversion {
 			return nil
 		}
 	}
 
-	manifest, err := generateHAProxyManifest(image, hash)
+	manifest, err := generateHAProxyManifest(image, fileversion)
 	if err != nil {
 		return err
 	}
@@ -71,11 +69,11 @@ func GenerateHAProxyManifest(filename, image string, primaries ...string) error 
 	return nil
 }
 
-func generateHAProxyManifest(image, configHash string) ([]byte, error) {
+func generateHAProxyManifest(image string, fileversion int) ([]byte, error) {
 	var buf bytes.Buffer
 	data := map[string]string{
-		"Image":      image,
-		"ConfigHash": configHash,
+		"Image":       image,
+		"Fileversion": strconv.Itoa(fileversion),
 	}
 
 	err := haproxyManifestTmpl.Execute(&buf, data)
@@ -84,4 +82,15 @@ func generateHAProxyManifest(image, configHash string) ([]byte, error) {
 	}
 
 	return buf.Bytes(), nil
+}
+
+var fileversionRegexp = regexp.MustCompile(`(?m)^ +fileversion: "(\d+)"`)
+
+func getFileversion(contents []byte) int {
+	matches := fileversionRegexp.FindSubmatch(contents)
+	if len(matches) == 2 {
+		i, _ := strconv.Atoi(string(matches[1]))
+		return i
+	}
+	return 0
 }
