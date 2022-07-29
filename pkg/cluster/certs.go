@@ -62,7 +62,7 @@ func (c *Controller) CheckRotateCertsDue(reset bool) (bool, error) {
 // This launches a pod on each primary to mount /etc/kubernetes and rotate the certs.
 // It leaves the pods up if any fail.
 func (c *Controller) RotateAllCerts(ctx context.Context) error {
-	if err := c.deletePods(RotateCertsSelector); err != nil {
+	if err := c.deletePods(c.Config.RotateCertsNamespace, RotateCertsSelector); err != nil {
 		c.Log.Warnf("Failed to delete rotate pods: %v", err)
 	}
 	opts := metav1.ListOptions{
@@ -104,19 +104,19 @@ func (c *Controller) RotateAllCerts(ctx context.Context) error {
 		c.logPodResults(c.Config.RotateCertsNamespace, pod.Name)
 	}
 
-	if err := c.deletePods(RotateCertsSelector); err != nil {
+	if err := c.deletePods(c.Config.RotateCertsNamespace, RotateCertsSelector); err != nil {
 		c.Log.Warnf("Failed to delete rotate pods: %v", err)
 	}
 
 	return nil
 }
 
-func (c *Controller) deletePods(selector labels.Selector) error {
+func (c *Controller) deletePods(namespace string, selector labels.Selector) error {
 	options := metav1.ListOptions{
 		LabelSelector: selector.String(),
 	}
 
-	return c.Config.Client.CoreV1().Pods(c.Config.RotateCertsNamespace).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, options)
+	return c.Config.Client.CoreV1().Pods(namespace).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, options)
 }
 
 func (c *Controller) getRotateCertsPodConfig(nodeName string) *corev1.Pod {
