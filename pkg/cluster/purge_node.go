@@ -9,6 +9,7 @@ import (
 	"gopkg.in/yaml.v2"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	k8syaml "k8s.io/apimachinery/pkg/util/yaml"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
@@ -172,7 +173,7 @@ func (c *Controller) removeKubeadmEndpoint(ctx context.Context, name string) (st
 
 	clusterStatus = k8s121ClusterStatus{}
 
-	if err := yaml.Unmarshal([]byte(cm.Data[clusterStatusConfigMapKey]), &clusterStatus); err != nil {
+	if err := k8syaml.Unmarshal([]byte(cm.Data[clusterStatusConfigMapKey]), &clusterStatus); err != nil {
 		return "", nil, errors.Wrap(err, "unmarshal kubeadm-config ClusterStatus")
 	}
 

@@ -2,9 +2,16 @@ package internallb
 
 import (
 	_ "embed"
+	"io/ioutil"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/yaml"
 )
 
 func TestGenerateHAProxyConfig(t *testing.T) {
@@ -57,7 +64,7 @@ backend kubernetes-primaries
 	assert.Equal(t, expect, string(out))
 }
 
-func TestGenerateHAProxyManifest(t *testing.T) {
+func Test_generateHAProxyManifest(t *testing.T) {
 	out, err := generateHAProxyManifest("haproxy:1.1.1", 0)
 	assert.NoError(t, err)
 
@@ -68,7 +75,8 @@ metadata:
   namespace: kube-system
   labels:
     app: kurl-haproxy
-    fileversion: "0"
+  annotations:
+    kurl.sh/haproxy-fileversion: "0"
 spec:
   containers:
   - image: "haproxy:1.1.1"
@@ -97,56 +105,175 @@ status: {}
 
 func Test_getFileversion(t *testing.T) {
 	tests := []struct {
-		name     string
-		contents []byte
-		want     int
+		name string
+		pod  corev1.Pod
+		want int
 	}{
 		{
 			name: "missing",
-			contents: []byte(`apiVersion: v1
-kind: Pod
-metadata:
-  name: haproxy
-  namespace: kube-system
-spec:`),
+			pod:  corev1.Pod{},
 			want: 0,
 		},
 		{
 			name: "zero",
-			contents: []byte(`apiVersion: v1
-kind: Pod
-metadata:
-  name: haproxy
-  namespace: kube-system
-  labels:
-    app: kurl-haproxy
-    # when making changes to the file that need to be synchronized, increment
-    # fileversion number
-    fileversion: "0"
-spec:`),
+			pod: corev1.Pod{ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					HAProxyFileversionAnnotation: "0",
+				},
+			}},
 			want: 0,
 		},
 		{
 			name: "one",
-			contents: []byte(`apiVersion: v1
-kind: Pod
-metadata:
-  name: haproxy
-  namespace: kube-system
-  labels:
-    app: kurl-haproxy
-    # when making changes to the file that need to be synchronized, increment
-    # fileversion number
-    fileversion: "1"
-spec:`),
+			pod: corev1.Pod{ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					HAProxyFileversionAnnotation: "1",
+				},
+			}},
 			want: 1,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := getFileversion(tt.contents); got != tt.want {
+			if got := getFileversion(tt.pod); got != tt.want {
 				t.Errorf("getFileversion() = %v, want %v", got, tt.want)
 			}
 		})
 	}
+}
+
+func Test_getImage(t *testing.T) {
+	tests := []struct {
+		name string
+		pod  corev1.Pod
+		want string
+	}{
+		{
+			name: "missing",
+			pod:  corev1.Pod{},
+			want: "",
+		},
+		{
+			name: "haproxy:lts-alpine",
+			pod: corev1.Pod{Spec: corev1.PodSpec{
+				Containers: []corev1.Container{{
+					Image: "haproxy:lts-alpine",
+				}},
+			}},
+			want: "haproxy:lts-alpine",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := getImage(tt.pod); got != tt.want {
+				t.Errorf("getImage() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestGenerateHAProxyManifestNew(t *testing.T) {
+	dir, err := os.MkdirTemp("", "TestGenerateHAProxyManifestNew")
+	require.NoError(t, err)
+	defer os.RemoveAll(dir)
+
+	filename := filepath.Join(dir, "haproxy.yaml")
+	image := "haproxy:lts-alpine"
+
+	didUpdate, err := GenerateHAProxyManifest(filename, image, 0)
+	require.NoError(t, err)
+
+	require.True(t, didUpdate)
+
+	contents, err := ioutil.ReadFile(filename)
+	require.NoError(t, err)
+
+	pod := corev1.Pod{}
+	err = yaml.Unmarshal(contents, &pod)
+	require.NoError(t, err)
+
+	currentFileversion := getFileversion(pod)
+	currentImage := getImage(pod)
+
+	assert.Equal(t, 0, currentFileversion)
+	assert.Equal(t, image, currentImage)
+}
+
+func TestGenerateHAProxyManifestExistingNoUpdate(t *testing.T) {
+	dir, err := os.MkdirTemp("", "TestGenerateHAProxyManifestNew")
+	require.NoError(t, err)
+	defer os.RemoveAll(dir)
+
+	filename := filepath.Join(dir, "haproxy.yaml")
+	image := "haproxy:lts-alpine"
+
+	_, err = GenerateHAProxyManifest(filename, image, 0)
+	require.NoError(t, err)
+
+	didUpdate, err := GenerateHAProxyManifest(filename, image, 0)
+	require.NoError(t, err)
+
+	require.False(t, didUpdate)
+}
+
+func TestGenerateHAProxyManifestNewImage(t *testing.T) {
+	dir, err := os.MkdirTemp("", "TestGenerateHAProxyManifestNew")
+	require.NoError(t, err)
+	defer os.RemoveAll(dir)
+
+	filename := filepath.Join(dir, "haproxy.yaml")
+	image := "haproxy:lts-alpine"
+
+	_, err = GenerateHAProxyManifest(filename, image, 0)
+	require.NoError(t, err)
+
+	image = "haproxy:2.6.2-alpine3.16"
+
+	didUpdate, err := GenerateHAProxyManifest(filename, image, 0)
+	require.NoError(t, err)
+
+	require.True(t, didUpdate)
+
+	contents, err := ioutil.ReadFile(filename)
+	require.NoError(t, err)
+
+	pod := corev1.Pod{}
+	err = yaml.Unmarshal(contents, &pod)
+	require.NoError(t, err)
+
+	currentFileversion := getFileversion(pod)
+	currentImage := getImage(pod)
+
+	assert.Equal(t, 0, currentFileversion)
+	assert.Equal(t, image, currentImage)
+}
+
+func TestGenerateHAProxyManifestNewFileversion(t *testing.T) {
+	dir, err := os.MkdirTemp("", "TestGenerateHAProxyManifestNew")
+	require.NoError(t, err)
+	defer os.RemoveAll(dir)
+
+	filename := filepath.Join(dir, "haproxy.yaml")
+	image := "haproxy:lts-alpine"
+
+	_, err = GenerateHAProxyManifest(filename, image, 0)
+	require.NoError(t, err)
+
+	didUpdate, err := GenerateHAProxyManifest(filename, image, 1)
+	require.NoError(t, err)
+
+	require.True(t, didUpdate)
+
+	contents, err := ioutil.ReadFile(filename)
+	require.NoError(t, err)
+
+	pod := corev1.Pod{}
+	err = yaml.Unmarshal(contents, &pod)
+	require.NoError(t, err)
+
+	currentFileversion := getFileversion(pod)
+	currentImage := getImage(pod)
+
+	assert.Equal(t, 1, currentFileversion)
+	assert.Equal(t, image, currentImage)
 }

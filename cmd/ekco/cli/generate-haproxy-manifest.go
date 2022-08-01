@@ -19,8 +19,7 @@ func GenerateHAProxyManifestCmd(v *viper.Viper) *cobra.Command {
 			v.BindPFlags(cmd.Flags())
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-
-			err := internallb.GenerateHAProxyManifest(filename, image)
+			_, err := internallb.GenerateHAProxyManifest(filename, image, internallb.DefaultFileversion)
 			if err != nil {
 				return err
 			}
