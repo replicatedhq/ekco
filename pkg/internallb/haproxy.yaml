@@ -5,7 +5,8 @@ metadata:
   namespace: kube-system
   labels:
     app: kurl-haproxy
-    fileversion: "{{ .Fileversion }}"
+  annotations:
+    kurl.sh/haproxy-fileversion: "{{ .Fileversion }}"
 spec:
   containers:
   - image: "{{ .Image }}"
