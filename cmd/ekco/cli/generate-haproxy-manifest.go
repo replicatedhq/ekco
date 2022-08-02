@@ -29,7 +29,7 @@ func GenerateHAProxyManifestCmd(v *viper.Viper) *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&filename, "file", "/etc/kubernetes/manifests/haproxy", "Filename for the haproxy static pod manifest")
-	cmd.Flags().StringVar(&image, "image", "haproxy:lts-alpine", "Container image for the haproxy static pod manifest")
+	cmd.Flags().StringVar(&image, "image", internallb.HAProxyImage, "Container image for the haproxy static pod manifest")
 
 	cmd.Flags().StringSliceVar(primaries, "primary-host", []string{}, "Kubernetes API server IP or hostname")
 	cmd.Flags().MarkDeprecated("primary-host", "this flag is no longer used")

@@ -11,6 +11,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/replicatedhq/ekco/pkg/ekcoops"
+	"github.com/replicatedhq/ekco/pkg/internallb"
 	"github.com/replicatedhq/ekco/pkg/logger"
 	"github.com/replicatedhq/ekco/pkg/webhook"
 	"github.com/spf13/cobra"
@@ -117,6 +118,7 @@ func OperatorCmd(v *viper.Viper) *cobra.Command {
 	cmd.Flags().String("host_task_namespace", "kurl", "Namespace where pods performing host tasks will run")
 	cmd.Flags().String("host_task_image", "replicated/ekco:latest", "Image to use in host task pods")
 	cmd.Flags().Bool("enable_internal_load_balancer", false, "Run haproxy on localhost forwarding to all in-cluster Kubernetes API servers")
+	cmd.Flags().String("internal_load_balancer_haproxy_image", internallb.HAProxyImage, "HAProxy container image to use for internal load balancer")
 	cmd.Flags().StringSlice("pod_image_overrides", nil, "Image to override in pods")
 	cmd.Flags().Bool("auto_approve_kubelet_csrs", false, "Enable auto approval of kubelet Certificate Signing Requests")
 

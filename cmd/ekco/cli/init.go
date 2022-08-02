@@ -92,6 +92,7 @@ func initClusterController(config *ekcoops.Config, log *zap.SugaredLogger) (*clu
 		ContourCertSecret:                     config.ContourCertSecret,
 		EnvoyCertSecret:                       config.EnvoyCertSecret,
 		EnableInternalLoadBalancer:            config.EnableInternalLoadBalancer,
+		InternalLoadBalancerHAProxyImage:      config.InternalLoadBalancerHAProxyImage,
 		HostTaskImage:                         config.HostTaskImage,
 		HostTaskNamespace:                     config.HostTaskNamespace,
 		AutoApproveKubeletCertSigningRequests: config.AutoApproveKubeletCertSigningRequests,
