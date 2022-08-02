@@ -45,6 +45,7 @@ type ControllerConfig struct {
 	HostTaskImage                         string
 	HostTaskNamespace                     string
 	EnableInternalLoadBalancer            bool
+	InternalLoadBalancerHAProxyImage      string
 	AutoApproveKubeletCertSigningRequests bool
 }
 

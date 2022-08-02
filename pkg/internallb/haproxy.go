@@ -14,6 +14,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/yaml"
 )
 
+const HAProxyImage = "haproxy:lts-alpine"
+
 //go:embed haproxy.cfg
 var haproxyCfg string
 var haproxyConfigTmpl = template.Must(template.New("").Parse(haproxyCfg))

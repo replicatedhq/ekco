@@ -177,6 +177,7 @@ func (c *Controller) sighupPods(namespace string, selector labels.Selector, cont
 func (c *Controller) getUpdateInternalLBPod(nodeName string, primaries ...string) *corev1.Pod {
 	namespace := c.Config.HostTaskNamespace
 	image := c.Config.HostTaskImage
+	haproxyImage := c.Config.InternalLoadBalancerHAProxyImage
 
 	hosts := strings.Join(primaries, ",")
 
@@ -230,7 +231,7 @@ func (c *Controller) getUpdateInternalLBPod(nodeName string, primaries ...string
 					Command: []string{
 						"/bin/bash",
 						"-c",
-						fmt.Sprintf("/usr/bin/ekco generate-haproxy-manifest --primary-host=%s --file /host/etc/kubernetes/manifests/haproxy.yaml", hosts),
+						fmt.Sprintf("/usr/bin/ekco generate-haproxy-manifest --primary-host=%s --file /host/etc/kubernetes/manifests/haproxy.yaml --image=%s", hosts, haproxyImage),
 					},
 					VolumeMounts: []corev1.VolumeMount{
 						{

@@ -55,6 +55,7 @@ type Config struct {
 	ContourCertSecret                     string        `mapstructure:"contour_cert_secret"`
 	EnvoyCertSecret                       string        `mapstructure:"envoy_cert_secret"`
 	EnableInternalLoadBalancer            bool          `mapstructure:"enable_internal_load_balancer"`
+	InternalLoadBalancerHAProxyImage      string        `mapstructure:"internal_load_balancer_haproxy_image"`
 	InternalLoadBalancerPort              int           `mapstructure:"internal_load_balancer_port"`
 	HostTaskImage                         string        `mapstructure:"host_task_image"`
 	HostTaskNamespace                     string        `mapstructure:"host_task_namespace"`
