@@ -165,22 +165,24 @@ func (o *Operator) adjustPoolReplicationLevels(numNodes int, doFullReconcile boo
 		factor = o.config.MaxCephPoolReplication
 	}
 
-	err := o.controller.SetBlockPoolReplication(o.config.CephBlockPool, factor, doFullReconcile)
+	didUpdate, err := o.controller.SetBlockPoolReplication(o.config.CephBlockPool, factor, doFullReconcile)
 	if err != nil {
 		return errors.Wrapf(err, "set pool %s replication to %d", o.config.CephBlockPool, factor)
 	}
 
-	err = o.controller.SetFilesystemReplication(o.config.CephFilesystem, factor, doFullReconcile)
+	_, err = o.controller.SetFilesystemReplication(o.config.CephFilesystem, factor, doFullReconcile)
 	if err != nil {
 		return errors.Wrapf(err, "set filesystem %s replication to %d", o.config.CephFilesystem, factor)
 	}
 
-	err = o.controller.SetObjectStoreReplication(o.config.CephObjectStore, factor, doFullReconcile)
+	_, err = o.controller.SetObjectStoreReplication(o.config.CephObjectStore, factor, doFullReconcile)
 	if err != nil {
 		return errors.Wrapf(err, "set object store %s replication to %d", o.config.CephObjectStore, factor)
 	}
 
-	err = o.controller.SetDeviceHealthMetricsReplication(factor, doFullReconcile)
+	// There is no CR to compare the desired and current level.
+	// Assume that if cephblockpool replication level has not yet been set then we need to do the same for device_health_metrics.
+	_, err = o.controller.SetDeviceHealthMetricsReplication(o.config.CephBlockPool, factor, doFullReconcile || didUpdate)
 	if err != nil {
 		return errors.Wrapf(err, "set health_device_metrics replication to %d", factor)
 	}
