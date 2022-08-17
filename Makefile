@@ -40,14 +40,12 @@ clean:
 
 .PHONY: deps
 deps:
-	go get golang.org/x/lint/golint
+	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(shell go env GOPATH)/bin
 
 .PHONY: lint
 lint:
 	# TODO: fix lint errors
-	golint -set_exit_status ./... \
-		| grep -v "should have comment" \
-		| grep -v "comment on exported method" || :
+	golangci-lint run ./... || true
 
 .PHONY: vet
 vet:
