@@ -13,6 +13,7 @@ import (
 	"github.com/replicatedhq/ekco/pkg/ekcoops"
 	"github.com/replicatedhq/ekco/pkg/internallb"
 	"github.com/replicatedhq/ekco/pkg/logger"
+	"github.com/replicatedhq/ekco/pkg/version"
 	"github.com/replicatedhq/ekco/pkg/webhook"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -36,6 +37,8 @@ func OperatorCmd(v *viper.Viper) *cobra.Command {
 			if err != nil {
 				return errors.Wrap(err, "failed to initialize logger")
 			}
+
+			log.Infof("Embedded kURL cluster operator (EKCO) %s", version.Version())
 
 			clusterController, err := initClusterController(config, log)
 			if err != nil {
