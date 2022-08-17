@@ -11,6 +11,7 @@ data:
     min_ready_master_nodes: 2
     min_ready_worker_nodes: 0
     maintain_rook_storage_nodes: true
+    reconcile_rook_mds_placement: true
     ceph_block_pool: replicapool
     ceph_filesystem: rook-shared-fs
     ceph_object_store: rook-ceph-store

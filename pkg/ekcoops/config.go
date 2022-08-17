@@ -34,6 +34,10 @@ type Config struct {
 	RookVersion            string `mapstructure:"rook_version"`
 	// when set, priority class to be applied to rook deployments and daemonsets
 	RookPriorityClass string `mapstructure:"rook_priority_class"`
+	// Whether to reconcile CephFilesystem MDS placement when the cluster is scaled beyond one
+	// node. MDS pod anti-affinity is made more lenient at install time by kURL to allow for single
+	// node Rook upgrades. This setting will revert that change upon the addition of a second node.
+	ReconcileRookMDSPlacement bool `mapstructure:"reconcile_rook_mds_placement"`
 
 	// kubernetes certificates directory
 	CertificatesDir string `mapstructure:"certificates_dir"`

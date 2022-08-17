@@ -95,6 +95,7 @@ func OperatorCmd(v *viper.Viper) *cobra.Command {
 	cmd.Flags().String("ceph_block_pool", "replicapool", "Name of CephBlockPool to manage if maintain_rook_storage_nodes is enabled")
 	cmd.Flags().String("ceph_filesystem", "rook-shared-fs", "Name of CephFilesystem to manage if maintain_rook_storage_nodes is enabled")
 	cmd.Flags().String("ceph_object_store", "replicated", "Name of CephObjectStore to manage if maintain_rook_storage_nodes is enabled")
+	cmd.Flags().Bool("reconcile_rook_mds_placement", true, "Reconcile CephFilesystem MDS placement when the cluster is scaled beyond one node")
 	cmd.Flags().String("rook_version", "1.4.3", "Version of Rook to manage")
 	cmd.Flags().String("rook_priority_class", "node-critical", "Priority class to add to Rook 1.0 Deployments and DaemonSets. Will be created if not found")
 	cmd.Flags().Int("min_ceph_pool_replication", 1, "Minimum replication factor of ceph_block_pool and ceph_filesystem pools")
