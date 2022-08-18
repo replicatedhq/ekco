@@ -15,8 +15,8 @@ func RotateKotsadmCertsCmd(v *viper.Viper) *cobra.Command {
 		Short: "Rotate kotsadm certs",
 		Long:  `Manually rotate kotsadm certificates`,
 		Args:  cobra.ExactArgs(0),
-		PreRun: func(cmd *cobra.Command, args []string) {
-			v.BindPFlags(cmd.Flags())
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return v.BindPFlags(cmd.Flags())
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			config, err := initEKCOConfig(v)

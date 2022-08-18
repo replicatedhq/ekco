@@ -75,10 +75,7 @@ func (c *Controller) shouldRotateContourCerts(caCert, contourCert, envoyCert *x5
 		return true
 	}
 	envoyCertTTL := time.Until(envoyCert.NotAfter)
-	if envoyCertTTL <= c.Config.RotateCertsTTL {
-		return true
-	}
-	return false
+	return envoyCertTTL <= c.Config.RotateCertsTTL
 }
 
 func (c *Controller) readContourCerts(contourNamespace, contourSecretName, envoySecretName string) (*x509.Certificate, *x509.Certificate, *x509.Certificate, error) {

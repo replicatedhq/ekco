@@ -15,11 +15,11 @@ func RootCmd(v *viper.Viper) *cobra.Command {
 		Use:   "ekco",
 		Short: "Embedded kURL cluster operator (EKCO) version",
 		Long:  `Print the version of this ECKO command`,
-		PersistentPreRun: func(cmd *cobra.Command, args []string) {
-			v.BindPFlags(cmd.PersistentFlags())
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			return v.BindPFlags(cmd.PersistentFlags())
 		},
-		PreRun: func(cmd *cobra.Command, args []string) {
-			v.BindPFlags(cmd.Flags())
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return v.BindPFlags(cmd.Flags())
 		},
 		Run: func(cmd *cobra.Command, args []string) {
 			cmd.Printf("Embedded kURL cluster operator (EKCO) %s\n", version.Version())

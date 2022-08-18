@@ -16,8 +16,8 @@ func RotateCertsCmd(v *viper.Viper) *cobra.Command {
 		Short: "Rotate certs ",
 		Long:  `Rotate certs in a kURL cluster`,
 		Args:  cobra.ExactArgs(0),
-		PreRun: func(cmd *cobra.Command, args []string) {
-			v.BindPFlags(cmd.Flags())
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return v.BindPFlags(cmd.Flags())
 		},
 		Run: func(cmd *cobra.Command, args []string) {
 			ttl := v.GetDuration("ttl")

@@ -15,8 +15,8 @@ func GenerateHAProxyConfigCmd(v *viper.Viper) *cobra.Command {
 		Use:   "generate-haproxy-config",
 		Short: "Generate HAProxy config file for the internal load balancer",
 		Args:  cobra.ExactArgs(0),
-		PreRun: func(cmd *cobra.Command, args []string) {
-			v.BindPFlags(cmd.Flags())
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return v.BindPFlags(cmd.Flags())
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 

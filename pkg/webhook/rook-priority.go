@@ -22,7 +22,7 @@ func (s *Server) rookPriority(c *gin.Context) {
 
 	body, err := ioutil.ReadAll(c.Request.Body)
 	if err != nil {
-		c.AbortWithError(http.StatusInternalServerError, err)
+		_ = c.AbortWithError(http.StatusInternalServerError, err)
 		return
 	}
 	_, _, err = codecs.UniversalDeserializer().Decode(body, nil, &request)

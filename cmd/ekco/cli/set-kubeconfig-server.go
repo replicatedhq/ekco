@@ -19,8 +19,8 @@ func SetKubeconfigServerCmd(v *viper.Viper) *cobra.Command {
 		Use:   "set-kubeconfig-server",
 		Short: "Update kubeconfig clients to use a new server",
 		Args:  cobra.ExactArgs(0),
-		PreRun: func(cmd *cobra.Command, args []string) {
-			v.BindPFlags(cmd.Flags())
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return v.BindPFlags(cmd.Flags())
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := context.Background()
