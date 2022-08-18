@@ -18,7 +18,6 @@ import (
 	"github.com/replicatedhq/ekco/pkg/k8s"
 	"github.com/replicatedhq/ekco/pkg/util"
 	cephv1 "github.com/rook/rook/pkg/apis/ceph.rook.io/v1"
-	rookv1 "github.com/rook/rook/pkg/apis/rook.io/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	apitypes "k8s.io/apimachinery/pkg/types"
@@ -56,7 +55,7 @@ func (c *Controller) UseNodesForStorage(names []string) (int, error) {
 	for _, name := range names {
 		if !storageNodes[name] {
 			c.Log.Infof("Adding node %q to CephCluster node storage list", name)
-			cluster.Spec.Storage.Nodes = append(cluster.Spec.Storage.Nodes, rookv1.Node{
+			cluster.Spec.Storage.Nodes = append(cluster.Spec.Storage.Nodes, cephv1.Node{
 				Name: name,
 			})
 			changed = true
@@ -78,7 +77,7 @@ func (c *Controller) removeCephClusterStorageNode(name string) error {
 	if err != nil {
 		return errors.Wrapf(err, "get CephCluster config")
 	}
-	var keep []rookv1.Node
+	var keep []cephv1.Node
 	for _, node := range cluster.Spec.Storage.Nodes {
 		if node.Name == name {
 			c.Log.Infof("Removing node %q from CephCluster storage list", name)
