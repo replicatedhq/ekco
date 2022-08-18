@@ -7,6 +7,7 @@ require (
 	github.com/coreos/go-systemd/v22 v22.3.2
 	github.com/gin-gonic/gin v1.7.0
 	github.com/google/martian v2.1.0+incompatible
+	github.com/hashicorp/go-multierror v1.1.1
 	github.com/pkg/errors v0.9.1
 	github.com/projectcontour/contour v1.19.1
 	github.com/rook/rook v1.6.11
@@ -46,6 +47,7 @@ require (
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/google/uuid v1.1.2 // indirect
 	github.com/googleapis/gnostic v0.5.5 // indirect
+	github.com/hashicorp/errwrap v1.0.0 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/imdario/mergo v0.3.12 // indirect
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
