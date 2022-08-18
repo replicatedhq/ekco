@@ -20,8 +20,8 @@ func PurgeNodeCmd(v *viper.Viper) *cobra.Command {
 		Short: "Purge node ",
 		Long:  `Manually purge a Kurl cluster node`,
 		Args:  cobra.ExactArgs(1),
-		PreRun: func(cmd *cobra.Command, args []string) {
-			v.BindPFlags(cmd.Flags())
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return v.BindPFlags(cmd.Flags())
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			config, err := initEKCOConfig(v)

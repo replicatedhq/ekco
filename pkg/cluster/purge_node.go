@@ -16,7 +16,6 @@ import (
 
 const (
 	clusterStatusConfigMapKey = "ClusterStatus"
-	kubeadmConfigConfigMap    = "kubeadm-config"
 )
 
 // PurgeNode cleans up a lost node.
@@ -33,7 +32,10 @@ func (c *Controller) PurgeNode(ctx context.Context, name string, rook bool) erro
 	}
 
 	if rook {
-		c.purgeCephOsd(ctx, name)
+		err := c.purgeCephOsd(ctx, name)
+		if err != nil {
+			c.Log.Warnf("Purge node %q: ceph osd purge command failed with error: %v", name, err)
+		}
 	}
 
 	maybeMaster := true

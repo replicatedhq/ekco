@@ -24,8 +24,8 @@ func OperatorCmd(v *viper.Viper) *cobra.Command {
 		Use:   "operator",
 		Short: "Embedded kURL cluster operator",
 		Long:  `Manage nodes and storage of an embedded kURL cluster`,
-		PreRun: func(cmd *cobra.Command, args []string) {
-			v.BindPFlags(cmd.Flags())
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return v.BindPFlags(cmd.Flags())
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			config, err := initEKCOConfig(v)

@@ -20,8 +20,8 @@ func ChangeLoadBalancerCmd(v *viper.Viper) *cobra.Command {
 		Use:   "change-load-balancer",
 		Short: "Handle Kubernetes load balancer address change on all nodes",
 		Args:  cobra.ExactArgs(0),
-		PreRun: func(cmd *cobra.Command, args []string) {
-			v.BindPFlags(cmd.Flags())
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return v.BindPFlags(cmd.Flags())
 		},
 		// Output must end with "Result:" for parsing in scripts
 		Run: func(cmd *cobra.Command, args []string) {
@@ -72,7 +72,7 @@ func ChangeLoadBalancerCmd(v *viper.Viper) *cobra.Command {
 	cmd.Flags().BoolVar(&internal, "internal", false, "Enable the internal load balancer")
 	cmd.Flags().StringVar(&exclude, "exclude", "", "Node to exclude")
 
-	cmd.MarkFlagRequired("server")
+	_ = cmd.MarkFlagRequired("server")
 
 	return cmd
 }

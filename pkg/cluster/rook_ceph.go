@@ -482,7 +482,7 @@ func (c *Controller) execCephOSDPurge(osdID string, hostname string) error {
 		return errors.Wrapf(err, "found no Rook pods for executing ceph commands")
 	}
 	// ignore error - OSD is probably already down
-	k8s.SyncExec(c.Config.Client.CoreV1(), c.Config.ClientConfig, "rook-ceph", pods.Items[0].Name, container, "ceph", "osd", "down", osdID)
+	_, _, _, _ = k8s.SyncExec(c.Config.Client.CoreV1(), c.Config.ClientConfig, "rook-ceph", pods.Items[0].Name, container, "ceph", "osd", "down", osdID)
 
 	exitCode, stdout, stderr, err := k8s.SyncExec(c.Config.Client.CoreV1(), c.Config.ClientConfig, "rook-ceph", pods.Items[0].Name, container, "ceph", "osd", "purge", osdID, "--yes-i-really-mean-it")
 	if exitCode != 0 {

@@ -37,6 +37,9 @@ func (o *Operator) ReconcilePrometheus(nodeCount int) error {
 			Value: desiredPrometheusReplicas,
 		}}
 		prometheusPayload, err := json.Marshal(prometheusPatch)
+		if err != nil {
+			return errors.Wrap(err, "failed to marshal json")
+		}
 		_, err = o.controller.Config.PrometheusV1.Namespace("monitoring").Patch(context.TODO(), "k8s", types.JSONPatchType, prometheusPayload, metav1.PatchOptions{})
 		if err != nil {
 			return errors.Wrap(err, "failed to patch prometheus")
@@ -58,6 +61,9 @@ func (o *Operator) ReconcilePrometheus(nodeCount int) error {
 			Value: desiredAlertManagerReplicas,
 		}}
 		alertManagersPayload, err := json.Marshal(alertManagersPatch)
+		if err != nil {
+			return errors.Wrap(err, "failed to marshal json")
+		}
 		_, err = o.controller.Config.AlertManagerV1.Namespace("monitoring").Patch(context.TODO(), "prometheus-alertmanager", types.JSONPatchType, alertManagersPayload, metav1.PatchOptions{})
 		if err != nil {
 			return errors.Wrap(err, "failed to patch alertmanager")

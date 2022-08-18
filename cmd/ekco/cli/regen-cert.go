@@ -20,8 +20,8 @@ func RegenCertCmd(v *viper.Viper) *cobra.Command {
 		Short: "Regenerate API server certificate",
 		Long:  `Regenerate an API server certificate with different subject alternative names`,
 		Args:  cobra.ExactArgs(0),
-		PreRun: func(cmd *cobra.Command, args []string) {
-			v.BindPFlags(cmd.Flags())
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return v.BindPFlags(cmd.Flags())
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			addAltNames := v.GetString("add-alt-names")

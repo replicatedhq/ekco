@@ -44,8 +44,7 @@ deps:
 
 .PHONY: lint
 lint:
-	# TODO: fix lint errors
-	golangci-lint run ./... || true
+	golangci-lint run ./...
 
 .PHONY: vet
 vet:
