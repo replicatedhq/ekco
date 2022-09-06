@@ -1,4 +1,4 @@
-FROM golang:1.17-buster AS build
+FROM golang:1.19-buster AS build
 
 ARG git_sha=unknown
 ARG version=alpha
