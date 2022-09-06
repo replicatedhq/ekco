@@ -1,7 +1,7 @@
 package kubeconfig
 
 import (
-	"io/ioutil"
+	"io"
 	"os"
 
 	"k8s.io/client-go/tools/clientcmd"
@@ -12,7 +12,7 @@ func SetServer(file string, server string) error {
 	if err != nil {
 		return err
 	}
-	bs, err := ioutil.ReadAll(f)
+	bs, err := io.ReadAll(f)
 	if err != nil {
 		return err
 	}

@@ -1,7 +1,6 @@
 package kubeconfig
 
 import (
-	"io/ioutil"
 	"os"
 	"testing"
 
@@ -46,7 +45,7 @@ users:
 		return
 	}
 
-	got, err := ioutil.ReadFile(f.Name())
+	got, err := os.ReadFile(f.Name())
 	if err != nil {
 		t.Fatal(err)
 		return

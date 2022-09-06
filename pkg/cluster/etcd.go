@@ -4,8 +4,8 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"io/ioutil"
 	"net"
+	"os"
 	"path/filepath"
 	"strconv"
 	"time"
@@ -63,7 +63,7 @@ func (c *Controller) removeEtcdPeer(ip string, remainingIPs []string) error {
 func getEtcdTLS(ctx context.Context, pkiDir string) (*tls.Config, error) {
 	config := &tls.Config{}
 
-	caCertPEM, err := ioutil.ReadFile(filepath.Join(pkiDir, "etcd/ca.crt"))
+	caCertPEM, err := os.ReadFile(filepath.Join(pkiDir, "etcd/ca.crt"))
 	if err != nil {
 		return nil, err
 	}
@@ -74,12 +74,12 @@ func getEtcdTLS(ctx context.Context, pkiDir string) (*tls.Config, error) {
 	}
 	config.RootCAs = pool
 
-	clientCertPEM, err := ioutil.ReadFile(filepath.Join(pkiDir, "etcd/healthcheck-client.crt"))
+	clientCertPEM, err := os.ReadFile(filepath.Join(pkiDir, "etcd/healthcheck-client.crt"))
 	if err != nil {
 		return nil, err
 	}
 
-	clientKeyPEM, err := ioutil.ReadFile(filepath.Join(pkiDir, "etcd/healthcheck-client.key"))
+	clientKeyPEM, err := os.ReadFile(filepath.Join(pkiDir, "etcd/healthcheck-client.key"))
 	if err != nil {
 		return nil, err
 	}

@@ -2,7 +2,6 @@ package internallb
 
 import (
 	_ "embed"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -185,7 +184,7 @@ func TestGenerateHAProxyManifestNew(t *testing.T) {
 
 	require.True(t, didUpdate)
 
-	contents, err := ioutil.ReadFile(filename)
+	contents, err := os.ReadFile(filename)
 	require.NoError(t, err)
 
 	pod := corev1.Pod{}
@@ -234,7 +233,7 @@ func TestGenerateHAProxyManifestNewImage(t *testing.T) {
 
 	require.True(t, didUpdate)
 
-	contents, err := ioutil.ReadFile(filename)
+	contents, err := os.ReadFile(filename)
 	require.NoError(t, err)
 
 	pod := corev1.Pod{}
@@ -264,7 +263,7 @@ func TestGenerateHAProxyManifestNewFileversion(t *testing.T) {
 
 	require.True(t, didUpdate)
 
-	contents, err := ioutil.ReadFile(filename)
+	contents, err := os.ReadFile(filename)
 	require.NoError(t, err)
 
 	pod := corev1.Pod{}

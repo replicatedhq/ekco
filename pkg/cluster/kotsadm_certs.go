@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"strings"
 	"time"
 
@@ -89,11 +89,11 @@ func (c *Controller) UpdateKubeletClientCertSecret() error {
 		return errors.Wrapf(err, "get kubelet client secret")
 	}
 
-	certData, err := ioutil.ReadFile("/etc/kubernetes/pki/apiserver-kubelet-client.crt")
+	certData, err := os.ReadFile("/etc/kubernetes/pki/apiserver-kubelet-client.crt")
 	if err != nil {
 		return errors.Wrapf(err, "read /etc/kubernetes/pki/apiserver-kubelet-client.crt")
 	}
-	keyData, err := ioutil.ReadFile("/etc/kubernetes/pki/apiserver-kubelet-client.key")
+	keyData, err := os.ReadFile("/etc/kubernetes/pki/apiserver-kubelet-client.key")
 	if err != nil {
 		return errors.Wrapf(err, "read /etc/kubernetes/pki/apiserver-kubelet-client.key")
 	}

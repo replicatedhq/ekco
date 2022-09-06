@@ -2,7 +2,7 @@ package webhook
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strings"
 
@@ -22,7 +22,7 @@ func (s *Server) overridePodImages(c *gin.Context) {
 		Response: &admissionv1.AdmissionResponse{},
 	}
 
-	body, err := ioutil.ReadAll(c.Request.Body)
+	body, err := io.ReadAll(c.Request.Body)
 	if err != nil {
 		_ = c.AbortWithError(http.StatusInternalServerError, err)
 		return
