@@ -5,7 +5,6 @@ import (
 	_ "embed"
 	"errors"
 	"html/template"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -50,7 +49,7 @@ func GenerateHAProxyManifest(filename, image string, fileversion int) (bool, err
 		return false, err
 	}
 
-	current, err := ioutil.ReadFile(filename)
+	current, err := os.ReadFile(filename)
 	if err == nil {
 		pod := corev1.Pod{}
 		if err := yaml.Unmarshal(current, &pod); err != nil {

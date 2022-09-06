@@ -2,7 +2,7 @@ package webhook
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -20,7 +20,7 @@ func (s *Server) rookPriority(c *gin.Context) {
 		response.Response.UID = request.Request.UID
 	}
 
-	body, err := ioutil.ReadAll(c.Request.Body)
+	body, err := io.ReadAll(c.Request.Body)
 	if err != nil {
 		_ = c.AbortWithError(http.StatusInternalServerError, err)
 		return
