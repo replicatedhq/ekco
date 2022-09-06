@@ -1,0 +1,22 @@
+name: alpha
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+
+  release:
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v3
+        with:
+          go-version: 1.17
+      - uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USER }}
+          password: ${{ secrets.DOCKERHUB_PASSWORD }}
+      - run: make docker-image DOCKER_IMAGE=replicated/ekco:alpha
+      - run: docker push replicated/ekco:alpha
