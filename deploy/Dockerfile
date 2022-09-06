@@ -11,8 +11,7 @@ COPY LICENSE LICENSE
 COPY cmd cmd
 COPY pkg pkg
 
-RUN --mount=type=cache,target=/root/.cache/go-build \
-    make build GIT_SHA=$git_sha VERSION=$version
+RUN make build GIT_SHA=$git_sha VERSION=$version
 
 
 FROM debian:buster-slim
