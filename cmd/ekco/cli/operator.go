@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/replicatedhq/ekco/pkg/cluster"
 	"github.com/replicatedhq/ekco/pkg/ekcoops"
 	"github.com/replicatedhq/ekco/pkg/internallb"
 	"github.com/replicatedhq/ekco/pkg/logger"
@@ -116,9 +117,14 @@ func OperatorCmd(v *viper.Viper) *cobra.Command {
 	cmd.Flags().String("kurl_proxy_cert_secret", "kotsadm-tls", "Name of the secret that holds the kurl proxy key pair")
 	cmd.Flags().String("kotsadm_kubelet_cert_namespace", "default", "Namespace where kotsadm is running")
 	cmd.Flags().String("kotsadm_kubelet_cert_secret", "default", "Name of the secret that holds the kubelet client certificate used by kotsadm")
-	cmd.Flags().String("contour_cert_namespace", "projectcontour", "Namespace where contour is running")
+	cmd.Flags().String("contour_namespace", cluster.DefaultContourNamespace, "Namespace where Contour is deployed")
+	cmd.Flags().String("contour_cert_namespace", cluster.DefaultContourNamespace, "Namespace where contour is running")
+	cmd.Flags().MarkDeprecated("contour_cert_namespace", "use contour_namespace instead")
+	cmd.Flags().MarkHidden("contour_cert_namespace")
 	cmd.Flags().String("contour_cert_secret", "contourcert", "Name of the secret that holds the contour certificate")
 	cmd.Flags().String("envoy_cert_secret", "envoycert", "Name of the secret that holds the envoy certificate")
+	cmd.Flags().Bool("restart_failed_envoy_pods", true, "Restarts envoy pods that have been in ready state 1/2 (envoy container not ready) for at least \"envoy_pods_not_ready_duration\"")
+	cmd.Flags().Duration("envoy_pods_not_ready_duration", cluster.DefaultEnvoyPodsNotReadyDuration, "Duration which to wait to restart failed envoy pods (see \"restart_failed_envoy_pods\")")
 	cmd.Flags().String("host_task_namespace", "kurl", "Namespace where pods performing host tasks will run")
 	cmd.Flags().String("host_task_image", "replicated/ekco:latest", "Image to use in host task pods")
 	cmd.Flags().Bool("enable_internal_load_balancer", false, "Run haproxy on localhost forwarding to all in-cluster Kubernetes API servers")

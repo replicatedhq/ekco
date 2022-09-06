@@ -55,9 +55,12 @@ type Config struct {
 	KurlProxyCertSecret                   string        `mapstructure:"kurl_proxy_cert_secret"`
 	KotsadmKubeletCertNamespace           string        `mapstructure:"kotsadm_kubelet_cert_namespace"`
 	KotsadmKubeletCertSecret              string        `mapstructure:"kotsadm_kubelet_cert_secret"`
-	ContourCertNamespace                  string        `mapstructure:"contour_cert_namespace"`
+	ContourNamespace                      string        `mapstructure:"contour_namespace"`
+	ContourCertNamespace                  string        `mapstructure:"contour_cert_namespace"` // deprecated
 	ContourCertSecret                     string        `mapstructure:"contour_cert_secret"`
 	EnvoyCertSecret                       string        `mapstructure:"envoy_cert_secret"`
+	RestartFailedEnvoyPods                bool          `mapstructure:"restart_failed_envoy_pods"`
+	EnvoyPodsNotReadyDuration             time.Duration `mapstructure:"envoy_pods_not_ready_duration"`
 	EnableInternalLoadBalancer            bool          `mapstructure:"enable_internal_load_balancer"`
 	InternalLoadBalancerHAProxyImage      string        `mapstructure:"internal_load_balancer_haproxy_image"`
 	InternalLoadBalancerPort              int           `mapstructure:"internal_load_balancer_port"`
