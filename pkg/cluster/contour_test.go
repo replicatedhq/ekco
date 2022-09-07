@@ -111,6 +111,39 @@ func Test_shouldRestartEnvoyPod(t *testing.T) {
 				}},
 			},
 		},
+		{
+			name: "both not ready",
+			want: false,
+			podStatus: corev1.PodStatus{
+				Phase: corev1.PodRunning,
+				ContainerStatuses: []corev1.ContainerStatus{
+					{
+						Name:  "shutdown-manager",
+						Ready: false,
+						State: corev1.ContainerState{
+							Running: &corev1.ContainerStateRunning{
+								StartedAt: metav1.Time{Time: time.Now().Add(-time.Hour)},
+							},
+						},
+					},
+					{
+						Name:  "envoy",
+						Ready: false,
+						State: corev1.ContainerState{
+							Running: &corev1.ContainerStateRunning{
+								StartedAt: metav1.Time{Time: time.Now().Add(-time.Hour)},
+							},
+						},
+					},
+				},
+				Conditions: []corev1.PodCondition{{
+					Type:               corev1.ContainersReady,
+					Status:             corev1.ConditionFalse,
+					Reason:             "ContainersNotReady",
+					LastTransitionTime: metav1.Time{Time: time.Now().Add(-2 * time.Minute)},
+				}},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -69,33 +69,27 @@ func shouldRestartEnvoyPod(podStatus corev1.PodStatus, notReadyDuration time.Dur
 
 	before := time.Now().Add(-notReadyDuration)
 
-	shutdownManagerReady, envoyNotReady := false, false
+	shutdownManagerReady, envoyReady := false, false
 	for _, status := range podStatus.ContainerStatuses {
+		if status.State.Running == nil || status.State.Running.StartedAt.Time.After(before) {
+			continue
+		}
 		switch status.Name {
 		case "shutdown-manager":
-			if status.Ready &&
-				status.State.Running != nil &&
-				status.State.Running.StartedAt.Time.Before(before) {
-				shutdownManagerReady = true
-			}
+			shutdownManagerReady = status.Ready
 		case "envoy":
-			if !status.Ready &&
-				status.State.Running != nil &&
-				status.State.Running.StartedAt.Time.Before(before) {
-				envoyNotReady = true
-			}
+			envoyReady = status.Ready
 		}
 	}
 
-	if !(shutdownManagerReady && envoyNotReady) {
-		return false
-	}
+	if shutdownManagerReady && !envoyReady {
+		for _, condition := range podStatus.Conditions {
+			if condition.Type == corev1.ContainersReady &&
+				condition.Reason == "ContainersNotReady" &&
+				condition.Status == corev1.ConditionFalse {
 
-	for _, condition := range podStatus.Conditions {
-		if condition.Type == corev1.ContainersReady &&
-			condition.Reason == "ContainersNotReady" &&
-			condition.Status == corev1.ConditionFalse {
-			return condition.LastTransitionTime.Time.Before(before)
+				return condition.LastTransitionTime.Time.Before(before)
+			}
 		}
 	}
 
