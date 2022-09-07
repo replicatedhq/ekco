@@ -24,6 +24,10 @@ func initEKCOConfig(v *viper.Viper) (*ekcoops.Config, error) {
 		return config, errors.New("min_ready_master_nodes must be at least 1")
 	}
 
+	if !v.IsSet("contour_namespace") && v.IsSet("contour_cert_namespace") {
+		config.ContourNamespace = config.ContourCertNamespace
+	}
+
 	return config, nil
 }
 
@@ -88,9 +92,11 @@ func initClusterController(config *ekcoops.Config, log *zap.SugaredLogger) (*clu
 		KurlProxyCertSecret:                   config.KurlProxyCertSecret,
 		KotsadmKubeletCertNamespace:           config.KotsadmKubeletCertNamespace,
 		KotsadmKubeletCertSecret:              config.KotsadmKubeletCertSecret,
-		ContourCertNamespace:                  config.ContourCertNamespace,
+		ContourNamespace:                      config.ContourNamespace,
 		ContourCertSecret:                     config.ContourCertSecret,
 		EnvoyCertSecret:                       config.EnvoyCertSecret,
+		RestartFailedEnvoyPods:                config.RestartFailedEnvoyPods,
+		EnvoyPodsNotReadyDuration:             config.EnvoyPodsNotReadyDuration,
 		EnableInternalLoadBalancer:            config.EnableInternalLoadBalancer,
 		InternalLoadBalancerHAProxyImage:      config.InternalLoadBalancerHAProxyImage,
 		HostTaskImage:                         config.HostTaskImage,

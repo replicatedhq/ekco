@@ -39,9 +39,11 @@ type ControllerConfig struct {
 	KurlProxyCertSecret                   string
 	KotsadmKubeletCertNamespace           string
 	KotsadmKubeletCertSecret              string
-	ContourCertNamespace                  string
+	ContourNamespace                      string
 	ContourCertSecret                     string
 	EnvoyCertSecret                       string
+	RestartFailedEnvoyPods                bool
+	EnvoyPodsNotReadyDuration             time.Duration
 	HostTaskImage                         string
 	HostTaskNamespace                     string
 	EnableInternalLoadBalancer            bool

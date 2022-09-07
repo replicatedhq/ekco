@@ -17,7 +17,7 @@ import (
 )
 
 func (c *Controller) RotateContourCerts() error {
-	contourNamespace := c.Config.ContourCertNamespace
+	contourNamespace := c.Config.ContourNamespace
 	contourSecretName := c.Config.ContourCertSecret
 	envoySecretName := c.Config.EnvoyCertSecret
 

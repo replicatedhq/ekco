@@ -81,6 +81,10 @@ func (o *Operator) Reconcile(nodes []corev1.Node, doFullReconcile bool) error {
 		multiErr = multierror.Append(multiErr, errors.Wrap(err, "failed to reconcile prometheus"))
 	}
 
+	if err := o.controller.RestartFailedEnvoyPods(context.Background()); err != nil {
+		multiErr = multierror.Append(multiErr, errors.Wrap(err, "failed to reconcile failed envoy pod"))
+	}
+
 	if o.config.AutoApproveKubeletCertSigningRequests {
 		if err := o.reconcileCertificateSigningRequests(); err != nil {
 			multiErr = multierror.Append(multiErr, errors.Wrap(err, "reconcile csrs"))
