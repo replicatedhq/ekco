@@ -16,7 +16,7 @@ RUN make build GIT_SHA=$git_sha VERSION=$version
 
 FROM debian:buster-slim
 
-RUN DEBIAN_FRONTEND=noninteractive apt-get update -qq && apt-get install -y --no-install-recommends \
+RUN DEBIAN_FRONTEND=noninteractive apt-get update -qq && apt-get upgrade -qq && apt-get install -y --no-install-recommends \
     libgcrypt20 \
     libgnutls30 \
     libhogweed4 \
