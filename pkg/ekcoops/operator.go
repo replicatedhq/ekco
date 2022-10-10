@@ -132,9 +132,13 @@ func (o *Operator) reconcileRook(nodes []corev1.Node, doFullReconcile bool) erro
 			if err != nil {
 				multiErr = multierror.Append(multiErr, errors.Wrapf(err, "adjust pool replication levels"))
 			} else {
-				err := o.controller.ReconcileMonCount(readyCount)
+				err := o.controller.ReconcileMonCount(context.TODO(), readyCount)
 				if err != nil {
 					multiErr = multierror.Append(multiErr, errors.Wrapf(err, "reconcile mon count"))
+				}
+				err = o.controller.ReconcileMgrCount(context.TODO(), readyCount)
+				if err != nil {
+					multiErr = multierror.Append(multiErr, errors.Wrapf(err, "reconcile mgr count"))
 				}
 			}
 		}

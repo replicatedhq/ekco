@@ -210,7 +210,7 @@ func (c *Controller) SetDeviceHealthMetricsReplication(cephBlockPoolName string,
 	return true, nil
 }
 
-func (c *Controller) ReconcileMonCount(count int) error {
+func (c *Controller) ReconcileMonCount(ctx context.Context, count int) error {
 	// single mon for 1 or 2 node cluster, 3 mons for all other clusters
 	if count < 3 {
 		count = 1
@@ -218,7 +218,7 @@ func (c *Controller) ReconcileMonCount(count int) error {
 		count = 3
 	}
 
-	cluster, err := c.GetCephCluster(context.TODO())
+	cluster, err := c.GetCephCluster(ctx)
 	if err != nil {
 		return errors.Wrapf(err, "get CephCluster config")
 	}
@@ -233,9 +233,40 @@ func (c *Controller) ReconcileMonCount(count int) error {
 
 	c.Log.Infof("Changing mon count from %d to %d", cluster.Spec.Mon.Count, count)
 	cluster.Spec.Mon.Count = count
-	_, err = c.Config.CephV1.CephClusters("rook-ceph").Update(context.TODO(), cluster, metav1.UpdateOptions{})
+	_, err = c.Config.CephV1.CephClusters("rook-ceph").Update(ctx, cluster, metav1.UpdateOptions{})
 	if err != nil {
 		return errors.Wrap(err, "update CephCluster with new mon count")
+	}
+
+	return nil
+}
+
+func (c *Controller) ReconcileMgrCount(ctx context.Context, count int) error {
+	// single mon for 1 node cluster, 2 mgrs for all other clusters
+	if count < 2 {
+		count = 1
+	} else {
+		count = 2
+	}
+
+	cluster, err := c.GetCephCluster(ctx)
+	if err != nil {
+		return errors.Wrapf(err, "get CephCluster config")
+	}
+
+	if cluster.Spec.Mgr.Count == count {
+		return nil
+	}
+	if cluster.Spec.Mgr.Count > count {
+		c.Log.Debugf("Will not reduce mgr count from %s to %s", cluster.Spec.Mgr.Count, count)
+		return nil
+	}
+
+	c.Log.Infof("Changing mgr count from %d to %d", cluster.Spec.Mgr.Count, count)
+	cluster.Spec.Mgr.Count = count
+	_, err = c.Config.CephV1.CephClusters("rook-ceph").Update(ctx, cluster, metav1.UpdateOptions{})
+	if err != nil {
+		return errors.Wrap(err, "update CephCluster with new mgr count")
 	}
 
 	return nil
