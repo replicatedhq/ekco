@@ -242,7 +242,11 @@ func (c *Controller) ReconcileMonCount(ctx context.Context, count int) error {
 }
 
 func (c *Controller) ReconcileMgrCount(ctx context.Context, count int) error {
-	// single mon for 1 node cluster, 2 mgrs for all other clusters
+	if c.Config.RookVersion.LT(Rookv19) {
+		return nil
+	}
+
+	// single mgr for 1 node cluster, 2 mgrs for all other clusters
 	if count < 2 {
 		count = 1
 	} else {
