@@ -28,3 +28,8 @@ func NewLogger(level zapcore.Level) (*zap.SugaredLogger, error) {
 	}
 	return logger.Sugar(), nil
 }
+
+func NewDiscardLogger() *zap.SugaredLogger {
+	logger := zap.NewNop()
+	return logger.Sugar()
+}

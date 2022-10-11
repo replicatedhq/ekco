@@ -127,7 +127,9 @@ func (o *Operator) reconcileRook(nodes []corev1.Node, doFullReconcile bool) erro
 		readyCount, err := o.ensureAllUsedForStorage(nodes)
 		if err != nil {
 			multiErr = multierror.Append(multiErr, errors.Wrapf(err, "ensure all ready nodes used for storage"))
-		} else {
+		}
+
+		if readyCount > 0 {
 			err := o.adjustPoolReplicationLevels(readyCount, doFullReconcile)
 			if err != nil {
 				multiErr = multierror.Append(multiErr, errors.Wrapf(err, "adjust pool replication levels"))
@@ -141,6 +143,13 @@ func (o *Operator) reconcileRook(nodes []corev1.Node, doFullReconcile bool) erro
 					multiErr = multierror.Append(multiErr, errors.Wrapf(err, "reconcile mgr count"))
 				}
 			}
+		}
+	}
+
+	if o.config.ReconcileCephCSIResources {
+		_, err := o.controller.SetCephCSIResources(context.TODO(), len(nodes))
+		if err != nil {
+			multiErr = multierror.Append(multiErr, errors.Wrapf(err, "patch filesystem %s mds placement", o.config.CephFilesystem))
 		}
 	}
 
