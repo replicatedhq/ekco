@@ -127,9 +127,7 @@ func (o *Operator) reconcileRook(nodes []corev1.Node, doFullReconcile bool) erro
 		readyCount, err := o.ensureAllUsedForStorage(nodes)
 		if err != nil {
 			multiErr = multierror.Append(multiErr, errors.Wrapf(err, "ensure all ready nodes used for storage"))
-		}
-
-		if readyCount > 0 {
+		} else {
 			err := o.adjustPoolReplicationLevels(readyCount, doFullReconcile)
 			if err != nil {
 				multiErr = multierror.Append(multiErr, errors.Wrapf(err, "adjust pool replication levels"))

@@ -231,7 +231,7 @@ func (c *Controller) ReconcileMonCount(ctx context.Context, count int) error {
 		return nil
 	}
 
-	c.Log.Infof("Changing mon count from %d to %d", cluster.Spec.Mon.Count, count)
+	c.Log.Infof("Increasing mon count from %d to %d", cluster.Spec.Mon.Count, count)
 	cluster.Spec.Mon.Count = count
 	_, err = c.Config.CephV1.CephClusters("rook-ceph").Update(ctx, cluster, metav1.UpdateOptions{})
 	if err != nil {
@@ -266,7 +266,7 @@ func (c *Controller) ReconcileMgrCount(ctx context.Context, count int) error {
 		return nil
 	}
 
-	c.Log.Infof("Changing mgr count from %d to %d", cluster.Spec.Mgr.Count, count)
+	c.Log.Infof("Increasing mgr count from %d to %d", cluster.Spec.Mgr.Count, count)
 	cluster.Spec.Mgr.Count = count
 	_, err = c.Config.CephV1.CephClusters("rook-ceph").Update(ctx, cluster, metav1.UpdateOptions{})
 	if err != nil {
