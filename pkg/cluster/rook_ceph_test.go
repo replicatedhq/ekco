@@ -1,6 +1,16 @@
 package cluster
 
-import "testing"
+import (
+	"context"
+	"testing"
+
+	"github.com/blang/semver"
+	"github.com/replicatedhq/ekco/pkg/logger"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/kubernetes/fake"
+)
 
 func TestParseCephOSDStatusHosts(t *testing.T) {
 	tests := []struct {
@@ -60,6 +70,89 @@ ID  HOST             USED  AVAIL  WR OPS  WR DATA  RD OPS  RD DATA  STATE
 			count := len(actual)
 			if test.count != count {
 				t.Errorf("got %d, want %d", count, test.count)
+			}
+		})
+	}
+}
+
+func TestController_SetCephCSIResources(t *testing.T) {
+	configMap := &corev1.ConfigMap{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "v1",
+			Kind:       "ConfigMap",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "rook-ceph-operator-config",
+			Namespace: "rook-ceph",
+		},
+		Data: map[string]string{},
+	}
+
+	type args struct {
+		nodeCount int
+	}
+	tests := []struct {
+		name        string
+		resources   []runtime.Object
+		rookVersion semver.Version
+		args        args
+		want        bool
+		wantErr     bool
+	}{
+		{
+			name:        "1 node",
+			resources:   []runtime.Object{configMap},
+			rookVersion: semver.MustParse("1.9.12"),
+			args: args{
+				nodeCount: 1,
+			},
+			want: false,
+		},
+		{
+			name:        "3 nodes",
+			resources:   []runtime.Object{configMap},
+			rookVersion: semver.MustParse("1.9.12"),
+			args: args{
+				nodeCount: 3,
+			},
+			want: true,
+		},
+		{
+			name:        "rook 1.8",
+			resources:   []runtime.Object{configMap},
+			rookVersion: semver.MustParse("1.8.10"),
+			args: args{
+				nodeCount: 3,
+			},
+			want: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			clientset := fake.NewSimpleClientset(tt.resources...)
+			c := &Controller{
+				Config: ControllerConfig{
+					Client:      clientset,
+					RookVersion: tt.rookVersion,
+				},
+				Log: logger.NewDiscardLogger(),
+			}
+			got, err := c.SetCephCSIResources(context.Background(), tt.args.nodeCount)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Controller.SetCephCSIResources() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("Controller.SetCephCSIResources() = %v, want %v", got, tt.want)
+			}
+
+			got, err = c.SetCephCSIResources(context.Background(), tt.args.nodeCount)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Controller.SetCephCSIResources() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != false {
+				t.Errorf("Controller.SetCephCSIResources() = %v, want %v", got, false)
 			}
 		})
 	}

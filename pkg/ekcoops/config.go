@@ -38,6 +38,9 @@ type Config struct {
 	// node. MDS pod anti-affinity is made more lenient at install time by kURL to allow for single
 	// node Rook upgrades. This setting will revert that change upon the addition of a second node.
 	ReconcileRookMDSPlacement bool `mapstructure:"reconcile_rook_mds_placement"`
+	// Whether to set Ceph CSI provisioner and plugin resources to their recommendations once the
+	// cluster has enough capacity at 3 nodes.
+	ReconcileCephCSIResources bool `mapstructure:"reconcile_ceph_csi_resources"`
 
 	// kubernetes certificates directory
 	CertificatesDir string `mapstructure:"certificates_dir"`

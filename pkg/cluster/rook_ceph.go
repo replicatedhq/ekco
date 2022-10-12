@@ -210,7 +210,7 @@ func (c *Controller) SetDeviceHealthMetricsReplication(cephBlockPoolName string,
 	return true, nil
 }
 
-func (c *Controller) ReconcileMonCount(count int) error {
+func (c *Controller) ReconcileMonCount(ctx context.Context, count int) error {
 	// single mon for 1 or 2 node cluster, 3 mons for all other clusters
 	if count < 3 {
 		count = 1
@@ -218,7 +218,7 @@ func (c *Controller) ReconcileMonCount(count int) error {
 		count = 3
 	}
 
-	cluster, err := c.GetCephCluster(context.TODO())
+	cluster, err := c.GetCephCluster(ctx)
 	if err != nil {
 		return errors.Wrapf(err, "get CephCluster config")
 	}
@@ -231,14 +231,115 @@ func (c *Controller) ReconcileMonCount(count int) error {
 		return nil
 	}
 
-	c.Log.Infof("Changing mon count from %d to %d", cluster.Spec.Mon.Count, count)
+	c.Log.Infof("Increasing mon count from %d to %d", cluster.Spec.Mon.Count, count)
 	cluster.Spec.Mon.Count = count
-	_, err = c.Config.CephV1.CephClusters("rook-ceph").Update(context.TODO(), cluster, metav1.UpdateOptions{})
+	_, err = c.Config.CephV1.CephClusters("rook-ceph").Update(ctx, cluster, metav1.UpdateOptions{})
 	if err != nil {
 		return errors.Wrap(err, "update CephCluster with new mon count")
 	}
 
 	return nil
+}
+
+func (c *Controller) ReconcileMgrCount(ctx context.Context, count int) error {
+	if c.Config.RookVersion.LT(Rookv19) {
+		return nil
+	}
+
+	// single mgr for 1 node cluster, 2 mgrs for all other clusters
+	if count < 2 {
+		count = 1
+	} else {
+		count = 2
+	}
+
+	cluster, err := c.GetCephCluster(ctx)
+	if err != nil {
+		return errors.Wrapf(err, "get CephCluster config")
+	}
+
+	if cluster.Spec.Mgr.Count == count {
+		return nil
+	}
+	if cluster.Spec.Mgr.Count > count {
+		c.Log.Debugf("Will not reduce mgr count from %s to %s", cluster.Spec.Mgr.Count, count)
+		return nil
+	}
+
+	c.Log.Infof("Increasing mgr count from %d to %d", cluster.Spec.Mgr.Count, count)
+	cluster.Spec.Mgr.Count = count
+	_, err = c.Config.CephV1.CephClusters("rook-ceph").Update(ctx, cluster, metav1.UpdateOptions{})
+	if err != nil {
+		return errors.Wrap(err, "update CephCluster with new mgr count")
+	}
+
+	return nil
+}
+
+const (
+	cephCSIRbdProvisionerResource    = "- name : csi-provisioner\n  resource:\n    requests:\n      memory: 128Mi\n      cpu: 100m\n    limits:\n      memory: 256Mi\n      cpu: 200m\n- name : csi-resizer\n  resource:\n    requests:\n      memory: 128Mi\n      cpu: 100m\n    limits:\n      memory: 256Mi\n      cpu: 200m\n- name : csi-attacher\n  resource:\n    requests:\n      memory: 128Mi\n      cpu: 100m\n    limits:\n      memory: 256Mi\n      cpu: 200m\n- name : csi-snapshotter\n  resource:\n    requests:\n      memory: 128Mi\n      cpu: 100m\n    limits:\n      memory: 256Mi\n      cpu: 200m\n- name : csi-rbdplugin\n  resource:\n    requests:\n      memory: 512Mi\n      cpu: 250m\n    limits:\n      memory: 1Gi\n      cpu: 500m\n- name : csi-omap-generator\n  resource:\n    requests:\n      memory: 512Mi\n      cpu: 250m\n    limits:\n      memory: 1Gi\n      cpu: 500m\n- name : liveness-prometheus\n  resource:\n    requests:\n      memory: 128Mi\n      cpu: 50m\n    limits:\n      memory: 256Mi\n      cpu: 100m\n"
+	cephCSIRbdPluginResource         = "- name : driver-registrar\n  resource:\n    requests:\n      memory: 128Mi\n      cpu: 50m\n    limits:\n      memory: 256Mi\n      cpu: 100m\n- name : csi-rbdplugin\n  resource:\n    requests:\n      memory: 512Mi\n      cpu: 250m\n    limits:\n      memory: 1Gi\n      cpu: 500m\n- name : liveness-prometheus\n  resource:\n    requests:\n      memory: 128Mi\n      cpu: 50m\n    limits:\n      memory: 256Mi\n      cpu: 100m\n"
+	cephCSICephfsProvisionerResource = "- name : csi-provisioner\n  resource:\n    requests:\n      memory: 128Mi\n      cpu: 100m\n    limits:\n      memory: 256Mi\n      cpu: 200m\n- name : csi-resizer\n  resource:\n    requests:\n      memory: 128Mi\n      cpu: 100m\n    limits:\n      memory: 256Mi\n      cpu: 200m\n- name : csi-attacher\n  resource:\n    requests:\n      memory: 128Mi\n      cpu: 100m\n    limits:\n      memory: 256Mi\n      cpu: 200m\n- name : csi-snapshotter\n  resource:\n    requests:\n      memory: 128Mi\n      cpu: 100m\n    limits:\n      memory: 256Mi\n      cpu: 200m\n- name : csi-cephfsplugin\n  resource:\n    requests:\n      memory: 512Mi\n      cpu: 250m\n    limits:\n      memory: 1Gi\n      cpu: 500m\n- name : liveness-prometheus\n  resource:\n    requests:\n      memory: 128Mi\n      cpu: 50m\n    limits:\n      memory: 256Mi\n      cpu: 100m\n"
+	cephCSICephfsPluginResource      = "- name : driver-registrar\n  resource:\n    requests:\n      memory: 128Mi\n      cpu: 50m\n    limits:\n      memory: 256Mi\n      cpu: 100m\n- name : csi-cephfsplugin\n  resource:\n    requests:\n      memory: 512Mi\n      cpu: 250m\n    limits:\n      memory: 1Gi\n      cpu: 500m\n- name : liveness-prometheus\n  resource:\n    requests:\n      memory: 128Mi\n      cpu: 50m\n    limits:\n      memory: 256Mi\n      cpu: 100m\n"
+	cephCSINfsProvisionerResource    = "- name : csi-provisioner\n  resource:\n    requests:\n      memory: 128Mi\n      cpu: 100m\n    limits:\n      memory: 256Mi\n      cpu: 200m\n- name : csi-nfsplugin\n  resource:\n    requests:\n      memory: 512Mi\n      cpu: 250m\n    limits:\n      memory: 1Gi\n      cpu: 500m\n"
+	cephCSINfsPluginResource         = "- name : driver-registrar\n  resource:\n    requests:\n      memory: 128Mi\n      cpu: 50m\n    limits:\n      memory: 256Mi\n      cpu: 100m\n- name : csi-nfsplugin\n  resource:\n    requests:\n      memory: 512Mi\n      cpu: 250m\n    limits:\n      memory: 1Gi\n      cpu: 500m\n"
+)
+
+var (
+	cephCSIResourcesPatch = []byte(fmt.Sprintf(
+		`{"data":{`+
+			`"CSI_RBD_PROVISIONER_RESOURCE":"%s",`+
+			`"CSI_RBD_PLUGIN_RESOURCE":"%s",`+
+			`"CSI_CEPHFS_PROVISIONER_RESOURCE":"%s",`+
+			`"CSI_CEPHFS_PLUGIN_RESOURCE":"%s",`+
+			`"CSI_NFS_PROVISIONER_RESOURCE":"%s",`+
+			`"CSI_NFS_PLUGIN_RESOURCE":"%s"`+
+			`}}`,
+		strings.ReplaceAll(cephCSIRbdProvisionerResource, "\n", "\\n"),
+		strings.ReplaceAll(cephCSIRbdPluginResource, "\n", "\\n"),
+		strings.ReplaceAll(cephCSICephfsProvisionerResource, "\n", "\\n"),
+		strings.ReplaceAll(cephCSICephfsPluginResource, "\n", "\\n"),
+		strings.ReplaceAll(cephCSINfsProvisionerResource, "\n", "\\n"),
+		strings.ReplaceAll(cephCSINfsPluginResource, "\n", "\\n"),
+	))
+)
+
+// SetCephCSIResources will set CSI provisioner and plugin resources to their recommendations once
+// the cluster has enough capacity at 3 nodes.
+func (c *Controller) SetCephCSIResources(ctx context.Context, nodeCount int) (bool, error) {
+	if c.Config.RookVersion.LT(Rookv19) {
+		return false, nil
+	}
+
+	if nodeCount < 3 {
+		return false, nil
+	}
+
+	configMap, err := c.Config.Client.CoreV1().ConfigMaps("rook-ceph").Get(ctx, "rook-ceph-operator-config", metav1.GetOptions{})
+	if err != nil {
+		return false, errors.Wrap(err, "get rook-ceph-operator-config configmap")
+	}
+
+	if !cephCSIResourcesNeedsUpdate(configMap.Data) {
+		return false, nil
+	}
+
+	c.Log.Infof("Setting Ceph CSI plugin and provisioner resources")
+
+	_, err = c.Config.Client.CoreV1().ConfigMaps("rook-ceph").Patch(ctx, "rook-ceph-operator-config", apitypes.MergePatchType, cephCSIResourcesPatch, metav1.PatchOptions{})
+	if err != nil {
+		return false, errors.Wrap(err, "patch rook-ceph-operator-config configmap")
+	}
+	return true, nil
+}
+
+func cephCSIResourcesNeedsUpdate(data map[string]string) bool {
+	return data["CSI_RBD_PROVISIONER_RESOURCE"] != cephCSIRbdProvisionerResource ||
+		data["CSI_RBD_PLUGIN_RESOURCE"] != cephCSIRbdPluginResource ||
+		data["CSI_CEPHFS_PROVISIONER_RESOURCE"] != cephCSICephfsProvisionerResource ||
+		data["CSI_CEPHFS_PLUGIN_RESOURCE"] != cephCSICephfsPluginResource ||
+		data["CSI_NFS_PROVISIONER_RESOURCE"] != cephCSINfsProvisionerResource ||
+		data["CSI_NFS_PLUGIN_RESOURCE"] != cephCSINfsPluginResource
 }
 
 // SetSharedFilesystemReplication ignores NotFound errors.

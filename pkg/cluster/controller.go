@@ -18,6 +18,7 @@ const (
 )
 
 var Rookv14 = semver.MustParse("1.4.0")
+var Rookv19 = semver.MustParse("1.9.0")
 
 type ControllerConfig struct {
 	Client                                kubernetes.Interface
