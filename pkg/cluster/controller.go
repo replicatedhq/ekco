@@ -27,7 +27,6 @@ type ControllerConfig struct {
 	AlertManagerV1                        dynamic.NamespaceableResourceInterface
 	PrometheusV1                          dynamic.NamespaceableResourceInterface
 	CertificatesDir                       string
-	RookVersion                           semver.Version
 	RookPriorityClass                     string
 	RotateCerts                           bool
 	RotateCertsImage                      string

@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	"github.com/replicatedhq/ekco/pkg/util"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/duration"
 	certutil "k8s.io/client-go/util/cert"
@@ -22,7 +22,7 @@ func (c *Controller) RotateKurlProxyCert() error {
 	// 1. Parse current cert from secret
 	secret, err := c.Config.Client.CoreV1().Secrets(ns).Get(context.TODO(), secretName, metav1.GetOptions{})
 	if err != nil {
-		if k8serrors.IsNotFound(err) {
+		if util.IsNotFoundErr(err) {
 			c.Log.Debugf("Kurl proxy cert secret does not exist, skipping renewal")
 			return nil
 		}
@@ -82,7 +82,7 @@ func (c *Controller) UpdateKubeletClientCertSecret() error {
 
 	secret, err := c.Config.Client.CoreV1().Secrets(ns).Get(context.TODO(), secretName, metav1.GetOptions{})
 	if err != nil {
-		if k8serrors.IsNotFound(err) {
+		if util.IsNotFoundErr(err) {
 			c.Log.Debugf("Kubelet client secret does not exist, skipping update")
 			return nil
 		}

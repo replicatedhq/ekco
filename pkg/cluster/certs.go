@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/replicatedhq/ekco/pkg/util"
 	corev1 "k8s.io/api/core/v1"
-	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
@@ -20,10 +20,11 @@ var errPodFailed error = errors.New("pod failed")
 func (c *Controller) CheckRotateCertsDue(reset bool) (bool, error) {
 	client := c.Config.Client.CoreV1().ConfigMaps(c.Config.RotateCertsNamespace)
 	cm, err := client.Get(context.TODO(), RotateCertsValue, metav1.GetOptions{})
-	if err != nil && !k8serrors.IsNotFound(err) {
-		return false, errors.Wrapf(err, "get configmap %s/%s", c.Config.RotateCertsNamespace, RotateCertsValue)
-	}
-	if err != nil && k8serrors.IsNotFound(err) {
+	if err != nil {
+		if !util.IsNotFoundErr(err) {
+			return false, errors.Wrapf(err, "get configmap %s/%s", c.Config.RotateCertsNamespace, RotateCertsValue)
+		}
+
 		// create the configmap the first time
 		cm = &corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{

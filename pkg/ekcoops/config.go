@@ -31,7 +31,6 @@ type Config struct {
 	CephObjectStore        string `mapstructure:"ceph_object_store"`
 	MinCephPoolReplication int    `mapstructure:"min_ceph_pool_replication"`
 	MaxCephPoolReplication int    `mapstructure:"max_ceph_pool_replication"`
-	RookVersion            string `mapstructure:"rook_version"`
 	// when set, priority class to be applied to rook deployments and daemonsets
 	RookPriorityClass string `mapstructure:"rook_priority_class"`
 	// Whether to reconcile CephFilesystem MDS placement when the cluster is scaled beyond one

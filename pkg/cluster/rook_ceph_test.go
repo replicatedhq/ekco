@@ -2,10 +2,13 @@ package cluster
 
 import (
 	"context"
+	_ "embed"
 	"testing"
 
 	"github.com/blang/semver"
 	"github.com/replicatedhq/ekco/pkg/logger"
+	"github.com/replicatedhq/ekco/pkg/util"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -132,12 +135,11 @@ func TestController_SetCephCSIResources(t *testing.T) {
 			clientset := fake.NewSimpleClientset(tt.resources...)
 			c := &Controller{
 				Config: ControllerConfig{
-					Client:      clientset,
-					RookVersion: tt.rookVersion,
+					Client: clientset,
 				},
 				Log: logger.NewDiscardLogger(),
 			}
-			got, err := c.SetCephCSIResources(context.Background(), tt.args.nodeCount)
+			got, err := c.SetCephCSIResources(context.Background(), tt.rookVersion, tt.args.nodeCount)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Controller.SetCephCSIResources() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -146,13 +148,106 @@ func TestController_SetCephCSIResources(t *testing.T) {
 				t.Errorf("Controller.SetCephCSIResources() = %v, want %v", got, tt.want)
 			}
 
-			got, err = c.SetCephCSIResources(context.Background(), tt.args.nodeCount)
+			got, err = c.SetCephCSIResources(context.Background(), tt.rookVersion, tt.args.nodeCount)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Controller.SetCephCSIResources() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if got != false {
 				t.Errorf("Controller.SetCephCSIResources() = %v, want %v", got, false)
+			}
+		})
+	}
+}
+
+func TestController_GetRookVersion(t *testing.T) {
+	rookCephOperatorDeployment := func(image string) *appsv1.Deployment {
+		return &appsv1.Deployment{
+			TypeMeta: metav1.TypeMeta{
+				APIVersion: "apps/v1",
+				Kind:       "Deployment",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "rook-ceph-operator",
+				Namespace: "rook-ceph",
+			},
+			Spec: appsv1.DeploymentSpec{
+				Template: corev1.PodTemplateSpec{
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{
+							{
+								Name:  "rook-ceph-operator",
+								Image: image,
+							},
+						},
+					},
+				},
+			},
+		}
+	}
+
+	newSemver := func(str string) *semver.Version {
+		version := semver.MustParse(str)
+		return &version
+	}
+
+	tests := []struct {
+		name              string
+		resources         []runtime.Object
+		want              *semver.Version
+		wantErr           bool
+		wantIsNotFoundErr bool
+	}{
+		{
+			name: "1.9.12",
+			resources: []runtime.Object{
+				rookCephOperatorDeployment("rook/rook-ceph:v1.9.12"),
+			},
+			want: newSemver("1.9.12"),
+		},
+		{
+			name: "1.0.4-9065b09-20210625",
+			resources: []runtime.Object{
+				rookCephOperatorDeployment("kurlsh/rook-ceph:v1.0.4-9065b09-20210625"),
+			},
+			want: newSemver("1.0.4-9065b09-20210625"),
+		},
+		{
+			name: "invalid semver",
+			resources: []runtime.Object{
+				rookCephOperatorDeployment("kurlsh/rook-ceph:not-semver"),
+			},
+			wantErr: true,
+		},
+		{
+			name:              "not found",
+			wantErr:           true,
+			wantIsNotFoundErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			clientset := fake.NewSimpleClientset(tt.resources...)
+			c := &Controller{
+				Config: ControllerConfig{
+					Client: clientset,
+				},
+				Log: logger.NewDiscardLogger(),
+			}
+			got, err := c.GetRookVersion(context.Background())
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Controller.GetRookVersion() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if tt.wantIsNotFoundErr {
+				if !util.IsNotFoundErr(err) {
+					t.Errorf("Controller.GetRookVersion() error = %T, want k8serrors.IsNotFound", err)
+				}
+			}
+			if !tt.wantErr {
+				if !(*tt.want).Equals(*got) {
+					t.Errorf("Controller.GetRookVersion() = %s, want %s", *got, *tt.want)
+				}
 			}
 		})
 	}

@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"github.com/blang/semver"
 	"github.com/pkg/errors"
 	"github.com/replicatedhq/ekco/pkg/cluster"
 	"github.com/replicatedhq/ekco/pkg/ekcoops"
@@ -63,21 +62,11 @@ func initClusterController(config *ekcoops.Config, log *zap.SugaredLogger) (*clu
 		Resource: "alertmanagers",
 	})
 
-	rv := config.RookVersion
-	if rv == "" {
-		rv = "1.4.3"
-	}
-	rookVersion, err := semver.Parse(rv)
-	if err != nil {
-		return nil, errors.Wrap(err, "parse rook version")
-	}
-
 	return cluster.NewController(cluster.ControllerConfig{
 		Client:                                client,
 		ClientConfig:                          clientConfig,
 		CephV1:                                rookcephclient,
 		CertificatesDir:                       config.CertificatesDir,
-		RookVersion:                           rookVersion,
 		AlertManagerV1:                        alertManagerClient,
 		PrometheusV1:                          prometheusClient,
 		RookPriorityClass:                     config.RookPriorityClass,
