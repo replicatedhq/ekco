@@ -30,6 +30,7 @@ func (c *Controller) ReconcileInternalLB(ctx context.Context, nodes []corev1.Nod
 		if !util.IsNotFoundErr(err) {
 			return errors.Wrapf(err, "get configmap %s/%s", c.Config.HostTaskNamespace, UpdateInternalLBValue)
 		}
+
 		// create the configmap the first time
 		cm = &corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
