@@ -12,7 +12,6 @@ import (
 	"github.com/replicatedhq/ekco/pkg/k8s"
 	"github.com/replicatedhq/ekco/pkg/util"
 	corev1 "k8s.io/api/core/v1"
-	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
@@ -27,10 +26,11 @@ func (c *Controller) ReconcileInternalLB(ctx context.Context, nodes []corev1.Nod
 
 	client := c.Config.Client.CoreV1().ConfigMaps(c.Config.HostTaskNamespace)
 	cm, err := client.Get(context.TODO(), UpdateInternalLBValue, metav1.GetOptions{})
-	if err != nil && !k8serrors.IsNotFound(err) {
-		return errors.Wrapf(err, "get configmap %s/%s", c.Config.HostTaskNamespace, UpdateInternalLBValue)
-	}
-	if k8serrors.IsNotFound(err) {
+	if err != nil {
+		if !util.IsNotFoundErr(err) {
+			return errors.Wrapf(err, "get configmap %s/%s", c.Config.HostTaskNamespace, UpdateInternalLBValue)
+		}
+
 		// create the configmap the first time
 		cm = &corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{

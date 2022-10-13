@@ -2,18 +2,16 @@ package util
 
 import (
 	"github.com/pkg/errors"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 )
 
 func IsNotFoundErr(err error) bool {
-	statusErr, ok := errors.Cause(err).(*apierrors.StatusError)
-	return ok && statusErr.Status().Reason == metav1.StatusReasonNotFound
+	return k8serrors.IsNotFound(errors.Cause(err))
 }
 
 func FilterOutErr(err error, fns ...utilerrors.Matcher) error {
-	return utilerrors.FilterOut(err, fns...)
+	return utilerrors.FilterOut(errors.Cause(err), fns...)
 }
 
 func FilterOutReasonNotFoundErr(err error) error {

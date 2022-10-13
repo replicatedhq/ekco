@@ -8,8 +8,8 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/projectcontour/contour/pkg/certs"
+	"github.com/replicatedhq/ekco/pkg/util"
 	corev1 "k8s.io/api/core/v1"
-	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/duration"
@@ -81,7 +81,7 @@ func (c *Controller) shouldRotateContourCerts(caCert, contourCert, envoyCert *x5
 func (c *Controller) readContourCerts(contourNamespace, contourSecretName, envoySecretName string) (*x509.Certificate, *x509.Certificate, *x509.Certificate, error) {
 	contourSecret, err := c.Config.Client.CoreV1().Secrets(contourNamespace).Get(context.TODO(), contourSecretName, metav1.GetOptions{})
 	if err != nil {
-		if k8serrors.IsNotFound(err) {
+		if util.IsNotFoundErr(err) {
 			return nil, nil, nil, nil
 		}
 		return nil, nil, nil, errors.Wrapf(err, "get secret %s/%s", contourNamespace, contourSecretName)
@@ -89,7 +89,7 @@ func (c *Controller) readContourCerts(contourNamespace, contourSecretName, envoy
 
 	envoySecret, err := c.Config.Client.CoreV1().Secrets(contourNamespace).Get(context.TODO(), envoySecretName, metav1.GetOptions{})
 	if err != nil {
-		if k8serrors.IsNotFound(err) {
+		if util.IsNotFoundErr(err) {
 			return nil, nil, nil, nil
 		}
 		return nil, nil, nil, errors.Wrapf(err, "get secret %s/%s", contourNamespace, envoySecretName)

@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	"github.com/replicatedhq/ekco/pkg/util"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/duration"
@@ -88,7 +88,7 @@ func (c *Controller) RotateRegistryCert() error {
 func (c *Controller) readRegistryCert(namespace, name string) (*x509.Certificate, error) {
 	secret, err := c.Config.Client.CoreV1().Secrets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
-		if k8serrors.IsNotFound(err) {
+		if util.IsNotFoundErr(err) {
 			return nil, nil
 		}
 		return nil, errors.Wrapf(err, "get secret %s/%s", namespace, name)

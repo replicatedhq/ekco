@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/blang/semver"
 	"github.com/pkg/errors"
 	"github.com/replicatedhq/ekco/pkg/cluster"
 	"github.com/replicatedhq/ekco/pkg/ekcoops"
@@ -53,7 +54,9 @@ func PurgeNodeCmd(v *viper.Viper) *cobra.Command {
 }
 
 func purgeNode(nodeName string, config *ekcoops.Config, clusterController *cluster.Controller) error {
-	nodeList, err := clusterController.Config.Client.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
+	ctx := context.TODO()
+
+	nodeList, err := clusterController.Config.Client.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return errors.Wrap(err, "failed to list nodes")
 	}
@@ -74,6 +77,16 @@ func purgeNode(nodeName string, config *ekcoops.Config, clusterController *clust
 		}
 	}
 
-	err = clusterController.PurgeNode(context.Background(), nodeName, config.MaintainRookStorageNodes)
+	var rookVersion *semver.Version
+	if config.MaintainRookStorageNodes {
+		rv, err := clusterController.GetRookVersion(ctx)
+		if err != nil && !util.IsNotFoundErr(err) {
+			return errors.Wrap(err, "failed to get Rook version")
+		} else if err == nil {
+			rookVersion = rv
+		}
+	}
+
+	err = clusterController.PurgeNode(ctx, nodeName, config.MaintainRookStorageNodes, rookVersion)
 	return errors.Wrap(err, "failed to purge node")
 }

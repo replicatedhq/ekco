@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/blang/semver"
 	"github.com/pkg/errors"
 	"github.com/replicatedhq/ekco/pkg/util"
 	"gopkg.in/yaml.v2"
@@ -19,7 +20,7 @@ const (
 )
 
 // PurgeNode cleans up a lost node.
-func (c *Controller) PurgeNode(ctx context.Context, name string, rook bool) error {
+func (c *Controller) PurgeNode(ctx context.Context, name string, rook bool, rookVersion *semver.Version) error {
 	c.Log.Infof("Purge node %q", name)
 
 	// get the Node before deleting because the etcd peer member removal step below may need the IP
@@ -31,8 +32,8 @@ func (c *Controller) PurgeNode(ctx context.Context, name string, rook bool) erro
 		node = nil
 	}
 
-	if rook {
-		err := c.purgeCephOsd(ctx, name)
+	if rook && rookVersion != nil {
+		err := c.purgeCephOsd(ctx, *rookVersion, name)
 		if err != nil {
 			c.Log.Warnf("Purge node %q: ceph osd purge command failed with error: %v", name, err)
 		}
@@ -98,7 +99,7 @@ func (c *Controller) PurgeNode(ctx context.Context, name string, rook bool) erro
 }
 
 // purgeCephOsd safely removes the OSD on a particular node name from the Ceph cluster.
-func (c *Controller) purgeCephOsd(ctx context.Context, name string) error {
+func (c *Controller) purgeCephOsd(ctx context.Context, rookVersion semver.Version, name string) error {
 	if err := c.removeCephClusterStorageNode(name); err != nil {
 		return err
 	}
@@ -109,7 +110,7 @@ func (c *Controller) purgeCephOsd(ctx context.Context, name string) error {
 	}
 
 	if osdID != "" {
-		if err := c.execCephOSDPurge(osdID, name); err != nil {
+		if err := c.execCephOSDPurge(rookVersion, osdID, name); err != nil {
 			return err
 		}
 		c.Log.Infof("Purge node %q: ceph osd purge command executed", name)

@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/blang/semver"
 	multierror "github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 	"github.com/replicatedhq/ekco/pkg/cluster"
@@ -49,19 +50,31 @@ func (o *Operator) Reconcile(nodes []corev1.Node, doFullReconcile bool) error {
 		o.log.Debugf("Performing full reconcile")
 	}
 
+	ctx := context.TODO()
+
 	var multiErr error
+
+	var rookVersion *semver.Version
+	rv, err := o.controller.GetRookVersion(ctx)
+	if err != nil && !util.IsNotFoundErr(err) {
+		o.log.Errorf("Failed to get Rook version: %v", err)
+	} else if err == nil {
+		rookVersion = rv
+	}
 
 	readyMasters, readyWorkers := util.NodeReadyCounts(nodes)
 	for _, node := range nodes {
-		err := o.reconcileNode(node, readyMasters, readyWorkers)
+		err := o.reconcileNode(node, readyMasters, readyWorkers, rookVersion)
 		if err != nil {
 			multiErr = multierror.Append(multiErr, errors.Wrapf(err, "reconcile node %s", node.Name))
 		}
 	}
 
-	err := o.reconcileRook(nodes, doFullReconcile)
-	if err != nil {
-		multiErr = multierror.Append(multiErr, err)
+	if rookVersion != nil {
+		err := o.reconcileRook(*rookVersion, nodes, doFullReconcile)
+		if err != nil {
+			multiErr = multierror.Append(multiErr, err)
+		}
 	}
 
 	if o.config.RotateCerts && doFullReconcile {
@@ -72,7 +85,7 @@ func (o *Operator) Reconcile(nodes []corev1.Node, doFullReconcile bool) error {
 	}
 
 	if o.config.EnableInternalLoadBalancer {
-		if err := o.controller.ReconcileInternalLB(context.Background(), nodes); err != nil {
+		if err := o.controller.ReconcileInternalLB(ctx, nodes); err != nil {
 			multiErr = multierror.Append(multiErr, errors.Wrap(err, "update internal loadbalancer"))
 		}
 	}
@@ -81,7 +94,7 @@ func (o *Operator) Reconcile(nodes []corev1.Node, doFullReconcile bool) error {
 		multiErr = multierror.Append(multiErr, errors.Wrap(err, "failed to reconcile prometheus"))
 	}
 
-	if err := o.controller.RestartFailedEnvoyPods(context.Background()); err != nil {
+	if err := o.controller.RestartFailedEnvoyPods(ctx); err != nil {
 		multiErr = multierror.Append(multiErr, errors.Wrap(err, "failed to reconcile failed envoy pod"))
 	}
 
@@ -94,7 +107,7 @@ func (o *Operator) Reconcile(nodes []corev1.Node, doFullReconcile bool) error {
 	return multiErr
 }
 
-func (o *Operator) reconcileNode(node corev1.Node, readyMasters, readyWorkers int) error {
+func (o *Operator) reconcileNode(node corev1.Node, readyMasters, readyWorkers int, rookVersion *semver.Version) error {
 	if o.config.PurgeDeadNodes && o.isDead(node) {
 		if util.NodeIsMaster(node) && readyMasters < o.config.MinReadyMasterNodes {
 			o.log.Debugf("Skipping auto-purge master: %d ready masters", readyMasters)
@@ -104,7 +117,7 @@ func (o *Operator) reconcileNode(node corev1.Node, readyMasters, readyWorkers in
 			return nil
 		}
 		o.log.Infof("Automatically purging dead node %s", node.Name)
-		err := o.controller.PurgeNode(context.TODO(), node.Name, o.config.MaintainRookStorageNodes)
+		err := o.controller.PurgeNode(context.TODO(), node.Name, o.config.MaintainRookStorageNodes, rookVersion)
 		if err != nil {
 			return errors.Wrapf(err, "purge dead node %s", node.Name)
 		}
@@ -120,15 +133,15 @@ func (o *Operator) reconcileNode(node corev1.Node, readyMasters, readyWorkers in
 	return nil
 }
 
-func (o *Operator) reconcileRook(nodes []corev1.Node, doFullReconcile bool) error {
+func (o *Operator) reconcileRook(rookVersion semver.Version, nodes []corev1.Node, doFullReconcile bool) error {
 	var multiErr error
 
 	if o.config.MaintainRookStorageNodes {
-		readyCount, err := o.ensureAllUsedForStorage(nodes)
+		readyCount, err := o.ensureAllUsedForStorage(rookVersion, nodes)
 		if err != nil {
 			multiErr = multierror.Append(multiErr, errors.Wrapf(err, "ensure all ready nodes used for storage"))
 		} else {
-			err := o.adjustPoolReplicationLevels(readyCount, doFullReconcile)
+			err := o.adjustPoolReplicationLevels(rookVersion, readyCount, doFullReconcile)
 			if err != nil {
 				multiErr = multierror.Append(multiErr, errors.Wrapf(err, "adjust pool replication levels"))
 			} else {
@@ -136,7 +149,7 @@ func (o *Operator) reconcileRook(nodes []corev1.Node, doFullReconcile bool) erro
 				if err != nil {
 					multiErr = multierror.Append(multiErr, errors.Wrapf(err, "reconcile mon count"))
 				}
-				err = o.controller.ReconcileMgrCount(context.TODO(), readyCount)
+				err = o.controller.ReconcileMgrCount(context.TODO(), rookVersion, readyCount)
 				if err != nil {
 					multiErr = multierror.Append(multiErr, errors.Wrapf(err, "reconcile mgr count"))
 				}
@@ -145,7 +158,7 @@ func (o *Operator) reconcileRook(nodes []corev1.Node, doFullReconcile bool) erro
 	}
 
 	if o.config.ReconcileCephCSIResources {
-		_, err := o.controller.SetCephCSIResources(context.TODO(), len(nodes))
+		_, err := o.controller.SetCephCSIResources(context.TODO(), rookVersion, len(nodes))
 		if err != nil {
 			multiErr = multierror.Append(multiErr, errors.Wrapf(err, "patch filesystem %s mds placement", o.config.CephFilesystem))
 		}
@@ -180,7 +193,7 @@ func (o *Operator) isDead(node corev1.Node) bool {
 // ensureAlUsedForStorage will only append nodes. Removing nodes is only done during purge.
 // Filter out not ready nodes since Rook fails to ever start an OSD on a node unless it's ready at
 // the moment it detects the added node in the list.
-func (o *Operator) ensureAllUsedForStorage(nodes []corev1.Node) (int, error) {
+func (o *Operator) ensureAllUsedForStorage(rookVersion semver.Version, nodes []corev1.Node) (int, error) {
 	var names []string
 
 	for _, node := range nodes {
@@ -189,11 +202,11 @@ func (o *Operator) ensureAllUsedForStorage(nodes []corev1.Node) (int, error) {
 		}
 	}
 
-	return o.controller.UseNodesForStorage(names)
+	return o.controller.UseNodesForStorage(rookVersion, names)
 }
 
 // adjustPoolSizes changes ceph pool replication factors up and down
-func (o *Operator) adjustPoolReplicationLevels(numNodes int, doFullReconcile bool) error {
+func (o *Operator) adjustPoolReplicationLevels(rookVersion semver.Version, numNodes int, doFullReconcile bool) error {
 	factor := numNodes
 
 	if factor < o.config.MinCephPoolReplication {
@@ -210,18 +223,18 @@ func (o *Operator) adjustPoolReplicationLevels(numNodes int, doFullReconcile boo
 		multiErr = multierror.Append(multiErr, errors.Wrapf(err, "get CephCluster config"))
 	}
 
-	didUpdate, err := o.controller.SetBlockPoolReplication(o.config.CephBlockPool, factor, cephcluster, doFullReconcile)
+	didUpdate, err := o.controller.SetBlockPoolReplication(rookVersion, o.config.CephBlockPool, factor, cephcluster, doFullReconcile)
 	if err != nil {
 		multiErr = multierror.Append(multiErr, errors.Wrapf(err, "set pool %s replication to %d", o.config.CephBlockPool, factor))
 	}
 
-	ok, err := o.controller.SetFilesystemReplication(o.config.CephFilesystem, factor, cephcluster, doFullReconcile)
+	ok, err := o.controller.SetFilesystemReplication(rookVersion, o.config.CephFilesystem, factor, cephcluster, doFullReconcile)
 	if err != nil {
 		multiErr = multierror.Append(multiErr, errors.Wrapf(err, "set filesystem %s replication to %d", o.config.CephFilesystem, factor))
 	}
 	didUpdate = didUpdate || ok
 
-	ok, err = o.controller.SetObjectStoreReplication(o.config.CephObjectStore, factor, cephcluster, doFullReconcile)
+	ok, err = o.controller.SetObjectStoreReplication(rookVersion, o.config.CephObjectStore, factor, cephcluster, doFullReconcile)
 	if err != nil {
 		multiErr = multierror.Append(multiErr, errors.Wrapf(err, "set object store %s replication to %d", o.config.CephObjectStore, factor))
 	}
@@ -229,7 +242,7 @@ func (o *Operator) adjustPoolReplicationLevels(numNodes int, doFullReconcile boo
 
 	// There is no CR to compare the desired and current level.
 	// Assume that if cephblockpool replication level has not yet been set then we need to do the same for device_health_metrics.
-	_, err = o.controller.SetDeviceHealthMetricsReplication(o.config.CephBlockPool, factor, cephcluster, doFullReconcile || didUpdate)
+	_, err = o.controller.SetDeviceHealthMetricsReplication(rookVersion, o.config.CephBlockPool, factor, cephcluster, doFullReconcile || didUpdate)
 	if err != nil {
 		multiErr = multierror.Append(multiErr, errors.Wrapf(err, "set health_device_metrics replication to %d", factor))
 	}
