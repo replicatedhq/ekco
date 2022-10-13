@@ -60,6 +60,7 @@ func (o *Operator) Reconcile(nodes []corev1.Node, doFullReconcile bool) error {
 		o.log.Errorf("Failed to get Rook version: %v", err)
 	} else if err == nil {
 		rookVersion = rv
+		o.log.Debugf("Rook version %s", rookVersion)
 	}
 
 	readyMasters, readyWorkers := util.NodeReadyCounts(nodes)
