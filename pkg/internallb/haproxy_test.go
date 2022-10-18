@@ -26,8 +26,7 @@ func TestGenerateHAProxyConfig(t *testing.T) {
 # Global settings
 #---------------------------------------------------------------------
 global
-    log /dev/log local0
-    log /dev/log local1 notice
+    log stdout format raw local0 notice
     daemon
 
 #---------------------------------------------------------------------
@@ -36,6 +35,7 @@ global
 # borrowed from https://github.com/openshift/machine-config-operator/blob/9674df13d76e3832c5b8404083fb6218a09503f8/templates/master/00-master/on-prem/files/haproxy-haproxy.yaml
 #---------------------------------------------------------------------
 defaults
+    log     global
     maxconn 20000
     mode    tcp
     option  dontlognull
