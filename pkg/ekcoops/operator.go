@@ -105,6 +105,12 @@ func (o *Operator) Reconcile(nodes []corev1.Node, doFullReconcile bool) error {
 		}
 	}
 
+	if o.config.EnableHAMinio {
+		if err := o.reconcileMinio(); err != nil {
+			multiErr = multierror.Append(multiErr, errors.Wrap(err, "reconcile minio"))
+		}
+	}
+
 	return multiErr
 }
 
@@ -320,5 +326,41 @@ func (o *Operator) reconcileCertificateSigningRequests() error {
 			o.log.Infof("CSR approval is successful %s", csr.Name)
 		}
 	}
+	return nil
+}
+
+func (o *Operator) reconcileMinio() error {
+	nodes, err := o.client.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		return errors.Wrap(err, "list nodes")
+	}
+
+	if m, w := util.NodeReadyCounts(nodes.Items); m+w < 3 {
+		return nil // not enough nodes, no ha minio
+	}
+
+	err = o.controller.ScaleMinioStatefulset(context.TODO(), o.config.MinioNamespace)
+	if err != nil {
+		return errors.Wrap(err, "scale minio statefulset")
+	}
+
+	// possibly migrate from old non-replicated minio and remove it
+	_, err = o.client.AppsV1().Deployments(o.config.MinioNamespace).Get(context.TODO(), "minio", metav1.GetOptions{})
+	if err != nil {
+		if !util.IsNotFoundErr(err) {
+			return errors.Wrap(err, "get minio deployment")
+		}
+	} else {
+		err = o.controller.MigrateMinioData(context.TODO(), o.config.MinioUtilImage, o.config.MinioNamespace)
+		if err != nil {
+			return errors.Wrap(err, "migrate data to ha minio")
+		}
+	}
+
+	err = o.controller.MaybeRebalanceMinioServers(context.TODO(), o.config.MinioNamespace)
+	if err != nil {
+		return errors.Wrap(err, "rebalance minio servers")
+	}
+
 	return nil
 }
