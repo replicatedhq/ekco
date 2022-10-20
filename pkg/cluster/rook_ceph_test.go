@@ -202,6 +202,7 @@ func TestController_GetRookVersion(t *testing.T) {
 			name: "1.9.12",
 			resources: []runtime.Object{
 				rookCephOperatorDeployment("rook/rook-ceph:v1.9.12"),
+				&corev1.Namespace{TypeMeta: metav1.TypeMeta{Kind: "Namespace", APIVersion: "v1"}, ObjectMeta: metav1.ObjectMeta{Name: "rook-ceph"}},
 			},
 			want: newSemver("1.9.12"),
 		},
@@ -209,6 +210,7 @@ func TestController_GetRookVersion(t *testing.T) {
 			name: "1.0.4-9065b09-20210625",
 			resources: []runtime.Object{
 				rookCephOperatorDeployment("kurlsh/rook-ceph:v1.0.4-9065b09-20210625"),
+				&corev1.Namespace{TypeMeta: metav1.TypeMeta{Kind: "Namespace", APIVersion: "v1"}, ObjectMeta: metav1.ObjectMeta{Name: "rook-ceph"}},
 			},
 			want: newSemver("1.0.4-9065b09-20210625"),
 		},
@@ -216,11 +218,21 @@ func TestController_GetRookVersion(t *testing.T) {
 			name: "invalid semver",
 			resources: []runtime.Object{
 				rookCephOperatorDeployment("kurlsh/rook-ceph:not-semver"),
+				&corev1.Namespace{TypeMeta: metav1.TypeMeta{Kind: "Namespace", APIVersion: "v1"}, ObjectMeta: metav1.ObjectMeta{Name: "rook-ceph"}},
 			},
 			wantErr: true,
 		},
 		{
-			name:              "not found",
+			name: "not found",
+			resources: []runtime.Object{
+				&corev1.Namespace{TypeMeta: metav1.TypeMeta{Kind: "Namespace", APIVersion: "v1"}, ObjectMeta: metav1.ObjectMeta{Name: "rook-ceph"}},
+			},
+			wantErr:           true,
+			wantIsNotFoundErr: true,
+		},
+		{
+			name:              "no namespace",
+			resources:         []runtime.Object{},
 			wantErr:           true,
 			wantIsNotFoundErr: true,
 		},
