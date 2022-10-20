@@ -835,6 +835,11 @@ func (c *Controller) cephOSDPoolSetMinSize(rookVersion semver.Version, name stri
 // GetRookVersion gets the Rook version from the container image tag of the rook-ceph-operator
 // deployment in the rook-ceph namespace.
 func (c *Controller) GetRookVersion(ctx context.Context) (*semver.Version, error) {
+	_, err := c.Config.Client.CoreV1().Namespaces().Get(ctx, "rook-ceph", metav1.GetOptions{})
+	if err != nil {
+		return nil, errors.Wrap(err, "get rook-ceph namespace")
+	}
+
 	deploy, err := c.Config.Client.AppsV1().Deployments("rook-ceph").Get(ctx, "rook-ceph-operator", metav1.GetOptions{})
 	if err != nil {
 		return nil, errors.Wrap(err, "get rook-ceph-operator deployment")
