@@ -335,25 +335,23 @@ func (o *Operator) reconcileMinio() error {
 		return errors.Wrap(err, "list nodes")
 	}
 
-	if m, w := util.NodeReadyCounts(nodes.Items); m+w < 3 {
-		return nil // not enough nodes, no ha minio
-	}
-
-	err = o.controller.ScaleMinioStatefulset(context.TODO(), o.config.MinioNamespace)
-	if err != nil {
-		return errors.Wrap(err, "scale minio statefulset")
-	}
-
-	// possibly migrate from old non-replicated minio and remove it
-	_, err = o.client.AppsV1().Deployments(o.config.MinioNamespace).Get(context.TODO(), "minio", metav1.GetOptions{})
-	if err != nil {
-		if !util.IsNotFoundErr(err) {
-			return errors.Wrap(err, "get minio deployment")
-		}
-	} else {
-		err = o.controller.MigrateMinioData(context.TODO(), o.config.MinioUtilImage, o.config.MinioNamespace)
+	if m, w := util.NodeReadyCounts(nodes.Items); m+w >= 3 {
+		err = o.controller.ScaleMinioStatefulset(context.TODO(), o.config.MinioNamespace)
 		if err != nil {
-			return errors.Wrap(err, "migrate data to ha minio")
+			return errors.Wrap(err, "scale minio statefulset")
+		}
+
+		// possibly migrate from old non-replicated minio and remove it
+		_, err = o.client.AppsV1().Deployments(o.config.MinioNamespace).Get(context.TODO(), "minio", metav1.GetOptions{})
+		if err != nil {
+			if !util.IsNotFoundErr(err) {
+				return errors.Wrap(err, "get minio deployment")
+			}
+		} else {
+			err = o.controller.MigrateMinioData(context.TODO(), o.config.MinioUtilImage, o.config.MinioNamespace)
+			if err != nil {
+				return errors.Wrap(err, "migrate data to ha minio")
+			}
 		}
 	}
 
