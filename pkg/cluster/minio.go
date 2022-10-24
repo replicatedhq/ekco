@@ -46,6 +46,7 @@ func (c *Controller) ScaleMinioStatefulset(ctx context.Context, ns string) error
 		return fmt.Errorf("failed to scale ha-minio statefulset: %w", err)
 	}
 
+	c.Log.Infof("Scaled HA MinIO Statefulset to %d replicas", scale32)
 	return nil
 }
 
@@ -56,7 +57,7 @@ func (c *Controller) MigrateMinioData(ctx context.Context, utilImage string, ns 
 	// if it's not, return nil - we'll migrate on a future reconcile
 	healthy := c.haMinioHealthy(ns)
 	if !healthy {
-		c.Log.Debugf("Not migrating data to HA Minio statefulset as it is not yet healthy")
+		c.Log.Infof("Not migrating data to HA Minio statefulset as it is not yet healthy")
 		return nil
 	}
 
@@ -195,6 +196,7 @@ func (c *Controller) MigrateMinioData(ctx context.Context, utilImage string, ns 
 		return fmt.Errorf("failed to clean up minio migration job: %w", err)
 	}
 
+	c.Log.Infof("Successfully migrated to HA MinIO")
 	return nil
 }
 
@@ -225,7 +227,7 @@ func (c *Controller) waitForJobCompletion(ctx context.Context, jobName string, j
 // and if it exists reschedule a replica from a node with ceil(replicas/nodes).
 func (c *Controller) MaybeRebalanceMinioServers(ctx context.Context, ns string) error {
 	if !c.haMinioHealthy(ns) {
-		c.Log.Debugf("Not rebalancing Minio pods as the statefulset is not healthy")
+		c.Log.Infof("Not rebalancing Minio pods as the statefulset is not healthy")
 		return nil
 	}
 
@@ -234,8 +236,7 @@ func (c *Controller) MaybeRebalanceMinioServers(ctx context.Context, ns string) 
 		return fmt.Errorf("faled to get ha-minio pods: %w", err)
 	}
 
-	var unschedulablePod *corev1.Pod
-	for idx, minioPod := range minioPods.Items {
+	for _, minioPod := range minioPods.Items {
 		if minioPod.Status.Phase != corev1.PodPending {
 			continue
 		}
@@ -243,13 +244,10 @@ func (c *Controller) MaybeRebalanceMinioServers(ctx context.Context, ns string) 
 			if condition.Type == corev1.PodScheduled && condition.Status == corev1.ConditionFalse {
 				if time.Since(condition.LastTransitionTime.Time) > time.Minute*5 {
 					// pod has been unschedulable for 5 minutes, we can assume it should be rescheduled
-					unschedulablePod = &minioPods.Items[idx]
+					return c.rescheduleOnePod(ctx, minioPod)
 				}
 			}
 		}
-	}
-	if unschedulablePod != nil {
-		return c.rescheduleOnePod(ctx, *unschedulablePod)
 	}
 
 	// make a map of nodes to minio pods
@@ -286,20 +284,24 @@ func (c *Controller) MaybeRebalanceMinioServers(ctx context.Context, ns string) 
 	}
 
 	for _, nodePods := range nodeMinioPods {
-		if shouldRescheduleAnyDuplicate && len(nodePods) > 1 {
-			// reschedule a pod from this node because there is a node with zero minio pods
+		if len(nodePods) > maxNodePods {
+			// reschedule a pod from this node because it has more than the expected maximum
 			if c.haMinioPodSafeToReschedule(nodePods[0]) {
 				return c.rescheduleOnePod(ctx, nodePods[0])
 			}
 		}
+	}
+	for _, nodePods := range nodeMinioPods {
 		if shouldRescheduleFromMax && len(nodePods) == maxNodePods {
 			// reschedule a pod from this node because there is a node with less than the minimum number of pods and this node has the maximum
 			if c.haMinioPodSafeToReschedule(nodePods[0]) {
 				return c.rescheduleOnePod(ctx, nodePods[0])
 			}
 		}
-		if len(nodePods) > maxNodePods {
-			// reschedule a pod from this node because it has more than the expected maximum
+	}
+	for _, nodePods := range nodeMinioPods {
+		if shouldRescheduleAnyDuplicate && len(nodePods) > 1 {
+			// reschedule a pod from this node because there is a node with zero minio pods
 			if c.haMinioPodSafeToReschedule(nodePods[0]) {
 				return c.rescheduleOnePod(ctx, nodePods[0])
 			}
@@ -344,7 +346,7 @@ func (c *Controller) rescheduleOnePod(ctx context.Context, pod corev1.Pod) error
 func (c *Controller) haMinioHealthy(ns string) bool {
 	resp, err := http.Get(fmt.Sprintf("http://ha-minio.%s.svc.cluster.local/minio/health/cluster", ns))
 	if err != nil {
-		c.Log.Debugf("failed to hit ha-minio endpoint: %s", err.Error())
+		c.Log.Infof("Failed to hit ha-minio endpoint: %s", err.Error())
 		return false
 	}
 
@@ -361,13 +363,13 @@ func (c *Controller) haMinioHealthy(ns string) bool {
 func (c *Controller) haMinioPodSafeToReschedule(pod corev1.Pod) bool {
 	resp, err := http.Get(fmt.Sprintf("http://%s:9000/minio/health/cluster?maintenance=true", pod.Status.PodIP))
 	if err != nil {
-		c.Log.Debugf("failed to hit ha-minio pod %s: %s", pod.Name, err.Error())
+		c.Log.Infof("Failed to hit ha-minio pod %s: %s", pod.Name, err.Error())
 		return false
 	}
 
 	if resp.StatusCode == 200 {
 		return true
 	}
-	c.Log.Debugf("removing ha-minio pod %s cancelled because the cluster would not be healthy", pod.Name)
+	c.Log.Infof("Not removing ha-minio pod %s because the cluster would not be healthy afterwards", pod.Name)
 	return false
 }
