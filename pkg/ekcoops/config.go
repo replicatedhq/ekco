@@ -70,4 +70,9 @@ type Config struct {
 	HostTaskNamespace                     string        `mapstructure:"host_task_namespace"`
 	PodImageOverrides                     []string      `mapstructure:"pod_image_overrides"`
 	AutoApproveKubeletCertSigningRequests bool          `mapstructure:"auto_approve_kubelet_csrs"`
+
+	// options for HA minio
+	EnableHAMinio  bool   `mapstructure:"enable_ha_minio"`  // should minio be scaled to multiple replicas on 3+ nodes
+	MinioNamespace string `mapstructure:"minio_namespace"`  // the namespace minio is installed in
+	MinioUtilImage string `mapstructure:"minio_util_image"` // the image to use to migrate minio from one node to ha
 }

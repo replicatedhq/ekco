@@ -12,3 +12,10 @@ jobs:
         with:
           go-version: 1.19
       - run: make deps test build
+
+  build-image:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v3
+      - run: make docker-image DOCKER_IMAGE=ttl.sh/replicated/ekco:$GITHUB_SHA VERSION=$GITHUB_REF_NAME
+      - run: docker push ttl.sh/replicated/ekco:$GITHUB_SHA
