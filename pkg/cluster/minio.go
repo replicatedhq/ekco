@@ -12,7 +12,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
+	apitypes "k8s.io/apimachinery/pkg/types"
 )
 
 func (c *Controller) ScaleMinioStatefulset(ctx context.Context, ns string) error {
@@ -72,9 +72,12 @@ func (c *Controller) MigrateMinioData(ctx context.Context, utilImage string, ns 
 	} else {
 		// delete existing minio service
 		c.Log.Infof("Disabling existing (non-HA) MinIO service")
-		err = c.Config.Client.CoreV1().Services(ns).Delete(ctx, "minio", metav1.DeleteOptions{})
+		doesNotExistSelector := `
+[ { "op": "replace", "path": "/spec/selector", "value": {"doesnotexist": "doesnotexist"} } ]
+`
+		_, err = c.Config.Client.CoreV1().Services(ns).Patch(ctx, "minio", apitypes.JSONPatchType, []byte(doesNotExistSelector), metav1.PatchOptions{})
 		if err != nil {
-			return fmt.Errorf("delete existing minio service: %w", err)
+			return fmt.Errorf("disable existing minio service: %w", err)
 		}
 	}
 
@@ -140,7 +143,7 @@ func (c *Controller) MigrateMinioData(ctx context.Context, utilImage string, ns 
 		},
 	}
 
-	_, err = c.Config.Client.BatchV1().Jobs(ns).Create(context.TODO(), &migrateJob, metav1.CreateOptions{})
+	_, err = c.Config.Client.BatchV1().Jobs(ns).Create(ctx, &migrateJob, metav1.CreateOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to create minio migration job: %w", err)
 	}
@@ -151,34 +154,13 @@ func (c *Controller) MigrateMinioData(ctx context.Context, utilImage string, ns 
 		return fmt.Errorf("failed to wait for migrate job to complete: %w", err)
 	}
 
-	// create a new minio service pointing to the ha-minio statefulset
-	minioService := corev1.Service{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "v1",
-			Kind:       "Service",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "minio",
-		},
-		Spec: corev1.ServiceSpec{
-			Type: corev1.ServiceTypeClusterIP,
-			Selector: map[string]string{
-				"app": "ha-minio",
-			},
-			Ports: []corev1.ServicePort{
-				{
-					Port:       80,
-					TargetPort: intstr.IntOrString{IntVal: 9000},
-					Protocol:   corev1.ProtocolTCP,
-				},
-			},
-		},
-	}
-
 	c.Log.Infof("Enabling new HA MinIO service")
-	_, err = c.Config.Client.CoreV1().Services(ns).Create(context.TODO(), &minioService, metav1.CreateOptions{})
+	haMinioSelector := `
+[ { "op": "replace", "path": "/spec/selector", "value": {"app": "ha-minio"} } ]
+`
+	_, err = c.Config.Client.CoreV1().Services(ns).Patch(ctx, "minio", apitypes.JSONPatchType, []byte(haMinioSelector), metav1.PatchOptions{})
 	if err != nil {
-		return fmt.Errorf("failed to create minio service: %w", err)
+		return fmt.Errorf("failed to enable minio service: %w", err)
 	}
 
 	// delete the minio deployment, pvc and the migration pod
