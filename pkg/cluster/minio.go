@@ -16,37 +16,30 @@ import (
 )
 
 func (c *Controller) ScaleMinioStatefulset(ctx context.Context, ns string) error {
-	currentMinioSS, err := c.Config.Client.AppsV1().StatefulSets(ns).Get(ctx, "ha-minio", metav1.GetOptions{})
+	currentScale, desiredScale, err := c.getMinioScale(ctx, ns)
 	if err != nil {
-		return fmt.Errorf("get ha-minio statefulset: %w", err)
+		return fmt.Errorf("determine current ha-minio statefulset status: %w", err)
 	}
 
-	scaleString := currentMinioSS.Annotations["kurl.sh/desired-scale"]
-	scaleInt, err := strconv.ParseInt(scaleString, 10, 32)
-	if err != nil {
-		return fmt.Errorf("failed to decode desired scale %q: %w", scaleString, err)
-	}
-	scale32 := int32(scaleInt)
-
-	if currentMinioSS.Spec.Replicas != nil && *currentMinioSS.Spec.Replicas == scale32 {
+	if currentScale == desiredScale {
 		return nil // already scaled
 	}
 
-	c.Log.Infof("Scaling HA MinIO Statefulset to %d replicas", scale32)
+	c.Log.Infof("Scaling HA MinIO Statefulset to %d replicas", desiredScale)
 
 	minioScale, err := c.Config.Client.AppsV1().StatefulSets(ns).GetScale(ctx, "ha-minio", metav1.GetOptions{})
 	if err != nil {
 		return fmt.Errorf("get ha-minio statefulset scale: %w", err)
 	}
 
-	minioScale.Spec.Replicas = scale32
+	minioScale.Spec.Replicas = desiredScale
 
 	_, err = c.Config.Client.AppsV1().StatefulSets(ns).UpdateScale(ctx, "ha-minio", minioScale, metav1.UpdateOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to scale ha-minio statefulset: %w", err)
 	}
 
-	c.Log.Infof("Scaled HA MinIO Statefulset to %d replicas", scale32)
+	c.Log.Infof("Scaled HA MinIO Statefulset to %d replicas", desiredScale)
 	return nil
 }
 
@@ -208,6 +201,15 @@ func (c *Controller) waitForJobCompletion(ctx context.Context, jobName string, j
 // If such a node does not exist, instead look for nodes with less than floor(replicas/nodes) replicas,
 // and if it exists reschedule a replica from a node with ceil(replicas/nodes).
 func (c *Controller) MaybeRebalanceMinioServers(ctx context.Context, ns string) error {
+	currentScale, _, err := c.getMinioScale(ctx, ns)
+	if err != nil {
+		c.Log.Infof("Unable to determine if MinIO has been scaled up: %w", err)
+		return nil
+	}
+	if currentScale == 0 {
+		return nil // no pods to rebalance as there are no pods
+	}
+
 	if !c.haMinioHealthy(ns) {
 		c.Log.Infof("Not rebalancing Minio pods as the statefulset is not healthy")
 		return nil
@@ -354,4 +356,23 @@ func (c *Controller) haMinioPodSafeToReschedule(pod corev1.Pod) bool {
 	}
 	c.Log.Infof("Not removing ha-minio pod %s because the cluster would not be healthy afterwards", pod.Name)
 	return false
+}
+
+func (c *Controller) getMinioScale(ctx context.Context, ns string) (currentScale, desiredScale int32, reterr error) {
+	currentMinioSS, err := c.Config.Client.AppsV1().StatefulSets(ns).Get(ctx, "ha-minio", metav1.GetOptions{})
+	if err != nil {
+		return 0, 0, fmt.Errorf("get ha-minio statefulset: %w", err)
+	}
+
+	scaleString := currentMinioSS.Annotations["kurl.sh/desired-scale"]
+	scaleInt, err := strconv.ParseInt(scaleString, 10, 32)
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to decode desired scale %q: %w", scaleString, err)
+	}
+	desiredScale = int32(scaleInt)
+
+	if currentMinioSS.Spec.Replicas != nil {
+		currentScale = *currentMinioSS.Spec.Replicas
+	}
+	return currentScale, desiredScale, nil
 }
