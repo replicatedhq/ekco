@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	KOTSADM_RQLITE_HA_REPLICA_COUNT = 3
+	KotsadmRqliteHAReplicaCount = 3
 )
 
 func (c *Controller) RotateKurlProxyCert() error {
@@ -130,7 +130,7 @@ func (c *Controller) EnableHAKotsadm(ctx context.Context, ns string) error {
 	// kotsadm api does not currently support running as multiple replicas, so we only scale kotsadm-rqlite (the db).
 	// IMPORTANT: once kotsadm api supports running as multiple replicas and this is updated to scale kotsadm, make sure
 	// to NOT scale older kotsadm versions that do not support multiple replicas.
-	if err := c.ScaleKotsadmRqlite(ctx, ns, KOTSADM_RQLITE_HA_REPLICA_COUNT); err != nil {
+	if err := c.ScaleKotsadmRqlite(ctx, ns, KotsadmRqliteHAReplicaCount); err != nil {
 		return errors.Wrap(err, "failed to scale up kotsadm-rqlite")
 	}
 	return nil
