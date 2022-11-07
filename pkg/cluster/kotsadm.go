@@ -13,6 +13,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/duration"
 	certutil "k8s.io/client-go/util/cert"
+	"k8s.io/utils/pointer"
+)
+
+const (
+	KotsadmRqliteHAReplicaCount = 3
 )
 
 func (c *Controller) RotateKurlProxyCert() error {
@@ -118,5 +123,53 @@ func (c *Controller) UpdateKubeletClientCertSecret() error {
 		return errors.Wrapf(err, "update")
 	}
 
+	return nil
+}
+
+func (c *Controller) EnableHAKotsadm(ctx context.Context, ns string) error {
+	// kotsadm api does not currently support running as multiple replicas, so we only scale kotsadm-rqlite (the db).
+	// IMPORTANT: once kotsadm api supports running as multiple replicas and this is updated to scale kotsadm, make sure
+	// to NOT scale older kotsadm versions that do not support multiple replicas.
+	if err := c.ScaleKotsadmRqlite(ctx, ns, KotsadmRqliteHAReplicaCount); err != nil {
+		return errors.Wrap(err, "failed to scale up kotsadm-rqlite")
+	}
+	return nil
+}
+
+func (c *Controller) ScaleKotsadmRqlite(ctx context.Context, ns string, desiredScale int32) error {
+	kotsadmRqliteSts, err := c.Config.Client.AppsV1().StatefulSets(ns).Get(ctx, "kotsadm-rqlite", metav1.GetOptions{})
+	if err != nil {
+		if util.IsNotFoundErr(err) {
+			// could be an older kotsadm version that doesn't use rqlite, or that the kotsadm-rqlite sts simply doesn't exist,
+			// in either case, it's not EKCO's problem at this point, so no-op here.
+			return nil
+		}
+		return errors.Wrap(err, "get kotsadm-rqlite statefulset")
+	}
+
+	var currentScale int32
+	if kotsadmRqliteSts.Spec.Replicas != nil {
+		currentScale = *kotsadmRqliteSts.Spec.Replicas
+	}
+	if currentScale == desiredScale {
+		return nil // already scaled
+	}
+
+	c.Log.Infof("Scaling kotsadm-rqlite Statefulset to %d replicas", desiredScale)
+
+	kotsadmRqliteSts.Spec.Replicas = pointer.Int32Ptr(desiredScale)
+
+	for i, arg := range kotsadmRqliteSts.Spec.Template.Spec.Containers[0].Args {
+		if strings.HasPrefix(arg, "-bootstrap-expect") {
+			kotsadmRqliteSts.Spec.Template.Spec.Containers[0].Args[i] = fmt.Sprintf("-bootstrap-expect=%d", desiredScale)
+			break
+		}
+	}
+
+	if _, err := c.Config.Client.AppsV1().StatefulSets(ns).Update(ctx, kotsadmRqliteSts, metav1.UpdateOptions{}); err != nil {
+		return errors.Wrap(err, "update kotsadm-rqlite statefulset")
+	}
+
+	c.Log.Infof("Scaled kotsadm-rqlite Statefulset to %d replicas", desiredScale)
 	return nil
 }
