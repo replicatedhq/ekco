@@ -139,6 +139,11 @@ func (c *Controller) EnableHAKotsadm(ctx context.Context, ns string) error {
 func (c *Controller) ScaleKotsadmRqlite(ctx context.Context, ns string, desiredScale int32) error {
 	kotsadmRqliteSts, err := c.Config.Client.AppsV1().StatefulSets(ns).Get(ctx, "kotsadm-rqlite", metav1.GetOptions{})
 	if err != nil {
+		if util.IsNotFoundErr(err) {
+			// could be an older kotsadm version that doesn't use rqlite, or that the kotsadm-rqlite sts simply doesn't exist,
+			// in either case, it's not EKCO's problem at this point, so no-op here.
+			return nil
+		}
 		return errors.Wrap(err, "get kotsadm-rqlite statefulset")
 	}
 

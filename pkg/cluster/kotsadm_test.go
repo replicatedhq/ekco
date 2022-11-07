@@ -21,14 +21,15 @@ func TestEnableHAKotsadm(t *testing.T) {
 		namespace string
 	}
 	tests := []struct {
-		name         string
-		args         args
-		wantReplicas int32
-		wantArgs     []string
-		wantErr      bool
+		name                string
+		args                args
+		kotsadmRqliteExists bool
+		wantReplicas        int32
+		wantArgs            []string
+		wantErr             bool
 	}{
 		{
-			name: "scales up rqlite and modifies its args",
+			name: "scales up kotsadm-rqlite and modifies its args",
 			args: args{
 				ctx:       context.Background(),
 				namespace: "default",
@@ -62,7 +63,8 @@ func TestEnableHAKotsadm(t *testing.T) {
 					},
 				}),
 			},
-			wantReplicas: 3,
+			kotsadmRqliteExists: true,
+			wantReplicas:        3,
 			wantArgs: []string{
 				"-disco-mode=dns",
 				"-disco-config={\"name\":\"kotsadm-rqlite-headless\"}",
@@ -71,6 +73,16 @@ func TestEnableHAKotsadm(t *testing.T) {
 				"-join-as=kotsadm",
 			},
 			wantErr: false,
+		},
+		{
+			name: "doesn't fail if kotsadm-rqlite doesn't exist",
+			args: args{
+				ctx:       context.Background(),
+				namespace: "default",
+				clientset: fake.NewSimpleClientset(),
+			},
+			kotsadmRqliteExists: false,
+			wantErr:             false,
 		},
 	}
 	for _, tt := range tests {
@@ -86,15 +98,17 @@ func TestEnableHAKotsadm(t *testing.T) {
 				return
 			}
 
-			sts, err := tt.args.clientset.AppsV1().StatefulSets(tt.args.namespace).Get(tt.args.ctx, "kotsadm-rqlite", metav1.GetOptions{})
-			if err != nil {
-				t.Errorf("failed to get kotsadm-rqlite statefulset: %v", err)
-			}
-			if *sts.Spec.Replicas != tt.wantReplicas {
-				t.Errorf("replicas = %v, want: %v", *sts.Spec.Replicas, tt.wantReplicas)
-			}
-			if !reflect.DeepEqual(sts.Spec.Template.Spec.Containers[0].Args, tt.wantArgs) {
-				t.Errorf("args = %v, want: %v", sts.Spec.Template.Spec.Containers[0].Args, tt.wantArgs)
+			if tt.kotsadmRqliteExists {
+				sts, err := tt.args.clientset.AppsV1().StatefulSets(tt.args.namespace).Get(tt.args.ctx, "kotsadm-rqlite", metav1.GetOptions{})
+				if err != nil {
+					t.Errorf("failed to get kotsadm-rqlite statefulset: %v", err)
+				}
+				if *sts.Spec.Replicas != tt.wantReplicas {
+					t.Errorf("replicas = %v, want: %v", *sts.Spec.Replicas, tt.wantReplicas)
+				}
+				if !reflect.DeepEqual(sts.Spec.Template.Spec.Containers[0].Args, tt.wantArgs) {
+					t.Errorf("args = %v, want: %v", sts.Spec.Template.Spec.Containers[0].Args, tt.wantArgs)
+				}
 			}
 		})
 	}
