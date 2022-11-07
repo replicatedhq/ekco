@@ -111,6 +111,12 @@ func (o *Operator) Reconcile(nodes []corev1.Node, doFullReconcile bool) error {
 		}
 	}
 
+	if o.config.EnableHAKotsadm {
+		if err := o.reconcileKotsadm(); err != nil {
+			multiErr = multierror.Append(multiErr, errors.Wrap(err, "reconcile kotsadm"))
+		}
+	}
+
 	return multiErr
 }
 
@@ -358,6 +364,22 @@ func (o *Operator) reconcileMinio() error {
 	err = o.controller.MaybeRebalanceMinioServers(context.TODO(), o.config.MinioNamespace)
 	if err != nil {
 		return errors.Wrap(err, "rebalance minio servers")
+	}
+
+	return nil
+}
+
+func (o *Operator) reconcileKotsadm() error {
+	nodes, err := o.client.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		return errors.Wrap(err, "list nodes")
+	}
+
+	if m, w := util.NodeReadyCounts(nodes.Items); m+w >= 3 {
+		err := o.controller.EnableHAKotsadm(context.TODO(), metav1.NamespaceDefault)
+		if err != nil {
+			return errors.Wrap(err, "enable HA kotsadm")
+		}
 	}
 
 	return nil

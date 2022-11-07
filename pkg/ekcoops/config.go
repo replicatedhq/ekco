@@ -75,4 +75,7 @@ type Config struct {
 	EnableHAMinio  bool   `mapstructure:"enable_ha_minio"`  // should minio be scaled to multiple replicas on 3+ nodes
 	MinioNamespace string `mapstructure:"minio_namespace"`  // the namespace minio is installed in
 	MinioUtilImage string `mapstructure:"minio_util_image"` // the image to use to migrate minio from one node to ha
+
+	// options for HA kotsadm
+	EnableHAKotsadm bool `mapstructure:"enable_ha_kotsadm"` // should kots components be scaled to multiple replicas on 3+ nodes
 }
