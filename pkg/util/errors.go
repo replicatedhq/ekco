@@ -7,7 +7,7 @@ import (
 )
 
 func IsNotFoundErr(err error) bool {
-	return k8serrors.IsNotFound(errors.Cause(err))
+	return k8serrors.IsNotFound(err)
 }
 
 func FilterOutErr(err error, fns ...utilerrors.Matcher) error {

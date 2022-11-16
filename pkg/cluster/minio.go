@@ -203,7 +203,7 @@ func (c *Controller) waitForJobCompletion(ctx context.Context, jobName string, j
 func (c *Controller) MaybeRebalanceMinioServers(ctx context.Context, ns string) error {
 	currentScale, _, err := c.getMinioScale(ctx, ns)
 	if err != nil {
-		c.Log.Infof("Unable to determine if MinIO has been scaled up: %w", err)
+		c.Log.Infof("Unable to determine if MinIO has been scaled up: %s", err.Error())
 		return nil
 	}
 	if currentScale == 0 {
@@ -293,6 +293,19 @@ func (c *Controller) MaybeRebalanceMinioServers(ctx context.Context, ns string) 
 	}
 
 	return nil
+}
+
+func (c *Controller) DoesHAMinioExist(ctx context.Context, ns string) (bool, error) {
+	_, _, err := c.getMinioScale(ctx, ns)
+	if err != nil {
+		if util.IsNotFoundErr(err) {
+			return false, nil
+		}
+
+		return false, err
+	}
+
+	return true, nil
 }
 
 func (c *Controller) rescheduleOnePod(ctx context.Context, pod corev1.Pod) error {
