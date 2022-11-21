@@ -336,6 +336,14 @@ func (o *Operator) reconcileCertificateSigningRequests() error {
 }
 
 func (o *Operator) reconcileMinio() error {
+	exists, err := o.controller.DoesHAMinioExist(context.TODO(), o.config.MinioNamespace)
+	if err != nil {
+		return errors.Wrap(err, "determine if ha-minio exists to be managed")
+	}
+	if !exists {
+		return nil // nothing to manage
+	}
+
 	nodes, err := o.client.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return errors.Wrap(err, "list nodes")
