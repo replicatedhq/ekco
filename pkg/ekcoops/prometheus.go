@@ -4,16 +4,11 @@ import (
 	"context"
 
 	"github.com/pkg/errors"
+	"github.com/replicatedhq/ekco/pkg/k8s"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/json"
 )
-
-type patchInt64Value struct {
-	Op    string `json:"op"`
-	Path  string `json:"path"`
-	Value int64  `json:"value"`
-}
 
 func (o *Operator) ReconcilePrometheus(nodeCount int) error {
 	prometheus, _ := o.controller.Config.PrometheusV1.Namespace("monitoring").Get(context.TODO(), "k8s", metav1.GetOptions{})
@@ -31,8 +26,8 @@ func (o *Operator) ReconcilePrometheus(nodeCount int) error {
 	o.log.Debugf("Ensuring k8s prometheus replicas are set to %d", desiredPrometheusReplicas)
 
 	if currentPrometheusReplicas != desiredPrometheusReplicas {
-		prometheusPatch := []patchInt64Value{{
-			Op:    "replace",
+		prometheusPatch := []k8s.JSONPatchOperation{{
+			Op:    k8s.JSONPatchOpReplace,
 			Path:  "/spec/replicas",
 			Value: desiredPrometheusReplicas,
 		}}
@@ -55,8 +50,8 @@ func (o *Operator) ReconcilePrometheus(nodeCount int) error {
 	o.log.Debugf("Ensuring prometheus alert manager replicas are set to %d", desiredPrometheusReplicas)
 
 	if currentAlertManagerReplicas != desiredAlertManagerReplicas {
-		alertManagersPatch := []patchInt64Value{{
-			Op:    "replace",
+		alertManagersPatch := []k8s.JSONPatchOperation{{
+			Op:    k8s.JSONPatchOpReplace,
 			Path:  "/spec/replicas",
 			Value: desiredAlertManagerReplicas,
 		}}

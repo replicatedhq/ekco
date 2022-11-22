@@ -255,9 +255,9 @@ func (o *Operator) adjustPoolReplicationLevels(rookVersion semver.Version, numNo
 
 	// There is no CR to compare the desired and current level.
 	// Assume that if cephblockpool replication level has not yet been set then we need to do the same for device_health_metrics.
-	_, err = o.controller.SetDeviceHealthMetricsReplication(rookVersion, o.config.CephBlockPool, factor, cephcluster, doFullReconcile || didUpdate)
+	_, err = o.controller.SetDeviceHealthMetricsReplication(rookVersion, cephcluster.Status.CephVersion.Version, o.config.CephBlockPool, factor, cephcluster, doFullReconcile || didUpdate)
 	if err != nil {
-		multiErr = multierror.Append(multiErr, errors.Wrapf(err, "set health_device_metrics replication to %d", factor))
+		multiErr = multierror.Append(multiErr, errors.Wrapf(err, "set device_health_metrics replication to %d", factor))
 	}
 
 	return multiErr

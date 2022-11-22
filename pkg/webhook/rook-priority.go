@@ -11,6 +11,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const (
+	RookCephNS = "rook-ceph"
+)
+
 func (s *Server) rookPriority(c *gin.Context) {
 	request := admissionv1.AdmissionReview{}
 	response := admissionv1.AdmissionReview{
@@ -34,7 +38,7 @@ func (s *Server) rookPriority(c *gin.Context) {
 	} else if request.Request != nil &&
 		request.Request.Resource.Group == "apps" &&
 		(request.Request.Resource.Resource == "deployments" || request.Request.Resource.Resource == "daemonsets") &&
-		request.Request.Namespace == "rook-ceph" {
+		request.Request.Namespace == RookCephNS {
 
 		log.Infof("Admission webhook mutating priority class for %s/%s", request.Request.Namespace, request.Request.Name)
 		response.Response.Allowed = true
