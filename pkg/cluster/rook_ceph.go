@@ -41,7 +41,7 @@ func init() {
 }
 
 // returns the number of nodes used for storage, which may be higher than the number of names passed in
-// if a node is currenlty not ready but has not been purged
+// if a node is currently not ready but has not been purged
 func (c *Controller) UseNodesForStorage(rookVersion semver.Version, names []string) (int, error) {
 	cluster, err := c.GetCephCluster(context.TODO())
 	if err != nil {
@@ -252,12 +252,11 @@ func (c *Controller) SetDeviceHealthMetricsReplication(rookVersion semver.Versio
 	return true, nil
 }
 
-func (c *Controller) ReconcileMonCount(ctx context.Context, count int) error {
+func (c *Controller) ReconcileMonCount(ctx context.Context, nodeCount int) error {
 	// single mon for 1 or 2 node cluster, 3 mons for all other clusters
-	if count < 3 {
-		count = 1
-	} else {
-		count = 3
+	monCount := 3
+	if nodeCount < 3 {
+		monCount = 1
 	}
 
 	cluster, err := c.GetCephCluster(ctx)
@@ -265,20 +264,20 @@ func (c *Controller) ReconcileMonCount(ctx context.Context, count int) error {
 		return errors.Wrapf(err, "get CephCluster config")
 	}
 
-	if cluster.Spec.Mon.Count == count {
+	if cluster.Spec.Mon.Count == monCount {
 		return nil
 	}
-	if cluster.Spec.Mon.Count > count {
-		c.Log.Debugf("Will not reduce mon count from %s to %s", cluster.Spec.Mon.Count, count)
+	if cluster.Spec.Mon.Count > monCount {
+		c.Log.Debugf("Will not reduce mon count from %s to %s", cluster.Spec.Mon.Count, monCount)
 		return nil
 	}
 
-	c.Log.Infof("Increasing mon count from %d to %d", cluster.Spec.Mon.Count, count)
+	c.Log.Infof("Increasing mon count from %d to %d", cluster.Spec.Mon.Count, monCount)
 
 	patches := []k8s.JSONPatchOperation{{
 		Op:    k8s.JSONPatchOpReplace,
 		Path:  "/spec/mon/count",
-		Value: count,
+		Value: monCount,
 	}}
 
 	_, err = c.JSONPatchCephCluster(ctx, patches)
@@ -289,16 +288,15 @@ func (c *Controller) ReconcileMonCount(ctx context.Context, count int) error {
 	return nil
 }
 
-func (c *Controller) ReconcileMgrCount(ctx context.Context, rookVersion semver.Version, count int) error {
+func (c *Controller) ReconcileMgrCount(ctx context.Context, rookVersion semver.Version, nodeCount int) error {
 	if rookVersion.LT(Rookv19) {
 		return nil
 	}
 
 	// single mgr for 1 node cluster, 2 mgrs for all other clusters
-	if count < 2 {
-		count = 1
-	} else {
-		count = 2
+	mgrCount := 2
+	if nodeCount < 2 {
+		mgrCount = 1
 	}
 
 	cluster, err := c.GetCephCluster(ctx)
@@ -306,20 +304,20 @@ func (c *Controller) ReconcileMgrCount(ctx context.Context, rookVersion semver.V
 		return errors.Wrapf(err, "get CephCluster config")
 	}
 
-	if cluster.Spec.Mgr.Count == count {
+	if cluster.Spec.Mgr.Count == mgrCount {
 		return nil
 	}
-	if cluster.Spec.Mgr.Count > count {
-		c.Log.Debugf("Will not reduce mgr count from %s to %s", cluster.Spec.Mgr.Count, count)
+	if cluster.Spec.Mgr.Count > mgrCount {
+		c.Log.Debugf("Will not reduce mgr count from %s to %s", cluster.Spec.Mgr.Count, mgrCount)
 		return nil
 	}
 
-	c.Log.Infof("Increasing mgr count from %d to %d", cluster.Spec.Mgr.Count, count)
+	c.Log.Infof("Increasing mgr count from %d to %d", cluster.Spec.Mgr.Count, mgrCount)
 
 	patches := []k8s.JSONPatchOperation{{
 		Op:    k8s.JSONPatchOpReplace,
 		Path:  "/spec/mgr/count",
-		Value: count,
+		Value: mgrCount,
 	}}
 
 	_, err = c.JSONPatchCephCluster(ctx, patches)
@@ -633,7 +631,7 @@ func (c *Controller) rookCephExec(rookVersion semver.Version, cmd ...string) err
 		return errors.Wrap(err, "found no Rook pods for executing ceph commands")
 	}
 
-	exitCode, stdout, stderr, err := k8s.SyncExec(c.Config.Client.CoreV1(), c.Config.ClientConfig, RookCephNS, pods.Items[0].Name, container, cmd...)
+	exitCode, stdout, stderr, err := c.SyncExecutor.ExecContainer(context.TODO(), RookCephNS, pods.Items[0].Name, container, cmd...)
 	if err != nil {
 		return err
 	}
@@ -665,9 +663,9 @@ func (c *Controller) execCephOSDPurge(rookVersion semver.Version, osdID string, 
 		return errors.Wrapf(err, "found no Rook pods for executing ceph commands")
 	}
 	// ignore error - OSD is probably already down
-	_, _, _, _ = k8s.SyncExec(c.Config.Client.CoreV1(), c.Config.ClientConfig, RookCephNS, pods.Items[0].Name, container, "ceph", "osd", "down", osdID)
+	_, _, _, _ = c.SyncExecutor.ExecContainer(context.TODO(), RookCephNS, pods.Items[0].Name, container, "ceph", "osd", "down", osdID)
 
-	exitCode, stdout, stderr, err := k8s.SyncExec(c.Config.Client.CoreV1(), c.Config.ClientConfig, RookCephNS, pods.Items[0].Name, container, "ceph", "osd", "purge", osdID, "--yes-i-really-mean-it")
+	exitCode, stdout, stderr, err := c.SyncExecutor.ExecContainer(context.TODO(), RookCephNS, pods.Items[0].Name, container, "ceph", "osd", "purge", osdID, "--yes-i-really-mean-it")
 	if exitCode != 0 {
 		c.Log.Debugf("`ceph osd purge %s` stdout: %s", osdID, stdout)
 		return fmt.Errorf("failed to purge OSD: %s", stderr)
@@ -677,7 +675,7 @@ func (c *Controller) execCephOSDPurge(rookVersion semver.Version, osdID string, 
 	}
 
 	// This removes the phantom OSD from the output of `ceph osd tree`
-	exitCode, stdout, stderr, err = k8s.SyncExec(c.Config.Client.CoreV1(), c.Config.ClientConfig, RookCephNS, pods.Items[0].Name, container, "ceph", "osd", "crush", "rm", hostname)
+	exitCode, stdout, stderr, err = c.SyncExecutor.ExecContainer(context.TODO(), RookCephNS, pods.Items[0].Name, container, "ceph", "osd", "crush", "rm", hostname)
 	if exitCode != 0 {
 		c.Log.Debugf("`ceph osd crush rm %s` stdout: %s", hostname, stdout)
 		return fmt.Errorf("failed to rm %s from crush map: %s", hostname, stderr)
@@ -703,7 +701,7 @@ func (c *Controller) CephFilesystemOK(rookVersion semver.Version, name string) (
 	}
 	// The filesystem will appear in `ceph fs ls` before it's ready to use. `ceph mds metadata` is
 	// better because it waits for the mds daemons to be running
-	exitCode, stdout, stderr, err := k8s.SyncExec(c.Config.Client.CoreV1(), c.Config.ClientConfig, RookCephNS, pods.Items[0].Name, container, "ceph", "mds", "metadata")
+	exitCode, stdout, stderr, err := c.SyncExecutor.ExecContainer(context.TODO(), RookCephNS, pods.Items[0].Name, container, "ceph", "mds", "metadata")
 	if err != nil {
 		return false, errors.Wrap(err, "running 'ceph fs ls'")
 	}
@@ -778,7 +776,7 @@ func (c *Controller) countUniqueHostsWithOSD(rookVersion semver.Version) (int, e
 	}
 
 	cmd := []string{"ceph", "osd", "status"}
-	exitCode, stdout, stderr, err := k8s.SyncExec(c.Config.Client.CoreV1(), c.Config.ClientConfig, RookCephNS, pods.Items[0].Name, container, cmd...)
+	exitCode, stdout, stderr, err := c.SyncExecutor.ExecContainer(context.TODO(), RookCephNS, pods.Items[0].Name, container, cmd...)
 	if err != nil {
 		return 0, errors.Wrap(err, "exec ceph osd status")
 	}

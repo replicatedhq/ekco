@@ -34,6 +34,51 @@ type StreamOptions struct {
 	Err           io.Writer
 }
 
+type SyncExecutorInterface interface {
+	ExecContainer(ctx context.Context, namespace, pod, container string, command ...string) (exitCode int, stdout string, stderr string, err error)
+}
+
+type SyncExecutor struct {
+	coreClient corev1client.CoreV1Interface
+	restConfig *restclient.Config
+}
+
+func NewSyncExecutor(coreClient corev1client.CoreV1Interface, restConfig *restclient.Config) *SyncExecutor {
+	return &SyncExecutor{
+		coreClient: coreClient,
+		restConfig: restConfig,
+	}
+}
+
+func (e *SyncExecutor) ExecContainer(ctx context.Context, namespace, pod, container string, command ...string) (exitCode int, stdout string, stderr string, err error) {
+	return SyncExec(ctx, e.coreClient, e.restConfig, namespace, pod, container, command...)
+}
+
+// SyncExec returns exitcode, stdout, stderr. A non-zero exit code from the command is not considered an error.
+func SyncExec(ctx context.Context, coreClient corev1client.CoreV1Interface, clientConfig *restclient.Config, ns, pod, container string, command ...string) (int, string, string, error) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	opts := ExecOptions{
+		CoreClient: coreClient,
+		Config:     clientConfig,
+		Command:    command,
+		StreamOptions: StreamOptions{
+			Namespace:     ns,
+			PodName:       pod,
+			ContainerName: container,
+			Out:           &stdout,
+			Err:           &stderr,
+		},
+	}
+	exitCode, err := ExecContainer(ctx, opts, nil)
+	if exitCode != 0 {
+		err = nil
+	}
+
+	return exitCode, stdout.String(), stderr.String(), err
+}
+
 // ExecContainer executes a remote execution against a pod. Returns exit code
 // and error. The error will be non-nil if exit code is not 0.
 func ExecContainer(ctx context.Context, opts ExecOptions, terminalSizeQueue remotecommand.TerminalSizeQueue) (int, error) {
@@ -74,29 +119,4 @@ func ExecContainer(ctx context.Context, opts ExecOptions, terminalSizeQueue remo
 		return exitCode, errors.Wrap(err, "stream exec")
 	}
 	return 0, nil
-}
-
-// SyncExec returns exitcode, stdout, stderr. A non-zero exit code from the command is not considered an error.
-func SyncExec(coreClient corev1client.CoreV1Interface, clientConfig *restclient.Config, ns, pod, container string, command ...string) (int, string, string, error) {
-	var stdout bytes.Buffer
-	var stderr bytes.Buffer
-
-	opts := ExecOptions{
-		CoreClient: coreClient,
-		Config:     clientConfig,
-		Command:    command,
-		StreamOptions: StreamOptions{
-			Namespace:     ns,
-			PodName:       pod,
-			ContainerName: container,
-			Out:           &stdout,
-			Err:           &stderr,
-		},
-	}
-	exitCode, err := ExecContainer(context.TODO(), opts, nil)
-	if exitCode != 0 {
-		err = nil
-	}
-
-	return exitCode, stdout.String(), stderr.String(), err
 }

@@ -68,6 +68,8 @@ docker-image:
 		--build-arg git_sha="$(GIT_SHA)" \
 		--build-arg version="$(VERSION)" \
 		.
+
+.PHONY: build-ttl.sh
 build-ttl.sh:
 	docker build \
 		-t ttl.sh/${CURRENT_USER}/ekco:12h \
@@ -76,3 +78,8 @@ build-ttl.sh:
 		--build-arg version=dev \
 		.
 	docker push ttl.sh/${CURRENT_USER}/ekco:12h
+
+.PHONY: generate-mocks
+generate-mocks: ## Generate mocks tests for CLI and preflight. More info: https://github.com/golang/mock
+	go install github.com/golang/mock/mockgen@v1.6.0
+	mockgen -source=pkg/k8s/exec.go -destination=pkg/k8s/mock/mock_exec.go
