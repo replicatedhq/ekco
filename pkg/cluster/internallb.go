@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/replicatedhq/ekco/pkg/k8s"
 	"github.com/replicatedhq/ekco/pkg/util"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -145,7 +144,7 @@ func (c *Controller) sighupPods(namespace string, selector labels.Selector, cont
 		pod := pod
 		go func() {
 			defer wg.Done()
-			exitCode, _, stderr, err := k8s.SyncExec(c.Config.Client.CoreV1(), c.Config.ClientConfig, namespace, pod.Name, container, cmd...)
+			exitCode, _, stderr, err := c.SyncExecutor.ExecContainer(context.TODO(), namespace, pod.Name, container, cmd...)
 			if err != nil {
 				errs <- errors.Wrapf(err, "exec pod %s", pod.Name)
 			} else if exitCode != 0 {

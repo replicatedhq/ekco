@@ -3,11 +3,12 @@ package cluster
 import "k8s.io/apimachinery/pkg/labels"
 
 const (
-	RookCephNS                   = "rook-ceph"
-	CephClusterName              = "rook-ceph"
-	RookCephSharedFSMetadataPool = "rook-shared-fs-metadata"
-	RookCephSharedFSDataPool     = "rook-shared-fs-data0"
-	CephDeviceHealthMetricsPool  = "device_health_metrics"
+	RookCephNS                        = "rook-ceph"
+	CephClusterName                   = "rook-ceph"
+	RookCephSharedFSMetadataPool      = "rook-shared-fs-metadata"
+	RookCephSharedFSDataPool          = "rook-shared-fs-data0"
+	CephDeviceHealthMetricsPool       = "device_health_metrics"
+	CephDeviceHealthMetricsPoolQuincy = ".mgr"
 
 	RookCephObjectStoreRootPool = ".rgw.root"
 

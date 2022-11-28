@@ -3,11 +3,17 @@ package cluster
 import (
 	"context"
 	_ "embed"
+	"fmt"
+	"reflect"
 	"testing"
 
 	"github.com/blang/semver"
+	"github.com/golang/mock/gomock"
+	mock_k8s "github.com/replicatedhq/ekco/pkg/k8s/mock"
 	"github.com/replicatedhq/ekco/pkg/logger"
 	"github.com/replicatedhq/ekco/pkg/util"
+	cephv1 "github.com/rook/rook/pkg/apis/ceph.rook.io/v1"
+	rookfake "github.com/rook/rook/pkg/client/clientset/versioned/fake"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -260,6 +266,1059 @@ func TestController_GetRookVersion(t *testing.T) {
 				if !(*tt.want).Equals(*got) {
 					t.Errorf("Controller.GetRookVersion() = %s, want %s", *got, *tt.want)
 				}
+			}
+		})
+	}
+}
+
+func TestController_UseNodesForStorage(t *testing.T) {
+	type args struct {
+		rookVersion semver.Version
+		names       []string
+	}
+	tests := []struct {
+		name                 string
+		nodes                []string
+		rookResources        []runtime.Object
+		args                 args
+		want                 int
+		wantStorageScopeSpec cephv1.StorageScopeSpec
+		wantErr              bool
+	}{
+		{
+			name:  "storage nodes should change from useAllNodes to 1, rook version 1.9.12",
+			nodes: []string{"node1"},
+			rookResources: []runtime.Object{
+				&cephv1.CephCluster{
+					TypeMeta: metav1.TypeMeta{Kind: "CephCluster", APIVersion: "ceph.rook.io/v1"},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "rook-ceph",
+						Namespace: "rook-ceph",
+					},
+					Spec: cephv1.ClusterSpec{
+						Storage: cephv1.StorageScopeSpec{
+							UseAllNodes: true,
+						},
+					},
+				},
+			},
+			args: args{
+				rookVersion: semver.MustParse("1.9.12"),
+				names:       []string{"node1"},
+			},
+			want: 1,
+			wantStorageScopeSpec: cephv1.StorageScopeSpec{
+				UseAllNodes: false,
+				Nodes: []cephv1.Node{
+					{
+						Name: "node1",
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name:  "storage nodes should stay at 1, rook version 1.9.12",
+			nodes: []string{"node1"},
+			rookResources: []runtime.Object{
+				&cephv1.CephCluster{
+					TypeMeta: metav1.TypeMeta{Kind: "CephCluster", APIVersion: "ceph.rook.io/v1"},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "rook-ceph",
+						Namespace: "rook-ceph",
+					},
+					Spec: cephv1.ClusterSpec{
+						Storage: cephv1.StorageScopeSpec{
+							UseAllNodes: false,
+							Nodes: []cephv1.Node{
+								{
+									Name: "node1",
+								},
+							},
+						},
+					},
+				},
+			},
+			args: args{
+				rookVersion: semver.MustParse("1.9.12"),
+				names:       []string{"node1"},
+			},
+			want: 1,
+			wantStorageScopeSpec: cephv1.StorageScopeSpec{
+				UseAllNodes: false,
+				Nodes: []cephv1.Node{
+					{
+						Name: "node1",
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name:  "storage nodes should increase from 1 to 3, rook version 1.9.12",
+			nodes: []string{"node1", "node2", "node3"},
+			rookResources: []runtime.Object{
+				&cephv1.CephCluster{
+					TypeMeta: metav1.TypeMeta{Kind: "CephCluster", APIVersion: "ceph.rook.io/v1"},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "rook-ceph",
+						Namespace: "rook-ceph",
+					},
+					Spec: cephv1.ClusterSpec{
+						Storage: cephv1.StorageScopeSpec{
+							UseAllNodes: false,
+							Nodes: []cephv1.Node{
+								{
+									Name: "node1",
+								},
+							},
+						},
+					},
+				},
+			},
+			args: args{
+				rookVersion: semver.MustParse("1.9.12"),
+				names:       []string{"node1", "node2", "node3"},
+			},
+			want: 3,
+			wantStorageScopeSpec: cephv1.StorageScopeSpec{
+				Nodes: []cephv1.Node{
+					{
+						Name: "node1",
+					},
+					{
+						Name: "node2",
+					},
+					{
+						Name: "node3",
+					},
+				},
+			},
+			wantErr: false,
+		},
+		// TODO: rookVersion 1.0.4
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			// TODO: deploy/rook-ceph-operator for rookVersion 1.0.4
+			resources := []runtime.Object{
+				&corev1.Pod{
+					TypeMeta: metav1.TypeMeta{Kind: "Pod", APIVersion: "v1"},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "rook-ceph-tools-5b8b8b8b8b-5b8b8",
+						Namespace: "rook-ceph",
+						Labels: map[string]string{
+							"app": "rook-ceph-tools",
+						},
+					},
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{
+							{
+								Name: "rook-ceph-tools",
+							},
+						},
+					},
+				},
+			}
+			cephOSDStatusOut := "ID  HOST   USED  AVAIL  WR OPS  WR DATA  RD OPS  RD DATA  STATE"
+			for _, node := range tt.nodes {
+				resources = append(resources, &corev1.Node{
+					TypeMeta: metav1.TypeMeta{Kind: "Node", APIVersion: "v1"},
+					ObjectMeta: metav1.ObjectMeta{
+						Name: node,
+					},
+				})
+				cephOSDStatusOut += fmt.Sprintf("\n0  %s   128M  99.8G      0        0       2       84   exists,up", node)
+			}
+
+			m := mock_k8s.NewMockSyncExecutorInterface(ctrl)
+			m.EXPECT().ExecContainer(gomock.Any(), "rook-ceph", "rook-ceph-tools-5b8b8b8b8b-5b8b8", "rook-ceph-tools", "ceph", "osd", "status").
+				Return(0, cephOSDStatusOut, "", nil)
+
+			clientset := fake.NewSimpleClientset(resources...)
+			rookClientset := rookfake.NewSimpleClientset(tt.rookResources...)
+
+			c := &Controller{
+				Config: ControllerConfig{
+					Client: clientset,
+					CephV1: rookClientset.CephV1(),
+				},
+				SyncExecutor: m,
+				Log:          logger.NewDiscardLogger(),
+			}
+			got, err := c.UseNodesForStorage(tt.args.rookVersion, tt.args.names)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Controller.UseNodesForStorage() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("Controller.UseNodesForStorage() = %v, want %v", got, tt.want)
+			}
+			cephCluster, err := rookClientset.CephV1().CephClusters("rook-ceph").Get(context.Background(), "rook-ceph", metav1.GetOptions{})
+			if err != nil {
+				t.Errorf("CephClusters.Get(\"rook-ceph\") error = %v", err)
+				return
+			}
+			if !reflect.DeepEqual(cephCluster.Spec.Storage, tt.wantStorageScopeSpec) {
+				t.Errorf("Controller.UseNodesForStorage() = %v, want %v", cephCluster.Spec.Storage, tt.wantStorageScopeSpec)
+			}
+		})
+	}
+}
+
+func TestController_removeCephClusterStorageNode(t *testing.T) {
+	type args struct {
+		name string
+	}
+	tests := []struct {
+		name                 string
+		nodes                []string
+		rookResources        []runtime.Object
+		args                 args
+		wantStorageScopeSpec cephv1.StorageScopeSpec
+		wantErr              bool
+	}{
+		{
+			name:  "storage nodes should decrease from 4 to 3, rook version 1.9.12",
+			nodes: []string{"node1", "node2", "node3", "node4"},
+			rookResources: []runtime.Object{
+				&cephv1.CephCluster{
+					TypeMeta: metav1.TypeMeta{Kind: "CephCluster", APIVersion: "ceph.rook.io/v1"},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "rook-ceph",
+						Namespace: "rook-ceph",
+					},
+					Spec: cephv1.ClusterSpec{
+						Storage: cephv1.StorageScopeSpec{
+							UseAllNodes: false,
+							Nodes: []cephv1.Node{
+								{
+									Name: "node1",
+								},
+								{
+									Name: "node2",
+								},
+								{
+									Name: "node3",
+								},
+								{
+									Name: "node4",
+								},
+							},
+						},
+					},
+				},
+			},
+			args: args{
+				name: "node2",
+			},
+			wantStorageScopeSpec: cephv1.StorageScopeSpec{
+				UseAllNodes: false,
+				Nodes: []cephv1.Node{
+					{
+						Name: "node1",
+					},
+					{
+						Name: "node3",
+					},
+					{
+						Name: "node4",
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name:  "storage node not found should not change storage spec and not result in an error, rook version 1.9.12",
+			nodes: []string{"node1", "node2", "node3"},
+			rookResources: []runtime.Object{
+				&cephv1.CephCluster{
+					TypeMeta: metav1.TypeMeta{Kind: "CephCluster", APIVersion: "ceph.rook.io/v1"},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "rook-ceph",
+						Namespace: "rook-ceph",
+					},
+					Spec: cephv1.ClusterSpec{
+						Storage: cephv1.StorageScopeSpec{
+							UseAllNodes: false,
+							Nodes: []cephv1.Node{
+								{
+									Name: "node1",
+								},
+								{
+									Name: "node2",
+								},
+								{
+									Name: "node3",
+								},
+							},
+						},
+					},
+				},
+			},
+			args: args{
+				name: "node4",
+			},
+			wantStorageScopeSpec: cephv1.StorageScopeSpec{
+				UseAllNodes: false,
+				Nodes: []cephv1.Node{
+					{
+						Name: "node1",
+					},
+					{
+						Name: "node2",
+					},
+					{
+						Name: "node3",
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name:  "useAllNodes true should not change storage spec and not result in an error, rook version 1.9.12",
+			nodes: []string{"node1", "node2", "node3"},
+			rookResources: []runtime.Object{
+				&cephv1.CephCluster{
+					TypeMeta: metav1.TypeMeta{Kind: "CephCluster", APIVersion: "ceph.rook.io/v1"},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "rook-ceph",
+						Namespace: "rook-ceph",
+					},
+					Spec: cephv1.ClusterSpec{
+						Storage: cephv1.StorageScopeSpec{
+							UseAllNodes: true,
+						},
+					},
+				},
+			},
+			args: args{
+				name: "node4",
+			},
+			wantStorageScopeSpec: cephv1.StorageScopeSpec{
+				UseAllNodes: true,
+			},
+			wantErr: false,
+		},
+		// TODO: rookVersion 1.0.4
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resources := []runtime.Object{}
+			for _, node := range tt.nodes {
+				resources = append(resources, &corev1.Node{
+					TypeMeta: metav1.TypeMeta{Kind: "Node", APIVersion: "v1"},
+					ObjectMeta: metav1.ObjectMeta{
+						Name: node,
+					},
+				})
+			}
+
+			clientset := fake.NewSimpleClientset(resources...)
+			rookClientset := rookfake.NewSimpleClientset(tt.rookResources...)
+
+			c := &Controller{
+				Config: ControllerConfig{
+					Client: clientset,
+					CephV1: rookClientset.CephV1(),
+				},
+				Log: logger.NewDiscardLogger(),
+			}
+			err := c.removeCephClusterStorageNode(tt.args.name)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Controller.removeCephClusterStorageNode() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			cephCluster, err := rookClientset.CephV1().CephClusters("rook-ceph").Get(context.Background(), "rook-ceph", metav1.GetOptions{})
+			if err != nil {
+				t.Errorf("CephClusters.Get(\"rook-ceph\") error = %v", err)
+				return
+			}
+			if !reflect.DeepEqual(cephCluster.Spec.Storage, tt.wantStorageScopeSpec) {
+				t.Errorf("Controller.UseNodesForStorage() = %v, want %v", cephCluster.Spec.Storage, tt.wantStorageScopeSpec)
+			}
+		})
+	}
+}
+
+func TestController_SetBlockPoolReplication(t *testing.T) {
+	type args struct {
+		rookVersion     semver.Version
+		name            string
+		level           int
+		cephcluster     *cephv1.CephCluster
+		doFullReconcile bool
+	}
+	tests := []struct {
+		name          string
+		rookResources []runtime.Object
+		args          args
+		want          bool
+		wantLevel     uint
+		wantErr       bool
+	}{
+		{
+			name: "blockpool replication should stay at 1, rook version 1.9.12",
+			rookResources: []runtime.Object{
+				&cephv1.CephBlockPool{
+					TypeMeta: metav1.TypeMeta{
+						APIVersion: "ceph.rook.io/v1",
+						Kind:       "CephBlockPool",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "replicapool",
+						Namespace: "rook-ceph",
+					},
+					Spec: cephv1.NamedBlockPoolSpec{
+						Name: "replicapool",
+						PoolSpec: cephv1.PoolSpec{
+							Replicated: cephv1.ReplicatedSpec{
+								Size: 1,
+							},
+						},
+					},
+				},
+			},
+			args: args{
+				rookVersion:     semver.MustParse("1.9.12"),
+				name:            "replicapool",
+				level:           1,
+				cephcluster:     nil,
+				doFullReconcile: false,
+			},
+			want:      false,
+			wantLevel: 1,
+			wantErr:   false,
+		},
+		{
+			name: "blockpool replication should stay at 1, do full reconcile, rook version 1.9.12",
+			rookResources: []runtime.Object{
+				&cephv1.CephBlockPool{
+					TypeMeta: metav1.TypeMeta{
+						APIVersion: "ceph.rook.io/v1",
+						Kind:       "CephBlockPool",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "replicapool",
+						Namespace: "rook-ceph",
+					},
+					Spec: cephv1.NamedBlockPoolSpec{
+						Name: "replicapool",
+						PoolSpec: cephv1.PoolSpec{
+							Replicated: cephv1.ReplicatedSpec{
+								Size: 1,
+							},
+						},
+					},
+				},
+			},
+			args: args{
+				rookVersion:     semver.MustParse("1.9.12"),
+				name:            "replicapool",
+				level:           1,
+				cephcluster:     nil,
+				doFullReconcile: true,
+			},
+			want:      true,
+			wantLevel: 1,
+			wantErr:   false,
+		},
+		{
+			name: "blockpool replication should increase from 1 to 3, rook version 1.9.12",
+			rookResources: []runtime.Object{
+				&cephv1.CephBlockPool{
+					TypeMeta: metav1.TypeMeta{
+						APIVersion: "ceph.rook.io/v1",
+						Kind:       "CephBlockPool",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "replicapool",
+						Namespace: "rook-ceph",
+					},
+					Spec: cephv1.NamedBlockPoolSpec{
+						Name: "replicapool",
+						PoolSpec: cephv1.PoolSpec{
+							Replicated: cephv1.ReplicatedSpec{
+								Size: 1,
+							},
+						},
+					},
+				},
+			},
+			args: args{
+				rookVersion:     semver.MustParse("1.9.12"),
+				name:            "replicapool",
+				level:           3,
+				cephcluster:     nil,
+				doFullReconcile: false,
+			},
+			want:      true,
+			wantLevel: 3,
+			wantErr:   false,
+		},
+		// TODO: rookVersion 1.0.4
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rookClientset := rookfake.NewSimpleClientset(tt.rookResources...)
+			c := &Controller{
+				Config: ControllerConfig{
+					CephV1: rookClientset.CephV1(),
+				},
+				Log: logger.NewDiscardLogger(),
+			}
+			got, err := c.SetBlockPoolReplication(tt.args.rookVersion, tt.args.name, tt.args.level, tt.args.cephcluster, tt.args.doFullReconcile)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Controller.SetBlockPoolReplication() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("Controller.SetBlockPoolReplication() = %v, want %v", got, tt.want)
+			}
+			cephBP, err := rookClientset.CephV1().CephBlockPools("rook-ceph").Get(context.Background(), "replicapool", metav1.GetOptions{})
+			if err != nil {
+				t.Errorf("CephBlockPools.Get(\"replicapool\") error = %v", err)
+				return
+			}
+			if cephBP.Spec.Replicated.Size != tt.wantLevel {
+				t.Errorf("CephBlockPool.Spec.Replicated.Size = %d, want %d", cephBP.Spec.Replicated.Size, tt.wantLevel)
+			}
+		})
+	}
+}
+
+func TestController_ReconcileMonCount(t *testing.T) {
+	type args struct {
+		nodeCount int
+	}
+	tests := []struct {
+		name          string
+		rookResources []runtime.Object
+		args          args
+		wantMonCount  int
+		wantErr       bool
+	}{
+		{
+			name: "mon count should stay at 1",
+			rookResources: []runtime.Object{
+				&cephv1.CephCluster{
+					TypeMeta: metav1.TypeMeta{
+						APIVersion: "ceph.rook.io/v1",
+						Kind:       "CephCluster",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "rook-ceph",
+						Namespace: "rook-ceph",
+					},
+					Spec: cephv1.ClusterSpec{
+						Mon: cephv1.MonSpec{
+							Count: 1,
+						},
+					},
+				},
+			},
+			args: args{
+				nodeCount: 1,
+			},
+			wantMonCount: 1,
+		},
+		{
+			name: "mon count should increase from 1 to 6",
+			rookResources: []runtime.Object{
+				&cephv1.CephCluster{
+					TypeMeta: metav1.TypeMeta{
+						APIVersion: "ceph.rook.io/v1",
+						Kind:       "CephCluster",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "rook-ceph",
+						Namespace: "rook-ceph",
+					},
+					Spec: cephv1.ClusterSpec{
+						Mon: cephv1.MonSpec{
+							Count: 1,
+						},
+					},
+				},
+			},
+			args: args{
+				nodeCount: 6,
+			},
+			wantMonCount: 3,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rookClientset := rookfake.NewSimpleClientset(tt.rookResources...)
+			c := &Controller{
+				Config: ControllerConfig{
+					CephV1: rookClientset.CephV1(),
+				},
+				Log: logger.NewDiscardLogger(),
+			}
+			if err := c.ReconcileMonCount(context.Background(), tt.args.nodeCount); (err != nil) != tt.wantErr {
+				t.Errorf("Controller.ReconcileMonCount() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			cephCluster, err := rookClientset.CephV1().CephClusters("rook-ceph").Get(context.Background(), "rook-ceph", metav1.GetOptions{})
+			if err != nil {
+				t.Errorf("CephClusters.Get(\"rook-ceph\") error = %v", err)
+				return
+			}
+			if cephCluster.Spec.Mon.Count != tt.wantMonCount {
+				t.Errorf("CephCluster.Spec.Mon.Count = %d, want %d", cephCluster.Spec.Mon.Count, tt.wantMonCount)
+			}
+		})
+	}
+}
+
+func TestController_ReconcileMgrCount(t *testing.T) {
+	type args struct {
+		rookVersion semver.Version
+		nodeCount   int
+	}
+	tests := []struct {
+		name          string
+		rookResources []runtime.Object
+		args          args
+		wantMgrCount  int
+		wantErr       bool
+	}{
+		{
+			name: "mgr count should stay at 1, rook version 1.9.12",
+			rookResources: []runtime.Object{
+				&cephv1.CephCluster{
+					TypeMeta: metav1.TypeMeta{
+						APIVersion: "ceph.rook.io/v1",
+						Kind:       "CephCluster",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "rook-ceph",
+						Namespace: "rook-ceph",
+					},
+					Spec: cephv1.ClusterSpec{
+						Mgr: cephv1.MgrSpec{
+							Count: 1,
+						},
+					},
+				},
+			},
+			args: args{
+				rookVersion: semver.MustParse("1.9.12"),
+				nodeCount:   1,
+			},
+			wantMgrCount: 1,
+		},
+		{
+			name: "mgr count should increase from 1 to 2, rook version 1.9.12",
+			rookResources: []runtime.Object{
+				&cephv1.CephCluster{
+					TypeMeta: metav1.TypeMeta{
+						APIVersion: "ceph.rook.io/v1",
+						Kind:       "CephCluster",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "rook-ceph",
+						Namespace: "rook-ceph",
+					},
+					Spec: cephv1.ClusterSpec{
+						Mgr: cephv1.MgrSpec{
+							Count: 1,
+						},
+					},
+				},
+			},
+			args: args{
+				rookVersion: semver.MustParse("1.9.12"),
+				nodeCount:   3,
+			},
+			wantMgrCount: 2,
+		},
+		{
+			name: "mgr count should not increase beyond 1, rook version 1.8.10",
+			rookResources: []runtime.Object{
+				&cephv1.CephCluster{
+					TypeMeta: metav1.TypeMeta{
+						APIVersion: "ceph.rook.io/v1",
+						Kind:       "CephCluster",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "rook-ceph",
+						Namespace: "rook-ceph",
+					},
+					Spec: cephv1.ClusterSpec{
+						Mgr: cephv1.MgrSpec{
+							Count: 1,
+						},
+					},
+				},
+			},
+			args: args{
+				rookVersion: semver.MustParse("1.8.10"),
+				nodeCount:   3,
+			},
+			wantMgrCount: 1,
+		},
+		// TODO: rookVersion 1.0.4
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rookClientset := rookfake.NewSimpleClientset(tt.rookResources...)
+			c := &Controller{
+				Config: ControllerConfig{
+					CephV1: rookClientset.CephV1(),
+				},
+				Log: logger.NewDiscardLogger(),
+			}
+			if err := c.ReconcileMgrCount(context.Background(), tt.args.rookVersion, tt.args.nodeCount); (err != nil) != tt.wantErr {
+				t.Errorf("Controller.ReconcileMgrCount() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			cephCluster, err := rookClientset.CephV1().CephClusters("rook-ceph").Get(context.Background(), "rook-ceph", metav1.GetOptions{})
+			if err != nil {
+				t.Errorf("CephClusters.Get(\"rook-ceph\") error = %v", err)
+				return
+			}
+			if cephCluster.Spec.Mgr.Count != tt.wantMgrCount {
+				t.Errorf("CephCluster.Spec.Mgr.Count = %d, want %d", cephCluster.Spec.Mgr.Count, tt.wantMgrCount)
+			}
+		})
+	}
+}
+
+func TestController_SetFilesystemReplication(t *testing.T) {
+	type args struct {
+		rookVersion     semver.Version
+		name            string
+		level           int
+		cephcluster     *cephv1.CephCluster
+		doFullReconcile bool
+	}
+	tests := []struct {
+		name          string
+		rookResources []runtime.Object
+		args          args
+		want          bool
+		wantLevel     uint
+		wantErr       bool
+	}{
+		{
+			name: "filesystem replication should stay at 1, rook version 1.9.12",
+			rookResources: []runtime.Object{
+				&cephv1.CephFilesystem{
+					TypeMeta: metav1.TypeMeta{
+						APIVersion: "ceph.rook.io/v1",
+						Kind:       "CephFilesystem",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "myfs",
+						Namespace: "rook-ceph",
+					},
+					Spec: cephv1.FilesystemSpec{
+						MetadataPool: cephv1.PoolSpec{
+							Replicated: cephv1.ReplicatedSpec{
+								Size: 1,
+							},
+						},
+						DataPools: []cephv1.NamedPoolSpec{
+							{
+								Name: "myfs-data0",
+								PoolSpec: cephv1.PoolSpec{
+									Replicated: cephv1.ReplicatedSpec{
+										Size: 1,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			args: args{
+				rookVersion:     semver.MustParse("1.9.12"),
+				name:            "myfs",
+				level:           1,
+				cephcluster:     nil,
+				doFullReconcile: false,
+			},
+			want:      false,
+			wantLevel: 1,
+			wantErr:   false,
+		},
+		{
+			name: "filesystem replication should stay at 1, do full reconcile, rook version 1.9.12",
+			rookResources: []runtime.Object{
+				&cephv1.CephFilesystem{
+					TypeMeta: metav1.TypeMeta{
+						APIVersion: "ceph.rook.io/v1",
+						Kind:       "CephFilesystem",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "myfs",
+						Namespace: "rook-ceph",
+					},
+					Spec: cephv1.FilesystemSpec{
+						MetadataPool: cephv1.PoolSpec{
+							Replicated: cephv1.ReplicatedSpec{
+								Size: 1,
+							},
+						},
+						DataPools: []cephv1.NamedPoolSpec{
+							{
+								Name: "myfs-data0",
+								PoolSpec: cephv1.PoolSpec{
+									Replicated: cephv1.ReplicatedSpec{
+										Size: 1,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			args: args{
+				rookVersion:     semver.MustParse("1.9.12"),
+				name:            "myfs",
+				level:           1,
+				cephcluster:     nil,
+				doFullReconcile: true,
+			},
+			want:      true,
+			wantLevel: 1,
+			wantErr:   false,
+		},
+		{
+			name: "filesystem replication should increase from 1 to 3, rook version 1.9.12",
+			rookResources: []runtime.Object{
+				&cephv1.CephFilesystem{
+					TypeMeta: metav1.TypeMeta{
+						APIVersion: "ceph.rook.io/v1",
+						Kind:       "CephFilesystem",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "myfs",
+						Namespace: "rook-ceph",
+					},
+					Spec: cephv1.FilesystemSpec{
+						MetadataPool: cephv1.PoolSpec{
+							Replicated: cephv1.ReplicatedSpec{
+								Size: 1,
+							},
+						},
+						DataPools: []cephv1.NamedPoolSpec{
+							{
+								Name: "myfs-data0",
+								PoolSpec: cephv1.PoolSpec{
+									Replicated: cephv1.ReplicatedSpec{
+										Size: 1,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			args: args{
+				rookVersion:     semver.MustParse("1.9.12"),
+				name:            "myfs",
+				level:           3,
+				cephcluster:     nil,
+				doFullReconcile: false,
+			},
+			want:      true,
+			wantLevel: 3,
+			wantErr:   false,
+		},
+		// TODO: rookVersion 1.0.4
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rookClientset := rookfake.NewSimpleClientset(tt.rookResources...)
+			c := &Controller{
+				Config: ControllerConfig{
+					CephV1: rookClientset.CephV1(),
+				},
+				Log: logger.NewDiscardLogger(),
+			}
+			got, err := c.SetFilesystemReplication(tt.args.rookVersion, tt.args.name, tt.args.level, tt.args.cephcluster, tt.args.doFullReconcile)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Controller.SetFilesystemReplication() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("Controller.SetFilesystemReplication() = %v, want %v", got, tt.want)
+			}
+			cephFs, err := rookClientset.CephV1().CephFilesystems("rook-ceph").Get(context.Background(), "myfs", metav1.GetOptions{})
+			if err != nil {
+				t.Errorf("CephFilesystems.Get(\"myfs\") error = %v", err)
+				return
+			}
+			if cephFs.Spec.MetadataPool.Replicated.Size != tt.wantLevel {
+				t.Errorf("CephFilesystem.Spec.MetadataPool.Replicated.Size = %d, want %d", cephFs.Spec.MetadataPool.Replicated.Size, tt.wantLevel)
+			}
+			if cephFs.Spec.DataPools[0].Replicated.Size != tt.wantLevel {
+				t.Errorf("CephFilesystem.Spec.DataPools[0].Replicated.Size = %d, want %d", cephFs.Spec.DataPools[0].Replicated.Size, tt.wantLevel)
+			}
+		})
+	}
+}
+
+func TestController_SetObjectStoreReplication(t *testing.T) {
+	type args struct {
+		rookVersion     semver.Version
+		name            string
+		level           int
+		cephcluster     *cephv1.CephCluster
+		doFullReconcile bool
+	}
+	tests := []struct {
+		name          string
+		rookResources []runtime.Object
+		args          args
+		want          bool
+		wantLevel     uint
+		wantErr       bool
+	}{
+		{
+			name: "objectstore replication should stay at 1, rook version 1.9.12",
+			rookResources: []runtime.Object{
+				&cephv1.CephObjectStore{
+					TypeMeta: metav1.TypeMeta{
+						APIVersion: "ceph.rook.io/v1",
+						Kind:       "CephObjectStore",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "my-store",
+						Namespace: "rook-ceph",
+					},
+					Spec: cephv1.ObjectStoreSpec{
+						MetadataPool: cephv1.PoolSpec{
+							Replicated: cephv1.ReplicatedSpec{
+								Size: 1,
+							},
+						},
+						DataPool: cephv1.PoolSpec{
+							Replicated: cephv1.ReplicatedSpec{
+								Size: 1,
+							},
+						},
+					},
+				},
+			},
+			args: args{
+				rookVersion:     semver.MustParse("1.9.12"),
+				name:            "my-store",
+				level:           1,
+				cephcluster:     nil,
+				doFullReconcile: false,
+			},
+			want:      false,
+			wantLevel: 1,
+			wantErr:   false,
+		},
+		{
+			name: "objectstore replication should stay at 1, do full reconcile, rook version 1.9.12",
+			rookResources: []runtime.Object{
+				&cephv1.CephObjectStore{
+					TypeMeta: metav1.TypeMeta{
+						APIVersion: "ceph.rook.io/v1",
+						Kind:       "CephObjectStore",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "my-store",
+						Namespace: "rook-ceph",
+					},
+					Spec: cephv1.ObjectStoreSpec{
+						MetadataPool: cephv1.PoolSpec{
+							Replicated: cephv1.ReplicatedSpec{
+								Size: 1,
+							},
+						},
+						DataPool: cephv1.PoolSpec{
+							Replicated: cephv1.ReplicatedSpec{
+								Size: 1,
+							},
+						},
+					},
+				},
+			},
+			args: args{
+				rookVersion:     semver.MustParse("1.9.12"),
+				name:            "my-store",
+				level:           1,
+				cephcluster:     nil,
+				doFullReconcile: true,
+			},
+			want:      true,
+			wantLevel: 1,
+			wantErr:   false,
+		},
+		{
+			name: "objectstore replication should increase from 1 to 3, rook version 1.9.12",
+			rookResources: []runtime.Object{
+				&cephv1.CephObjectStore{
+					TypeMeta: metav1.TypeMeta{
+						APIVersion: "ceph.rook.io/v1",
+						Kind:       "CephObjectStore",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "my-store",
+						Namespace: "rook-ceph",
+					},
+					Spec: cephv1.ObjectStoreSpec{
+						MetadataPool: cephv1.PoolSpec{
+							Replicated: cephv1.ReplicatedSpec{
+								Size: 1,
+							},
+						},
+						DataPool: cephv1.PoolSpec{
+							Replicated: cephv1.ReplicatedSpec{
+								Size: 1,
+							},
+						},
+					},
+				},
+			},
+			args: args{
+				rookVersion:     semver.MustParse("1.9.12"),
+				name:            "my-store",
+				level:           3,
+				cephcluster:     nil,
+				doFullReconcile: false,
+			},
+			want:      true,
+			wantLevel: 3,
+			wantErr:   false,
+		},
+		// TODO: rookVersion 1.0.4
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rookClientset := rookfake.NewSimpleClientset(tt.rookResources...)
+			c := &Controller{
+				Config: ControllerConfig{
+					CephV1: rookClientset.CephV1(),
+				},
+				Log: logger.NewDiscardLogger(),
+			}
+			got, err := c.SetObjectStoreReplication(tt.args.rookVersion, tt.args.name, tt.args.level, tt.args.cephcluster, tt.args.doFullReconcile)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Controller.SetObjectStoreReplication() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("Controller.SetObjectStoreReplication() = %v, want %v", got, tt.want)
+			}
+			cephOS, err := rookClientset.CephV1().CephObjectStores("rook-ceph").Get(context.Background(), "my-store", metav1.GetOptions{})
+			if err != nil {
+				t.Errorf("CephObjectStores.Get(\"my-store\") error = %v", err)
+				return
+			}
+			if cephOS.Spec.MetadataPool.Replicated.Size != tt.wantLevel {
+				t.Errorf("CephObjectStore.Spec.MetadataPool.Replicated.Size = %d, want %d", cephOS.Spec.MetadataPool.Replicated.Size, tt.args.level)
+			}
+			if cephOS.Spec.DataPool.Replicated.Size != tt.wantLevel {
+				t.Errorf("CephObjectStore.Spec.DataPool.Replicated.Size = %d, want %d", cephOS.Spec.DataPool.Replicated.Size, tt.args.level)
 			}
 		})
 	}

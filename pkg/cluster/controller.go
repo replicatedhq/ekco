@@ -7,6 +7,7 @@ import (
 	"k8s.io/client-go/dynamic"
 
 	"github.com/blang/semver"
+	"github.com/replicatedhq/ekco/pkg/k8s"
 	cephv1 "github.com/rook/rook/pkg/client/clientset/versioned/typed/ceph.rook.io/v1"
 	"go.uber.org/zap"
 	"k8s.io/client-go/kubernetes"
@@ -23,7 +24,7 @@ var Rookv19 = semver.MustParse("1.9.0")
 type ControllerConfig struct {
 	Client                                kubernetes.Interface
 	ClientConfig                          *restclient.Config
-	CephV1                                *cephv1.CephV1Client
+	CephV1                                cephv1.CephV1Interface
 	AlertManagerV1                        dynamic.NamespaceableResourceInterface
 	PrometheusV1                          dynamic.NamespaceableResourceInterface
 	CertificatesDir                       string
@@ -52,12 +53,18 @@ type ControllerConfig struct {
 }
 
 type Controller struct {
-	Config ControllerConfig
-	Log    *zap.SugaredLogger
+	Config       ControllerConfig
+	SyncExecutor k8s.SyncExecutorInterface
+	Log          *zap.SugaredLogger
 
 	sync.Mutex
 }
 
 func NewController(config ControllerConfig, log *zap.SugaredLogger) *Controller {
-	return &Controller{Config: config, Log: log}
+	syncExecutor := k8s.NewSyncExecutor(config.Client.CoreV1(), config.ClientConfig)
+	return &Controller{
+		Config:       config,
+		SyncExecutor: syncExecutor,
+		Log:          log,
+	}
 }
