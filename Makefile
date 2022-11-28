@@ -70,7 +70,7 @@ docker-image:
 		.
 
 .PHONY: build-ttl.sh
-build-ttl.sh:
+build-ttl.sh: ## Build the EKCO Docker container and deploy it to ttl.sh for use in the development environment
 	docker build \
 		-t ttl.sh/${CURRENT_USER}/ekco:12h \
 		-f deploy/Dockerfile \
