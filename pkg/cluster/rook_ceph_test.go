@@ -286,7 +286,7 @@ func TestController_UseNodesForStorage(t *testing.T) {
 		wantErr              bool
 	}{
 		{
-			name:  "storage nodes increase from useAllNodes to 1, rook version 1.9.12",
+			name:  "storage nodes should change from useAllNodes to 1, rook version 1.9.12",
 			nodes: []string{"node1"},
 			rookResources: []runtime.Object{
 				&cephv1.CephCluster{
@@ -318,7 +318,7 @@ func TestController_UseNodesForStorage(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:  "storage nodes stays at 1, rook version 1.9.12",
+			name:  "storage nodes should stay at 1, rook version 1.9.12",
 			nodes: []string{"node1"},
 			rookResources: []runtime.Object{
 				&cephv1.CephCluster{
@@ -355,7 +355,7 @@ func TestController_UseNodesForStorage(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:  "storage nodes increase from 1 to 3, rook version 1.9.12",
+			name:  "storage nodes should increase from 1 to 3, rook version 1.9.12",
 			nodes: []string{"node1", "node2", "node3"},
 			rookResources: []runtime.Object{
 				&cephv1.CephCluster{
@@ -482,7 +482,7 @@ func TestController_removeCephClusterStorageNode(t *testing.T) {
 		wantErr              bool
 	}{
 		{
-			name:  "storage nodes decrease from 4 to 3, rook version 1.9.12",
+			name:  "storage nodes should decrease from 4 to 3, rook version 1.9.12",
 			nodes: []string{"node1", "node2", "node3", "node4"},
 			rookResources: []runtime.Object{
 				&cephv1.CephCluster{
@@ -532,7 +532,7 @@ func TestController_removeCephClusterStorageNode(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:  "storage node not found, rook version 1.9.12",
+			name:  "storage node not found should not change storage spec and not result in an error, rook version 1.9.12",
 			nodes: []string{"node1", "node2", "node3"},
 			rookResources: []runtime.Object{
 				&cephv1.CephCluster{
@@ -579,7 +579,7 @@ func TestController_removeCephClusterStorageNode(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:  "useAllNodes true, rook version 1.9.12",
+			name:  "useAllNodes true should not change storage spec and not result in an error, rook version 1.9.12",
 			nodes: []string{"node1", "node2", "node3"},
 			rookResources: []runtime.Object{
 				&cephv1.CephCluster{
@@ -661,7 +661,7 @@ func TestController_SetBlockPoolReplication(t *testing.T) {
 		wantErr       bool
 	}{
 		{
-			name: "blockpool replication stays at 1, rook version 1.9.12",
+			name: "blockpool replication should stay at 1, rook version 1.9.12",
 			rookResources: []runtime.Object{
 				&cephv1.CephBlockPool{
 					TypeMeta: metav1.TypeMeta{
@@ -694,7 +694,7 @@ func TestController_SetBlockPoolReplication(t *testing.T) {
 			wantErr:   false,
 		},
 		{
-			name: "blockpool replication stays at 1, do full reconcile, rook version 1.9.12",
+			name: "blockpool replication should stay at 1, do full reconcile, rook version 1.9.12",
 			rookResources: []runtime.Object{
 				&cephv1.CephBlockPool{
 					TypeMeta: metav1.TypeMeta{
@@ -727,7 +727,7 @@ func TestController_SetBlockPoolReplication(t *testing.T) {
 			wantErr:   false,
 		},
 		{
-			name: "blockpool replication increase from 1 to 3, rook version 1.9.12",
+			name: "blockpool replication should increase from 1 to 3, rook version 1.9.12",
 			rookResources: []runtime.Object{
 				&cephv1.CephBlockPool{
 					TypeMeta: metav1.TypeMeta{
@@ -802,7 +802,7 @@ func TestController_ReconcileMonCount(t *testing.T) {
 		wantErr       bool
 	}{
 		{
-			name: "mon count stays at 1",
+			name: "mon count should stay at 1",
 			rookResources: []runtime.Object{
 				&cephv1.CephCluster{
 					TypeMeta: metav1.TypeMeta{
@@ -826,7 +826,7 @@ func TestController_ReconcileMonCount(t *testing.T) {
 			wantMonCount: 1,
 		},
 		{
-			name: "mon count increase from 1 to 6",
+			name: "mon count should increase from 1 to 6",
 			rookResources: []runtime.Object{
 				&cephv1.CephCluster{
 					TypeMeta: metav1.TypeMeta{
@@ -887,7 +887,7 @@ func TestController_ReconcileMgrCount(t *testing.T) {
 		wantErr       bool
 	}{
 		{
-			name: "mgr count stays at 1, rook version 1.9.12",
+			name: "mgr count should stay at 1, rook version 1.9.12",
 			rookResources: []runtime.Object{
 				&cephv1.CephCluster{
 					TypeMeta: metav1.TypeMeta{
@@ -912,7 +912,7 @@ func TestController_ReconcileMgrCount(t *testing.T) {
 			wantMgrCount: 1,
 		},
 		{
-			name: "mgr count increase from 1 to 3, rook version 1.9.12",
+			name: "mgr count should increase from 1 to 2, rook version 1.9.12",
 			rookResources: []runtime.Object{
 				&cephv1.CephCluster{
 					TypeMeta: metav1.TypeMeta{
@@ -937,7 +937,7 @@ func TestController_ReconcileMgrCount(t *testing.T) {
 			wantMgrCount: 2,
 		},
 		{
-			name: "mgr count increase from 1 to 3, rook version 1.8.10",
+			name: "mgr count should not increase beyond 1, rook version 1.8.10",
 			rookResources: []runtime.Object{
 				&cephv1.CephCluster{
 					TypeMeta: metav1.TypeMeta{
@@ -1004,7 +1004,7 @@ func TestController_SetFilesystemReplication(t *testing.T) {
 		wantErr       bool
 	}{
 		{
-			name: "filesystem replication stays at 1, rook version 1.9.12",
+			name: "filesystem replication should stay at 1, rook version 1.9.12",
 			rookResources: []runtime.Object{
 				&cephv1.CephFilesystem{
 					TypeMeta: metav1.TypeMeta{
@@ -1046,7 +1046,7 @@ func TestController_SetFilesystemReplication(t *testing.T) {
 			wantErr:   false,
 		},
 		{
-			name: "filesystem replication stays at 1, do full reconcile, rook version 1.9.12",
+			name: "filesystem replication should stay at 1, do full reconcile, rook version 1.9.12",
 			rookResources: []runtime.Object{
 				&cephv1.CephFilesystem{
 					TypeMeta: metav1.TypeMeta{
@@ -1088,7 +1088,7 @@ func TestController_SetFilesystemReplication(t *testing.T) {
 			wantErr:   false,
 		},
 		{
-			name: "filesystem replication increase from 1 to 3, rook version 1.9.12",
+			name: "filesystem replication should increase from 1 to 3, rook version 1.9.12",
 			rookResources: []runtime.Object{
 				&cephv1.CephFilesystem{
 					TypeMeta: metav1.TypeMeta{
@@ -1180,7 +1180,7 @@ func TestController_SetObjectStoreReplication(t *testing.T) {
 		wantErr       bool
 	}{
 		{
-			name: "objectstore replication stays at 1, rook version 1.9.12",
+			name: "objectstore replication should stay at 1, rook version 1.9.12",
 			rookResources: []runtime.Object{
 				&cephv1.CephObjectStore{
 					TypeMeta: metav1.TypeMeta{
@@ -1217,7 +1217,7 @@ func TestController_SetObjectStoreReplication(t *testing.T) {
 			wantErr:   false,
 		},
 		{
-			name: "objectstore replication stays at 1, do full reconcile, rook version 1.9.12",
+			name: "objectstore replication should stay at 1, do full reconcile, rook version 1.9.12",
 			rookResources: []runtime.Object{
 				&cephv1.CephObjectStore{
 					TypeMeta: metav1.TypeMeta{
@@ -1254,7 +1254,7 @@ func TestController_SetObjectStoreReplication(t *testing.T) {
 			wantErr:   false,
 		},
 		{
-			name: "objectstore replication increase from 1 to 3, rook version 1.9.12",
+			name: "objectstore replication should increase from 1 to 3, rook version 1.9.12",
 			rookResources: []runtime.Object{
 				&cephv1.CephObjectStore{
 					TypeMeta: metav1.TypeMeta{

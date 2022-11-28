@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	RookCephNS = "rook-ceph"
+	rookCephNS = "rook-ceph"
 )
 
 func (s *Server) rookPriority(c *gin.Context) {
@@ -38,7 +38,7 @@ func (s *Server) rookPriority(c *gin.Context) {
 	} else if request.Request != nil &&
 		request.Request.Resource.Group == "apps" &&
 		(request.Request.Resource.Resource == "deployments" || request.Request.Resource.Resource == "daemonsets") &&
-		request.Request.Namespace == RookCephNS {
+		request.Request.Namespace == rookCephNS {
 
 		log.Infof("Admission webhook mutating priority class for %s/%s", request.Request.Namespace, request.Request.Name)
 		response.Response.Allowed = true

@@ -34,15 +34,21 @@ type StreamOptions struct {
 	Err           io.Writer
 }
 
+// SyncExecutorInterface is an interface for executing synchronous commands in
+// a container.
 type SyncExecutorInterface interface {
 	ExecContainer(ctx context.Context, namespace, pod, container string, command ...string) (exitCode int, stdout string, stderr string, err error)
 }
 
+// SyncExecutor is a wrapper around k8s.io/client-go/util/exec that provides
+// an interface for executing synchronous commands in a container.
 type SyncExecutor struct {
 	coreClient corev1client.CoreV1Interface
 	restConfig *restclient.Config
 }
 
+// NewSyncExecutor returns a new SyncExecutor for executing commands in a
+// container.
 func NewSyncExecutor(coreClient corev1client.CoreV1Interface, restConfig *restclient.Config) *SyncExecutor {
 	return &SyncExecutor{
 		coreClient: coreClient,
@@ -50,6 +56,9 @@ func NewSyncExecutor(coreClient corev1client.CoreV1Interface, restConfig *restcl
 	}
 }
 
+// ExecContainer executes a remote execution against a pod. Returns exit code,
+// standard out and standard error strings and an error. A non-zero exit code
+// from the command is not considered an error.
 func (e *SyncExecutor) ExecContainer(ctx context.Context, namespace, pod, container string, command ...string) (exitCode int, stdout string, stderr string, err error) {
 	return SyncExec(ctx, e.coreClient, e.restConfig, namespace, pod, container, command...)
 }

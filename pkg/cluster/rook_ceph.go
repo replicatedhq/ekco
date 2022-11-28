@@ -24,6 +24,24 @@ import (
 	"k8s.io/apimachinery/pkg/util/yaml"
 )
 
+const (
+	// maxMonCount is the maximum number of mon replicas that should be
+	// deployed to a cluster
+	maxMonCount = 3
+
+	// minMonCount is the minimum number of mon replicas that should be
+	// deployed to a cluster
+	minMonCount = 1
+
+	// maxMgrCount is the maximum number of mgr replicas that should be
+	// deployed to a cluster
+	maxMgrCount = 2
+
+	// minMgrCount is the minimum number of mgr replicas that should be
+	// deployed to a cluster
+	minMgrCount = 1
+)
+
 var cephErrENOENT = errors.New("Ceph ENOENT")
 var cephOSDStatusRX = regexp.MustCompile(`^\s*\d\s+(?P<host>\S+)`)
 
@@ -252,11 +270,14 @@ func (c *Controller) SetDeviceHealthMetricsReplication(rookVersion semver.Versio
 	return true, nil
 }
 
+// ReconcileMonCount ensures the CephCluster has the desired number of mons.
+// A single mon for clusters with 1 or 2 nodes, and 3 mons for all other
+// clusters.
 func (c *Controller) ReconcileMonCount(ctx context.Context, nodeCount int) error {
 	// single mon for 1 or 2 node cluster, 3 mons for all other clusters
-	monCount := 3
-	if nodeCount < 3 {
-		monCount = 1
+	desiredMonCount := maxMonCount
+	if nodeCount < maxMonCount {
+		desiredMonCount = minMonCount
 	}
 
 	cluster, err := c.GetCephCluster(ctx)
@@ -264,20 +285,20 @@ func (c *Controller) ReconcileMonCount(ctx context.Context, nodeCount int) error
 		return errors.Wrapf(err, "get CephCluster config")
 	}
 
-	if cluster.Spec.Mon.Count == monCount {
+	if cluster.Spec.Mon.Count == desiredMonCount {
 		return nil
 	}
-	if cluster.Spec.Mon.Count > monCount {
-		c.Log.Debugf("Will not reduce mon count from %s to %s", cluster.Spec.Mon.Count, monCount)
+	if cluster.Spec.Mon.Count > desiredMonCount {
+		c.Log.Debugf("Will not reduce mon count from %s to %s", cluster.Spec.Mon.Count, desiredMonCount)
 		return nil
 	}
 
-	c.Log.Infof("Increasing mon count from %d to %d", cluster.Spec.Mon.Count, monCount)
+	c.Log.Infof("Increasing mon count from %d to %d", cluster.Spec.Mon.Count, desiredMonCount)
 
 	patches := []k8s.JSONPatchOperation{{
 		Op:    k8s.JSONPatchOpReplace,
 		Path:  "/spec/mon/count",
-		Value: monCount,
+		Value: desiredMonCount,
 	}}
 
 	_, err = c.JSONPatchCephCluster(ctx, patches)
@@ -288,15 +309,17 @@ func (c *Controller) ReconcileMonCount(ctx context.Context, nodeCount int) error
 	return nil
 }
 
+// ReconcileMgrCount ensures the CephCluster has the desired number of mgrs.
+// A single mgr for clusters with 1 node, and 2 mgrs for all other clusters.
 func (c *Controller) ReconcileMgrCount(ctx context.Context, rookVersion semver.Version, nodeCount int) error {
 	if rookVersion.LT(Rookv19) {
 		return nil
 	}
 
 	// single mgr for 1 node cluster, 2 mgrs for all other clusters
-	mgrCount := 2
-	if nodeCount < 2 {
-		mgrCount = 1
+	desiredMgrCount := maxMgrCount
+	if nodeCount < maxMgrCount {
+		desiredMgrCount = minMgrCount
 	}
 
 	cluster, err := c.GetCephCluster(ctx)
@@ -304,20 +327,20 @@ func (c *Controller) ReconcileMgrCount(ctx context.Context, rookVersion semver.V
 		return errors.Wrapf(err, "get CephCluster config")
 	}
 
-	if cluster.Spec.Mgr.Count == mgrCount {
+	if cluster.Spec.Mgr.Count == desiredMgrCount {
 		return nil
 	}
-	if cluster.Spec.Mgr.Count > mgrCount {
-		c.Log.Debugf("Will not reduce mgr count from %s to %s", cluster.Spec.Mgr.Count, mgrCount)
+	if cluster.Spec.Mgr.Count > desiredMgrCount {
+		c.Log.Debugf("Will not reduce mgr count from %s to %s", cluster.Spec.Mgr.Count, desiredMgrCount)
 		return nil
 	}
 
-	c.Log.Infof("Increasing mgr count from %d to %d", cluster.Spec.Mgr.Count, mgrCount)
+	c.Log.Infof("Increasing mgr count from %d to %d", cluster.Spec.Mgr.Count, desiredMgrCount)
 
 	patches := []k8s.JSONPatchOperation{{
 		Op:    k8s.JSONPatchOpReplace,
 		Path:  "/spec/mgr/count",
-		Value: mgrCount,
+		Value: desiredMgrCount,
 	}}
 
 	_, err = c.JSONPatchCephCluster(ctx, patches)
@@ -394,7 +417,8 @@ func cephCSIResourcesNeedsUpdate(data map[string]string) bool {
 		data["CSI_NFS_PLUGIN_RESOURCE"] != cephCSINfsPluginResource
 }
 
-// SetSharedFilesystemReplication ignores NotFound errors.
+// SetSharedFilesystemReplication will set the shared filesystem replication to
+// the number of OSDs in the cluster. Returns true if the resource was updated.
 func (c *Controller) SetFilesystemReplication(rookVersion semver.Version, name string, level int, cephcluster *cephv1.CephCluster, doFullReconcile bool) (bool, error) {
 	if name == "" {
 		return false, nil
@@ -520,6 +544,9 @@ func (c *Controller) PatchFilesystemMDSPlacementMultinode(name string, numNodes 
 }
 
 // SetObjectStoreReplication ignores NotFound errors.
+
+// SetObjectStoreReplication will set the object store pool replication to the
+// number of OSDs in the cluster. Returns true if the resource was updated.
 func (c *Controller) SetObjectStoreReplication(rookVersion semver.Version, name string, level int, cephcluster *cephv1.CephCluster, doFullReconcile bool) (bool, error) {
 	if name == "" {
 		return false, nil
@@ -891,6 +918,8 @@ func (c *Controller) GetCephCluster(ctx context.Context) (*cephv1.CephCluster, e
 	return c.Config.CephV1.CephClusters(RookCephNS).Get(ctx, CephClusterName, metav1.GetOptions{})
 }
 
+// JSONPatchCephCluster patches the "rook-ceph" CephCluster with the given JSON
+// patches.
 func (c *Controller) JSONPatchCephCluster(ctx context.Context, patches []k8s.JSONPatchOperation) (*cephv1.CephCluster, error) {
 	patchData, err := json.Marshal(patches)
 	if err != nil {
