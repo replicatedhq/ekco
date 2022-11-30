@@ -12,6 +12,7 @@ import (
 	multierror "github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 	"github.com/replicatedhq/ekco/pkg/cluster"
+	"github.com/replicatedhq/ekco/pkg/rook"
 	"github.com/replicatedhq/ekco/pkg/util"
 	"go.uber.org/zap"
 	certificatesv1 "k8s.io/api/certificates/v1"
@@ -231,23 +232,31 @@ func (o *Operator) adjustPoolReplicationLevels(rookVersion semver.Version, numNo
 
 	var multiErr error
 
+	var cephVersion *semver.Version
 	cephcluster, err := o.controller.GetCephCluster(context.TODO())
 	if err != nil {
 		multiErr = multierror.Append(multiErr, errors.Wrapf(err, "get CephCluster config"))
+	} else {
+		ver, err := rook.GetCephVersion(*cephcluster)
+		if err != nil {
+			multiErr = multierror.Append(multiErr, errors.Wrapf(err, "get ceph version"))
+		} else {
+			cephVersion = &ver
+		}
 	}
 
-	didUpdate, err := o.controller.SetBlockPoolReplication(rookVersion, o.config.CephBlockPool, factor, cephcluster, doFullReconcile)
+	didUpdate, err := o.controller.SetBlockPoolReplication(rookVersion, cephVersion, o.config.CephBlockPool, factor, doFullReconcile)
 	if err != nil {
 		multiErr = multierror.Append(multiErr, errors.Wrapf(err, "set pool %s replication to %d", o.config.CephBlockPool, factor))
 	}
 
-	ok, err := o.controller.SetFilesystemReplication(rookVersion, o.config.CephFilesystem, factor, cephcluster, doFullReconcile)
+	ok, err := o.controller.SetFilesystemReplication(rookVersion, cephVersion, o.config.CephFilesystem, factor, doFullReconcile)
 	if err != nil {
 		multiErr = multierror.Append(multiErr, errors.Wrapf(err, "set filesystem %s replication to %d", o.config.CephFilesystem, factor))
 	}
 	didUpdate = didUpdate || ok
 
-	ok, err = o.controller.SetObjectStoreReplication(rookVersion, o.config.CephObjectStore, factor, cephcluster, doFullReconcile)
+	ok, err = o.controller.SetObjectStoreReplication(rookVersion, cephVersion, o.config.CephObjectStore, factor, doFullReconcile)
 	if err != nil {
 		multiErr = multierror.Append(multiErr, errors.Wrapf(err, "set object store %s replication to %d", o.config.CephObjectStore, factor))
 	}
@@ -255,7 +264,7 @@ func (o *Operator) adjustPoolReplicationLevels(rookVersion semver.Version, numNo
 
 	// There is no CR to compare the desired and current level.
 	// Assume that if cephblockpool replication level has not yet been set then we need to do the same for device_health_metrics.
-	_, err = o.controller.SetDeviceHealthMetricsReplication(rookVersion, cephcluster.Status.CephVersion.Version, o.config.CephBlockPool, factor, cephcluster, doFullReconcile || didUpdate)
+	_, err = o.controller.SetDeviceHealthMetricsReplication(rookVersion, cephVersion, o.config.CephBlockPool, factor, doFullReconcile || didUpdate)
 	if err != nil {
 		multiErr = multierror.Append(multiErr, errors.Wrapf(err, "set device_health_metrics replication to %d", factor))
 	}
