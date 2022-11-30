@@ -248,7 +248,7 @@ func (c *Controller) SetDeviceHealthMetricsReplication(rookVersion, cephVersion 
 	}
 
 	poolName := CephDeviceHealthMetricsPool
-	if cephVersion.Major >= 17 {
+	if cephVersion.Major >= CephQuincy.Major {
 		poolName = CephDeviceHealthMetricsPoolQuincy
 	}
 
@@ -624,7 +624,7 @@ func (c *Controller) SetObjectStoreReplication(rookVersion, cephVersion semver.V
 
 	// Object store pools pg_num_min is incorrectly set to 32 for Ceph Quincy. Tell the autoscaler
 	// to reduce the PGs to 8. https://github.com/rook/rook/issues/11366
-	if cephVersion.GTE(CephQuincy) {
+	if cephVersion.Major >= CephQuincy.Major {
 		var multiErr error
 		for _, pool := range append([]string{RookCephObjectStoreRootPool}, RookCephObjectStoreMetadataPoolsQuincy...) {
 			err := c.cephOSDPoolSetPgNumMin(rookVersion, objectStorePoolName(name, pool), 8)
