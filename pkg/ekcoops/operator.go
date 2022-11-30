@@ -232,14 +232,16 @@ func (o *Operator) adjustPoolReplicationLevels(rookVersion semver.Version, numNo
 
 	var multiErr error
 
-	cephVersion := semver.Version{}
+	var cephVersion *semver.Version
 	cephcluster, err := o.controller.GetCephCluster(context.TODO())
 	if err != nil {
 		multiErr = multierror.Append(multiErr, errors.Wrapf(err, "get CephCluster config"))
 	} else {
-		cephVersion, err = rook.GetCephVersion(*cephcluster)
+		ver, err := rook.GetCephVersion(*cephcluster)
 		if err != nil {
 			multiErr = multierror.Append(multiErr, errors.Wrapf(err, "get ceph version"))
+		} else {
+			cephVersion = &ver
 		}
 	}
 

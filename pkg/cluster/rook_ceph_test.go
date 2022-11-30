@@ -21,6 +21,9 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 )
 
+var cephPacific = semver.MustParse("16.2.6-0")
+var cephQuincy = semver.MustParse("17.2.5-0")
+
 func TestParseCephOSDStatusHosts(t *testing.T) {
 	tests := []struct {
 		name  string
@@ -647,7 +650,7 @@ func TestController_removeCephClusterStorageNode(t *testing.T) {
 func TestController_SetBlockPoolReplication(t *testing.T) {
 	type args struct {
 		rookVersion     semver.Version
-		cephVersion     semver.Version
+		cephVersion     *semver.Version
 		name            string
 		level           int
 		doFullReconcile bool
@@ -684,7 +687,7 @@ func TestController_SetBlockPoolReplication(t *testing.T) {
 			},
 			args: args{
 				rookVersion:     semver.MustParse("1.9.12"),
-				cephVersion:     semver.MustParse("16.2.6"),
+				cephVersion:     &cephPacific,
 				name:            "replicapool",
 				level:           1,
 				doFullReconcile: false,
@@ -717,7 +720,7 @@ func TestController_SetBlockPoolReplication(t *testing.T) {
 			},
 			args: args{
 				rookVersion:     semver.MustParse("1.9.12"),
-				cephVersion:     semver.MustParse("16.2.6"),
+				cephVersion:     &cephPacific,
 				name:            "replicapool",
 				level:           1,
 				doFullReconcile: true,
@@ -750,7 +753,7 @@ func TestController_SetBlockPoolReplication(t *testing.T) {
 			},
 			args: args{
 				rookVersion:     semver.MustParse("1.9.12"),
-				cephVersion:     semver.MustParse("16.2.6"),
+				cephVersion:     &cephPacific,
 				name:            "replicapool",
 				level:           3,
 				doFullReconcile: false,
@@ -990,7 +993,7 @@ func TestController_ReconcileMgrCount(t *testing.T) {
 func TestController_SetFilesystemReplication(t *testing.T) {
 	type args struct {
 		rookVersion     semver.Version
-		cephVersion     semver.Version
+		cephVersion     *semver.Version
 		name            string
 		level           int
 		doFullReconcile bool
@@ -1036,7 +1039,7 @@ func TestController_SetFilesystemReplication(t *testing.T) {
 			},
 			args: args{
 				rookVersion:     semver.MustParse("1.9.12"),
-				cephVersion:     semver.MustParse("16.2.6"),
+				cephVersion:     &cephPacific,
 				name:            "myfs",
 				level:           1,
 				doFullReconcile: false,
@@ -1078,7 +1081,7 @@ func TestController_SetFilesystemReplication(t *testing.T) {
 			},
 			args: args{
 				rookVersion:     semver.MustParse("1.9.12"),
-				cephVersion:     semver.MustParse("16.2.6"),
+				cephVersion:     &cephPacific,
 				name:            "myfs",
 				level:           1,
 				doFullReconcile: true,
@@ -1120,7 +1123,7 @@ func TestController_SetFilesystemReplication(t *testing.T) {
 			},
 			args: args{
 				rookVersion:     semver.MustParse("1.9.12"),
-				cephVersion:     semver.MustParse("16.2.6"),
+				cephVersion:     &cephPacific,
 				name:            "myfs",
 				level:           3,
 				doFullReconcile: false,
@@ -1166,7 +1169,7 @@ func TestController_SetFilesystemReplication(t *testing.T) {
 func TestController_SetObjectStoreReplication(t *testing.T) {
 	type args struct {
 		rookVersion     semver.Version
-		cephVersion     semver.Version
+		cephVersion     *semver.Version
 		name            string
 		level           int
 		doFullReconcile bool
@@ -1209,7 +1212,7 @@ func TestController_SetObjectStoreReplication(t *testing.T) {
 			},
 			args: args{
 				rookVersion:     semver.MustParse("1.9.12"),
-				cephVersion:     semver.MustParse("16.2.6"),
+				cephVersion:     &cephPacific,
 				name:            "my-store",
 				level:           1,
 				doFullReconcile: false,
@@ -1246,7 +1249,7 @@ func TestController_SetObjectStoreReplication(t *testing.T) {
 			},
 			args: args{
 				rookVersion:     semver.MustParse("1.9.12"),
-				cephVersion:     semver.MustParse("16.2.6"),
+				cephVersion:     &cephPacific,
 				name:            "my-store",
 				level:           1,
 				doFullReconcile: true,
@@ -1283,7 +1286,7 @@ func TestController_SetObjectStoreReplication(t *testing.T) {
 			},
 			args: args{
 				rookVersion:     semver.MustParse("1.9.12"),
-				cephVersion:     semver.MustParse("16.2.6"),
+				cephVersion:     &cephPacific,
 				name:            "my-store",
 				level:           3,
 				doFullReconcile: false,
@@ -1353,7 +1356,7 @@ func TestController_SetObjectStoreReplication(t *testing.T) {
 			},
 			args: args{
 				rookVersion:     semver.MustParse("1.9.12"),
-				cephVersion:     semver.MustParse("17.2.5-0"),
+				cephVersion:     &cephQuincy,
 				name:            "my-store",
 				level:           1,
 				doFullReconcile: true,
