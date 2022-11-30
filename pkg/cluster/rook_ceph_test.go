@@ -647,9 +647,9 @@ func TestController_removeCephClusterStorageNode(t *testing.T) {
 func TestController_SetBlockPoolReplication(t *testing.T) {
 	type args struct {
 		rookVersion     semver.Version
+		cephVersion     semver.Version
 		name            string
 		level           int
-		cephcluster     *cephv1.CephCluster
 		doFullReconcile bool
 	}
 	tests := []struct {
@@ -684,9 +684,9 @@ func TestController_SetBlockPoolReplication(t *testing.T) {
 			},
 			args: args{
 				rookVersion:     semver.MustParse("1.9.12"),
+				cephVersion:     semver.MustParse("16.2.6"),
 				name:            "replicapool",
 				level:           1,
-				cephcluster:     nil,
 				doFullReconcile: false,
 			},
 			want:      false,
@@ -717,9 +717,9 @@ func TestController_SetBlockPoolReplication(t *testing.T) {
 			},
 			args: args{
 				rookVersion:     semver.MustParse("1.9.12"),
+				cephVersion:     semver.MustParse("16.2.6"),
 				name:            "replicapool",
 				level:           1,
-				cephcluster:     nil,
 				doFullReconcile: true,
 			},
 			want:      true,
@@ -750,9 +750,9 @@ func TestController_SetBlockPoolReplication(t *testing.T) {
 			},
 			args: args{
 				rookVersion:     semver.MustParse("1.9.12"),
+				cephVersion:     semver.MustParse("16.2.6"),
 				name:            "replicapool",
 				level:           3,
-				cephcluster:     nil,
 				doFullReconcile: false,
 			},
 			want:      true,
@@ -770,7 +770,7 @@ func TestController_SetBlockPoolReplication(t *testing.T) {
 				},
 				Log: logger.NewDiscardLogger(),
 			}
-			got, err := c.SetBlockPoolReplication(tt.args.rookVersion, tt.args.name, tt.args.level, tt.args.cephcluster, tt.args.doFullReconcile)
+			got, err := c.SetBlockPoolReplication(tt.args.rookVersion, tt.args.cephVersion, tt.args.name, tt.args.level, tt.args.doFullReconcile)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Controller.SetBlockPoolReplication() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -990,9 +990,9 @@ func TestController_ReconcileMgrCount(t *testing.T) {
 func TestController_SetFilesystemReplication(t *testing.T) {
 	type args struct {
 		rookVersion     semver.Version
+		cephVersion     semver.Version
 		name            string
 		level           int
-		cephcluster     *cephv1.CephCluster
 		doFullReconcile bool
 	}
 	tests := []struct {
@@ -1036,9 +1036,9 @@ func TestController_SetFilesystemReplication(t *testing.T) {
 			},
 			args: args{
 				rookVersion:     semver.MustParse("1.9.12"),
+				cephVersion:     semver.MustParse("16.2.6"),
 				name:            "myfs",
 				level:           1,
-				cephcluster:     nil,
 				doFullReconcile: false,
 			},
 			want:      false,
@@ -1078,9 +1078,9 @@ func TestController_SetFilesystemReplication(t *testing.T) {
 			},
 			args: args{
 				rookVersion:     semver.MustParse("1.9.12"),
+				cephVersion:     semver.MustParse("16.2.6"),
 				name:            "myfs",
 				level:           1,
-				cephcluster:     nil,
 				doFullReconcile: true,
 			},
 			want:      true,
@@ -1120,9 +1120,9 @@ func TestController_SetFilesystemReplication(t *testing.T) {
 			},
 			args: args{
 				rookVersion:     semver.MustParse("1.9.12"),
+				cephVersion:     semver.MustParse("16.2.6"),
 				name:            "myfs",
 				level:           3,
-				cephcluster:     nil,
 				doFullReconcile: false,
 			},
 			want:      true,
@@ -1140,7 +1140,7 @@ func TestController_SetFilesystemReplication(t *testing.T) {
 				},
 				Log: logger.NewDiscardLogger(),
 			}
-			got, err := c.SetFilesystemReplication(tt.args.rookVersion, tt.args.name, tt.args.level, tt.args.cephcluster, tt.args.doFullReconcile)
+			got, err := c.SetFilesystemReplication(tt.args.rookVersion, tt.args.cephVersion, tt.args.name, tt.args.level, tt.args.doFullReconcile)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Controller.SetFilesystemReplication() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -1166,18 +1166,20 @@ func TestController_SetFilesystemReplication(t *testing.T) {
 func TestController_SetObjectStoreReplication(t *testing.T) {
 	type args struct {
 		rookVersion     semver.Version
+		cephVersion     semver.Version
 		name            string
 		level           int
-		cephcluster     *cephv1.CephCluster
 		doFullReconcile bool
 	}
 	tests := []struct {
-		name          string
-		rookResources []runtime.Object
-		args          args
-		want          bool
-		wantLevel     uint
-		wantErr       bool
+		name                    string
+		resources               []runtime.Object
+		rookResources           []runtime.Object
+		mockSyncExecutorExpects func(*mock_k8s.MockSyncExecutorInterface)
+		args                    args
+		want                    bool
+		wantLevel               uint
+		wantErr                 bool
 	}{
 		{
 			name: "objectstore replication should stay at 1, rook version 1.9.12",
@@ -1207,9 +1209,9 @@ func TestController_SetObjectStoreReplication(t *testing.T) {
 			},
 			args: args{
 				rookVersion:     semver.MustParse("1.9.12"),
+				cephVersion:     semver.MustParse("16.2.6"),
 				name:            "my-store",
 				level:           1,
-				cephcluster:     nil,
 				doFullReconcile: false,
 			},
 			want:      false,
@@ -1244,9 +1246,9 @@ func TestController_SetObjectStoreReplication(t *testing.T) {
 			},
 			args: args{
 				rookVersion:     semver.MustParse("1.9.12"),
+				cephVersion:     semver.MustParse("16.2.6"),
 				name:            "my-store",
 				level:           1,
-				cephcluster:     nil,
 				doFullReconcile: true,
 			},
 			want:      true,
@@ -1281,27 +1283,109 @@ func TestController_SetObjectStoreReplication(t *testing.T) {
 			},
 			args: args{
 				rookVersion:     semver.MustParse("1.9.12"),
+				cephVersion:     semver.MustParse("16.2.6"),
 				name:            "my-store",
 				level:           3,
-				cephcluster:     nil,
 				doFullReconcile: false,
 			},
 			want:      true,
 			wantLevel: 3,
 			wantErr:   false,
 		},
+		{
+			name: "should reconcile object store metadata pools pg_num_min for ceph quincy, do full reconcile",
+			resources: []runtime.Object{
+				&corev1.Pod{
+					TypeMeta: metav1.TypeMeta{Kind: "Pod", APIVersion: "v1"},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "rook-ceph-tools-5b8b8b8b8b-5b8b8",
+						Namespace: "rook-ceph",
+						Labels: map[string]string{
+							"app": "rook-ceph-tools",
+						},
+					},
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{
+							{
+								Name: "rook-ceph-tools",
+							},
+						},
+					},
+				},
+			},
+			rookResources: []runtime.Object{
+				&cephv1.CephObjectStore{
+					TypeMeta: metav1.TypeMeta{
+						APIVersion: "ceph.rook.io/v1",
+						Kind:       "CephObjectStore",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "my-store",
+						Namespace: "rook-ceph",
+					},
+					Spec: cephv1.ObjectStoreSpec{
+						MetadataPool: cephv1.PoolSpec{
+							Replicated: cephv1.ReplicatedSpec{
+								Size: 1,
+							},
+						},
+						DataPool: cephv1.PoolSpec{
+							Replicated: cephv1.ReplicatedSpec{
+								Size: 1,
+							},
+						},
+					},
+				},
+			},
+			mockSyncExecutorExpects: func(m *mock_k8s.MockSyncExecutorInterface) {
+				for _, name := range []string{
+					".rgw.root",
+					"my-store.rgw.control",
+					"my-store.rgw.meta",
+					"my-store.rgw.log",
+					"my-store.rgw.buckets.index",
+					"my-store.rgw.buckets.non-ec",
+					"my-store.rgw.otp",
+				} {
+					m.EXPECT().ExecContainer(gomock.Any(), "rook-ceph", "rook-ceph-tools-5b8b8b8b8b-5b8b8", "rook-ceph-tools", "ceph", "osd", "pool", "set", name, "pg_num_min", "8").
+						Return(0, "", "set pool 7 pg_num_min to 8", nil)
+				}
+			},
+			args: args{
+				rookVersion:     semver.MustParse("1.9.12"),
+				cephVersion:     semver.MustParse("17.2.5-0"),
+				name:            "my-store",
+				level:           1,
+				doFullReconcile: true,
+			},
+			want:      true,
+			wantLevel: 1,
+			wantErr:   false,
+		},
 		// TODO: rookVersion 1.0.4
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			m := mock_k8s.NewMockSyncExecutorInterface(ctrl)
+			if tt.mockSyncExecutorExpects != nil {
+				tt.mockSyncExecutorExpects(m)
+			}
+
+			clientset := fake.NewSimpleClientset(tt.resources...)
 			rookClientset := rookfake.NewSimpleClientset(tt.rookResources...)
 			c := &Controller{
 				Config: ControllerConfig{
+					Client: clientset,
 					CephV1: rookClientset.CephV1(),
 				},
-				Log: logger.NewDiscardLogger(),
+				SyncExecutor: m,
+				Log:          logger.NewDiscardLogger(),
 			}
-			got, err := c.SetObjectStoreReplication(tt.args.rookVersion, tt.args.name, tt.args.level, tt.args.cephcluster, tt.args.doFullReconcile)
+
+			got, err := c.SetObjectStoreReplication(tt.args.rookVersion, tt.args.cephVersion, tt.args.name, tt.args.level, tt.args.doFullReconcile)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Controller.SetObjectStoreReplication() error = %v, wantErr %v", err, tt.wantErr)
 				return

@@ -34,6 +34,15 @@ var (
 		"rgw.buckets.index",
 		"rgw.buckets.non-ec",
 	}
+	RookCephObjectStoreMetadataPoolsQuincy = []string{
+		// .rgw.root (rootPool) is appended to this slice where needed
+		"rgw.control",
+		"rgw.meta",
+		"rgw.log",
+		"rgw.buckets.index",
+		"rgw.buckets.non-ec",
+		"rgw.otp",
+	}
 	RookCephObjectStoreDataPools = []string{
 		"rgw.buckets.data",
 	}

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/blang/semver"
+	multierror "github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 	"github.com/replicatedhq/ekco/pkg/k8s"
 	"github.com/replicatedhq/ekco/pkg/util"
@@ -22,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	apitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/yaml"
+	"k8s.io/utils/strings/slices"
 )
 
 const (
@@ -171,7 +173,7 @@ func (c *Controller) deleteK8sDeploymentOSD(name string) (string, error) {
 }
 
 // SetBlockPoolReplicationLevel ignores NotFound errors.
-func (c *Controller) SetBlockPoolReplication(rookVersion semver.Version, name string, level int, cephcluster *cephv1.CephCluster, doFullReconcile bool) (bool, error) {
+func (c *Controller) SetBlockPoolReplication(rookVersion, cephVersion semver.Version, name string, level int, doFullReconcile bool) (bool, error) {
 	if name == "" {
 		return false, nil
 	}
@@ -218,7 +220,7 @@ func (c *Controller) SetBlockPoolReplication(rookVersion semver.Version, name st
 		// Rook will also run this command but there is a race condition: if the next command that
 		// sets the min_size runs before Rook has increased the size, then the min_size command will
 		// fail. This command is idempotent.
-		err = c.cephOSDPoolSetSize(rookVersion, name, level, cephcluster)
+		err = c.cephOSDPoolSetSize(rookVersion, cephVersion, name, level)
 		if err != nil {
 			return false, errors.Wrapf(err, "set block pool %q size to %d", name, minSize)
 		}
@@ -230,7 +232,7 @@ func (c *Controller) SetBlockPoolReplication(rookVersion semver.Version, name st
 	return true, nil
 }
 
-func (c *Controller) SetDeviceHealthMetricsReplication(rookVersion semver.Version, cephVersion string, cephBlockPoolName string, level int, cephcluster *cephv1.CephCluster, doFullReconcile bool) (bool, error) {
+func (c *Controller) SetDeviceHealthMetricsReplication(rookVersion, cephVersion semver.Version, cephBlockPoolName string, level int, doFullReconcile bool) (bool, error) {
 	if rookVersion.LT(Rookv14) {
 		return false, nil
 	}
@@ -246,19 +248,13 @@ func (c *Controller) SetDeviceHealthMetricsReplication(rookVersion semver.Versio
 	}
 
 	poolName := CephDeviceHealthMetricsPool
-	if cephVersion != "" {
-		cephVersionSemver, err := semver.Parse(cephVersion)
-		if err != nil {
-			return false, errors.Wrapf(err, "parse ceph version %q", cephVersion)
-		}
-		if cephVersionSemver.Major >= 17 {
-			poolName = CephDeviceHealthMetricsPoolQuincy
-		}
+	if cephVersion.Major >= 17 {
+		poolName = CephDeviceHealthMetricsPoolQuincy
 	}
 
 	c.Log.Debugf("Ensuring %s replication level is %d", poolName, level)
 
-	err := c.cephOSDPoolSetSize(rookVersion, poolName, level, cephcluster)
+	err := c.cephOSDPoolSetSize(rookVersion, cephVersion, poolName, level)
 	if err != nil {
 		return false, errors.Wrapf(err, "scale %s pool size", poolName)
 	}
@@ -419,7 +415,7 @@ func cephCSIResourcesNeedsUpdate(data map[string]string) bool {
 
 // SetSharedFilesystemReplication will set the shared filesystem replication to
 // the number of OSDs in the cluster. Returns true if the resource was updated.
-func (c *Controller) SetFilesystemReplication(rookVersion semver.Version, name string, level int, cephcluster *cephv1.CephCluster, doFullReconcile bool) (bool, error) {
+func (c *Controller) SetFilesystemReplication(rookVersion, cephVersion semver.Version, name string, level int, doFullReconcile bool) (bool, error) {
 	if name == "" {
 		return false, nil
 	}
@@ -480,7 +476,7 @@ func (c *Controller) SetFilesystemReplication(rookVersion semver.Version, name s
 		}
 		// Changing the size in the CephFilesystem has no effect so it needs to be set manually
 		// https://github.com/rook/rook/issues/3144
-		err := c.cephOSDPoolSetSize(rookVersion, RookCephSharedFSMetadataPool, level, cephcluster)
+		err := c.cephOSDPoolSetSize(rookVersion, cephVersion, RookCephSharedFSMetadataPool, level)
 		if err != nil {
 			return false, errors.Wrapf(err, "scale shared fs metadata pool size")
 		}
@@ -488,7 +484,7 @@ func (c *Controller) SetFilesystemReplication(rookVersion semver.Version, name s
 		if err != nil {
 			return false, errors.Wrapf(err, "scale shared fs metadata pool min_size")
 		}
-		err = c.cephOSDPoolSetSize(rookVersion, RookCephSharedFSDataPool, level, cephcluster)
+		err = c.cephOSDPoolSetSize(rookVersion, cephVersion, RookCephSharedFSDataPool, level)
 		if err != nil {
 			return false, errors.Wrapf(err, "scale shared fs data pool size")
 		}
@@ -547,7 +543,7 @@ func (c *Controller) PatchFilesystemMDSPlacementMultinode(name string, numNodes 
 
 // SetObjectStoreReplication will set the object store pool replication to the
 // number of OSDs in the cluster. Returns true if the resource was updated.
-func (c *Controller) SetObjectStoreReplication(rookVersion semver.Version, name string, level int, cephcluster *cephv1.CephCluster, doFullReconcile bool) (bool, error) {
+func (c *Controller) SetObjectStoreReplication(rookVersion, cephVersion semver.Version, name string, level int, doFullReconcile bool) (bool, error) {
 	if name == "" {
 		return false, nil
 	}
@@ -604,40 +600,40 @@ func (c *Controller) SetObjectStoreReplication(rookVersion semver.Version, name 
 	if err != nil {
 		return false, errors.Wrapf(err, "patch CephObjectStore %s", name)
 	}
+
 	// Changing the size in the CephObjectStore has no effect in Rook 1.0 so it needs to be set
 	// manually https://github.com/rook/rook/issues/4341
 	if rookVersion.LT(Rookv14) {
-		err := c.cephOSDPoolSetSize(rookVersion, objectStorePoolName(name, RookCephObjectStoreRootPool), level, cephcluster)
-		if err != nil {
-			return false, errors.Wrap(err, "scale ceph object store root pool size")
-		}
-		err = c.cephOSDPoolSetMinSize(rookVersion, objectStorePoolName(name, RookCephObjectStoreRootPool), minSize)
-		if err != nil {
-			return false, errors.Wrap(err, "scale ceph object store root pool min_size")
-		}
-		for _, pool := range RookCephObjectStoreMetadataPools {
-			err := c.cephOSDPoolSetSize(rookVersion, objectStorePoolName(name, pool), level, cephcluster)
-			if err == cephErrENOENT {
+		pools := append([]string{RookCephObjectStoreRootPool}, RookCephObjectStoreMetadataPools...)
+		pools = append(pools, RookCephObjectStoreDataPools...)
+		for _, pool := range pools {
+			err := c.cephOSDPoolSetSize(rookVersion, cephVersion, objectStorePoolName(name, pool), level)
+			if err == cephErrENOENT && slices.Contains(RookCephObjectStoreMetadataPools, pool) {
 				// the non-ec metadata pool doesn't always exist
 				continue
 			}
 			if err != nil {
-				return false, errors.Wrapf(err, "scale ceph object store metadata pool %s size", pool)
+				return false, errors.Wrapf(err, "scale ceph object store pool %s size", pool)
 			}
 			err = c.cephOSDPoolSetMinSize(rookVersion, objectStorePoolName(name, pool), minSize)
 			if err != nil {
-				return false, errors.Wrapf(err, "scale ceph object store metadata pool %s min_size", pool)
+				return false, errors.Wrapf(err, "scale ceph object store pool %s min_size", pool)
 			}
 		}
-		for _, pool := range RookCephObjectStoreDataPools {
-			err := c.cephOSDPoolSetSize(rookVersion, objectStorePoolName(name, pool), level, cephcluster)
+	}
+
+	// Object store pools pg_num_min is incorrectly set to 32 for Ceph Quincy. Tell the autoscaler
+	// to reduce the PGs to 8. https://github.com/rook/rook/issues/11366
+	if cephVersion.GTE(CephQuincy) {
+		var multiErr error
+		for _, pool := range append([]string{RookCephObjectStoreRootPool}, RookCephObjectStoreMetadataPoolsQuincy...) {
+			err := c.cephOSDPoolSetPgNumMin(rookVersion, objectStorePoolName(name, pool), 8)
 			if err != nil {
-				return false, errors.Wrapf(err, "scale ceph object store data pool %s size", pool)
+				multiErr = multierror.Append(multiErr, errors.Wrapf(err, "set ceph object store metadata pool %s pg_num_min", pool))
 			}
-			err = c.cephOSDPoolSetMinSize(rookVersion, objectStorePoolName(name, pool), minSize)
-			if err != nil {
-				return false, errors.Wrapf(err, "scale ceph object store data pool %s min_size", pool)
-			}
+		}
+		if multiErr != nil {
+			return false, multiErr
 		}
 	}
 
@@ -929,25 +925,22 @@ func (c *Controller) JSONPatchCephCluster(ctx context.Context, patches []k8s.JSO
 	return c.Config.CephV1.CephClusters(RookCephNS).Patch(ctx, CephClusterName, apitypes.JSONPatchType, patchData, metav1.PatchOptions{})
 }
 
-func (c *Controller) cephOSDPoolSetSize(rookVersion semver.Version, name string, size int, cephcluster *cephv1.CephCluster) error {
+func (c *Controller) cephOSDPoolSetSize(rookVersion, cephVersion semver.Version, name string, size int) error {
 	args := []string{"ceph", "osd", "pool", "set", name, "size", strconv.Itoa(size)}
-	if size == 1 {
-		if cephcluster != nil && cephcluster.Status.CephVersion != nil && cephcluster.Status.CephVersion.Version != "" {
-			ver, err := semver.Parse(cephcluster.Status.CephVersion.Version)
-			if err != nil {
-				c.Log.Warnf("Set pool size %s: failed to parse ceph version: %v", name, err)
-			} else {
-				if ver.Major >= 16 && ver.Minor >= 2 {
-					args = append(args, "--yes-i-really-mean-it")
-				}
-			}
-		}
+	if size == 1 && cephVersion.Major >= 16 && cephVersion.Minor >= 2 {
+		args = append(args, "--yes-i-really-mean-it")
 	}
 	return c.rookCephExec(rookVersion, args...)
 }
 
 func (c *Controller) cephOSDPoolSetMinSize(rookVersion semver.Version, name string, minSize int) error {
 	args := []string{"ceph", "osd", "pool", "set", name, "min_size", strconv.Itoa(minSize)}
+	return c.rookCephExec(rookVersion, args...)
+}
+
+// cephOSDPoolSetPgNumMin sets the pg_num_min property of the given pool to pgNumMin.
+func (c *Controller) cephOSDPoolSetPgNumMin(rookVersion semver.Version, name string, pgNumMin uint64) error {
+	args := []string{"ceph", "osd", "pool", "set", name, "pg_num_min", strconv.FormatUint(pgNumMin, 10)}
 	return c.rookCephExec(rookVersion, args...)
 }
 
