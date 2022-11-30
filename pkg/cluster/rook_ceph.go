@@ -173,7 +173,7 @@ func (c *Controller) deleteK8sDeploymentOSD(name string) (string, error) {
 }
 
 // SetBlockPoolReplicationLevel ignores NotFound errors.
-func (c *Controller) SetBlockPoolReplication(rookVersion, cephVersion semver.Version, name string, level int, doFullReconcile bool) (bool, error) {
+func (c *Controller) SetBlockPoolReplication(rookVersion semver.Version, cephVersion *semver.Version, name string, level int, doFullReconcile bool) (bool, error) {
 	if name == "" {
 		return false, nil
 	}
@@ -232,7 +232,7 @@ func (c *Controller) SetBlockPoolReplication(rookVersion, cephVersion semver.Ver
 	return true, nil
 }
 
-func (c *Controller) SetDeviceHealthMetricsReplication(rookVersion, cephVersion semver.Version, cephBlockPoolName string, level int, doFullReconcile bool) (bool, error) {
+func (c *Controller) SetDeviceHealthMetricsReplication(rookVersion semver.Version, cephVersion *semver.Version, cephBlockPoolName string, level int, doFullReconcile bool) (bool, error) {
 	if rookVersion.LT(Rookv14) {
 		return false, nil
 	}
@@ -248,7 +248,7 @@ func (c *Controller) SetDeviceHealthMetricsReplication(rookVersion, cephVersion 
 	}
 
 	poolName := CephDeviceHealthMetricsPool
-	if cephVersion.Major >= CephQuincy.Major {
+	if cephVersion != nil && cephVersion.Major >= CephQuincy.Major {
 		poolName = CephDeviceHealthMetricsPoolQuincy
 	}
 
@@ -415,7 +415,7 @@ func cephCSIResourcesNeedsUpdate(data map[string]string) bool {
 
 // SetSharedFilesystemReplication will set the shared filesystem replication to
 // the number of OSDs in the cluster. Returns true if the resource was updated.
-func (c *Controller) SetFilesystemReplication(rookVersion, cephVersion semver.Version, name string, level int, doFullReconcile bool) (bool, error) {
+func (c *Controller) SetFilesystemReplication(rookVersion semver.Version, cephVersion *semver.Version, name string, level int, doFullReconcile bool) (bool, error) {
 	if name == "" {
 		return false, nil
 	}
@@ -543,7 +543,7 @@ func (c *Controller) PatchFilesystemMDSPlacementMultinode(name string, numNodes 
 
 // SetObjectStoreReplication will set the object store pool replication to the
 // number of OSDs in the cluster. Returns true if the resource was updated.
-func (c *Controller) SetObjectStoreReplication(rookVersion, cephVersion semver.Version, name string, level int, doFullReconcile bool) (bool, error) {
+func (c *Controller) SetObjectStoreReplication(rookVersion semver.Version, cephVersion *semver.Version, name string, level int, doFullReconcile bool) (bool, error) {
 	if name == "" {
 		return false, nil
 	}
@@ -624,7 +624,7 @@ func (c *Controller) SetObjectStoreReplication(rookVersion, cephVersion semver.V
 
 	// Object store pools pg_num_min is incorrectly set to 32 for Ceph Quincy. Tell the autoscaler
 	// to reduce the PGs to 8. https://github.com/rook/rook/issues/11366
-	if cephVersion.Major >= CephQuincy.Major {
+	if cephVersion != nil && cephVersion.Major >= CephQuincy.Major {
 		var multiErr error
 		for _, pool := range append([]string{RookCephObjectStoreRootPool}, RookCephObjectStoreMetadataPoolsQuincy...) {
 			err := c.cephOSDPoolSetPgNumMin(rookVersion, objectStorePoolName(name, pool), 8)
@@ -925,9 +925,9 @@ func (c *Controller) JSONPatchCephCluster(ctx context.Context, patches []k8s.JSO
 	return c.Config.CephV1.CephClusters(RookCephNS).Patch(ctx, CephClusterName, apitypes.JSONPatchType, patchData, metav1.PatchOptions{})
 }
 
-func (c *Controller) cephOSDPoolSetSize(rookVersion, cephVersion semver.Version, name string, size int) error {
+func (c *Controller) cephOSDPoolSetSize(rookVersion semver.Version, cephVersion *semver.Version, name string, size int) error {
 	args := []string{"ceph", "osd", "pool", "set", name, "size", strconv.Itoa(size)}
-	if size == 1 && cephVersion.Major >= 16 && cephVersion.Minor >= 2 {
+	if size == 1 && cephVersion != nil && cephVersion.Major >= CephPacific.Major {
 		args = append(args, "--yes-i-really-mean-it")
 	}
 	return c.rookCephExec(rookVersion, args...)
