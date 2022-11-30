@@ -222,11 +222,11 @@ func (c *Controller) SetBlockPoolReplication(rookVersion, cephVersion semver.Ver
 		// fail. This command is idempotent.
 		err = c.cephOSDPoolSetSize(rookVersion, cephVersion, name, level)
 		if err != nil {
-			return false, errors.Wrapf(err, "set block pool %q size to %d", name, minSize)
+			return true, errors.Wrapf(err, "set block pool %q size to %d", name, minSize)
 		}
 		err = c.cephOSDPoolSetMinSize(rookVersion, name, minSize)
 		if err != nil {
-			return false, errors.Wrapf(err, "set block pool %q min_size to %d", name, minSize)
+			return true, errors.Wrapf(err, "set block pool %q min_size to %d", name, minSize)
 		}
 	}
 	return true, nil
@@ -478,19 +478,19 @@ func (c *Controller) SetFilesystemReplication(rookVersion, cephVersion semver.Ve
 		// https://github.com/rook/rook/issues/3144
 		err := c.cephOSDPoolSetSize(rookVersion, cephVersion, RookCephSharedFSMetadataPool, level)
 		if err != nil {
-			return false, errors.Wrapf(err, "scale shared fs metadata pool size")
+			return true, errors.Wrapf(err, "scale shared fs metadata pool size")
 		}
 		err = c.cephOSDPoolSetMinSize(rookVersion, RookCephSharedFSMetadataPool, minSize)
 		if err != nil {
-			return false, errors.Wrapf(err, "scale shared fs metadata pool min_size")
+			return true, errors.Wrapf(err, "scale shared fs metadata pool min_size")
 		}
 		err = c.cephOSDPoolSetSize(rookVersion, cephVersion, RookCephSharedFSDataPool, level)
 		if err != nil {
-			return false, errors.Wrapf(err, "scale shared fs data pool size")
+			return true, errors.Wrapf(err, "scale shared fs data pool size")
 		}
 		err = c.cephOSDPoolSetMinSize(rookVersion, RookCephSharedFSDataPool, minSize)
 		if err != nil {
-			return false, errors.Wrapf(err, "scale shared fs data pool min_size")
+			return true, errors.Wrapf(err, "scale shared fs data pool min_size")
 		}
 	}
 
@@ -613,11 +613,11 @@ func (c *Controller) SetObjectStoreReplication(rookVersion, cephVersion semver.V
 				continue
 			}
 			if err != nil {
-				return false, errors.Wrapf(err, "scale ceph object store pool %s size", pool)
+				return true, errors.Wrapf(err, "scale ceph object store pool %s size", pool)
 			}
 			err = c.cephOSDPoolSetMinSize(rookVersion, objectStorePoolName(name, pool), minSize)
 			if err != nil {
-				return false, errors.Wrapf(err, "scale ceph object store pool %s min_size", pool)
+				return true, errors.Wrapf(err, "scale ceph object store pool %s min_size", pool)
 			}
 		}
 	}
@@ -633,7 +633,7 @@ func (c *Controller) SetObjectStoreReplication(rookVersion, cephVersion semver.V
 			}
 		}
 		if multiErr != nil {
-			return false, multiErr
+			return true, multiErr
 		}
 	}
 
