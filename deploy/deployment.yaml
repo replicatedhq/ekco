@@ -28,6 +28,7 @@ metadata:
   name: ekc-operator
   namespace: kurl
 spec:
+  replicas: 1
   selector:
     matchLabels:
       app: ekc-operator
