@@ -158,15 +158,14 @@ func (o *Operator) reconcileRook(rookVersion semver.Version, nodes []corev1.Node
 			err := o.adjustPoolReplicationLevels(rookVersion, readyCount, doFullReconcile)
 			if err != nil {
 				multiErr = multierror.Append(multiErr, errors.Wrapf(err, "adjust pool replication levels"))
-			} else {
-				err := o.controller.ReconcileMonCount(context.TODO(), readyCount)
-				if err != nil {
-					multiErr = multierror.Append(multiErr, errors.Wrapf(err, "reconcile mon count"))
-				}
-				err = o.controller.ReconcileMgrCount(context.TODO(), rookVersion, readyCount)
-				if err != nil {
-					multiErr = multierror.Append(multiErr, errors.Wrapf(err, "reconcile mgr count"))
-				}
+			}
+			err = o.controller.ReconcileMonCount(context.TODO(), readyCount)
+			if err != nil {
+				multiErr = multierror.Append(multiErr, errors.Wrapf(err, "reconcile mon count"))
+			}
+			err = o.controller.ReconcileMgrCount(context.TODO(), rookVersion, readyCount)
+			if err != nil {
+				multiErr = multierror.Append(multiErr, errors.Wrapf(err, "reconcile mgr count"))
 			}
 		}
 	}

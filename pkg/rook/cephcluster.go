@@ -1,7 +1,7 @@
 package rook
 
 import (
-	"errors"
+	"strings"
 
 	"github.com/blang/semver"
 	cephv1 "github.com/rook/rook/pkg/apis/ceph.rook.io/v1"
@@ -11,7 +11,15 @@ import (
 // resource.
 func GetCephVersion(cluster cephv1.CephCluster) (semver.Version, error) {
 	if cluster.Status.CephVersion == nil {
-		return semver.Version{}, errors.New("status.CephVersion is nil")
+		// status.cephVersion is nil for Rook 1.0.4
+		parts := strings.Split(cluster.Spec.CephVersion.Image, ":")
+		imageTag := parts[len(parts)-1]
+		ver, err := semver.Parse(strings.TrimPrefix(imageTag, "v"))
+		if err != nil {
+			return semver.Version{}, err
+		}
+		ver.Pre = []semver.PRVersion{{VersionNum: 0, IsNum: true}}
+		return ver, nil
 	}
 
 	return semver.Parse(cluster.Status.CephVersion.Version)
