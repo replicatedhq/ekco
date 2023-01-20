@@ -93,6 +93,22 @@ func (c *Controller) PurgeNode(ctx context.Context, name string, rook bool, rook
 			return err
 		}
 		c.Log.Infof("Purge node %q: deleted Kubernetes Node object", name)
+
+		// The following error cannot be faced in upper versions.
+		// We are adding here the steps to fix it manually.
+		// More info: https://github.com/rook/rook/issues/2262#issuecomment-460898915
+		if rookVersion.LT(semver.MustParse("1.4.9")) {
+			c.Log.Warnf("The Rook version used is %s and it is recommended to update the Rook version. \n"+
+				"More info: https://kurl.sh/docs/install-with-kurl/managing-nodes#rook-ceph-cluster-prerequisites \n"+
+				"Be aware that by removing nodes with this Rook version it may leave Ceph unhealthy.\n"+
+				"Please, check the Ceph status (kubectl -n rook-ceph exec deployment.apps/rook-ceph-operator -- ceph status) \n"+
+				"and if you verify that it is unhealthy after removing the node then: \n"+
+				"- Stop the Rook operator (kubectl -n rook-ceph scale --replicas=0 deployment.apps/rook-ceph-operator) \n"+
+				"- Delete the deployment for the failed mon (kubectl -n rook-ceph get pod -l app=rook-ceph-mon) \n"+
+				"- Edit the configmap rook-ceph-mon-endpoints and (carefully) remove the failed mon from the list (kubect -n rook-ceph edit configmaps rook-ceph-mon-endpoints) \n"+
+				"- Start the Rook operator (kubectl -n rook-ceph scale --replicas=1 deployment.apps/rook-ceph-operator) \n "+
+				"- Ensure that Ceph came back in a healthy state (kubectl -n rook-ceph exec deployment.apps/rook-ceph-operator -- ceph status) ", rookVersion)
+		}
 	}
 
 	return nil
