@@ -101,7 +101,7 @@ func (c *Controller) PurgeNode(ctx context.Context, name string, rook bool, rook
 			c.Log.Warnf("The Rook version used is %s and it is recommended to update the Rook version. \n"+
 				"More info: https://kurl.sh/docs/install-with-kurl/managing-nodes#rook-ceph-cluster-prerequisites \n"+
 				"It's worth noting that using this version of Rook to manage nodes may result in an unhealthy Ceph cluster.\n"+
-				"If new nodes are added, it is recommended to check the status of Ceph (using the command "kubectl -n rook-ceph exec deployment.apps/rook-ceph-operator -- ceph status"). \n"+
+				"If new nodes are added, it is recommended to check the status of Ceph (using the command 'kubectl -n rook-ceph exec deployment.apps/rook-ceph-operator -- ceph status'). \n"+
 				"If Ceph is found to be unhealthy, please check the topic: \n"+
 				"https://community.replicated.com/t/managing-nodes-when-the-previous-rook-version-is-in-use-might-leave-ceph-in-an-unhealthy-state-where-mon-pods-are-not-rescheduled/1099", rookVersion)
 		}
