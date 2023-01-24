@@ -107,7 +107,8 @@ func (c *Controller) PurgeNode(ctx context.Context, name string, rook bool, rook
 				"- Delete the deployment for the failed mon (find out the Peding pod to be deleted with: kubectl -n rook-ceph get pod -l app=rook-ceph-mon) \n"+
 				"- Edit the configmap rook-ceph-mon-endpoints and (carefully) remove the failed mon from the list (kubect -n rook-ceph edit configmaps rook-ceph-mon-endpoints) \n"+
 				"- Start the Rook operator (kubectl -n rook-ceph scale --replicas=1 deployment.apps/rook-ceph-operator) \n "+
-				"- Ensure that Ceph came back in a healthy state (kubectl -n rook-ceph exec deployment.apps/rook-ceph-operator -- ceph status) ", rookVersion)
+				"- Ensure that Ceph came back in a healthy state (kubectl -n rook-ceph exec deployment.apps/rook-ceph-operator -- ceph status) \n"+
+				"- For further information see: https://community.replicated.com/t/managing-nodes-when-the-previous-rook-version-is-in-use-might-leave-ceph-in-an-unhealthy-state-where-mon-pods-are-not-rescheduled/1099", rookVersion)
 		}
 	}
 
