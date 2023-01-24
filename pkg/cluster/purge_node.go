@@ -100,14 +100,10 @@ func (c *Controller) PurgeNode(ctx context.Context, name string, rook bool, rook
 		if rookVersion.LT(semver.MustParse("1.4.9")) {
 			c.Log.Warnf("The Rook version used is %s and it is recommended to update the Rook version. \n"+
 				"More info: https://kurl.sh/docs/install-with-kurl/managing-nodes#rook-ceph-cluster-prerequisites \n"+
-				"Be aware that by removing nodes with this Rook version it may leave Ceph unhealthy.\n"+
-				"Please, check the Ceph status (kubectl -n rook-ceph exec deployment.apps/rook-ceph-operator -- ceph status) \n"+
-				"and if you verify that it is unhealthy after removing the node then: \n"+
-				"- Stop the Rook operator (kubectl -n rook-ceph scale --replicas=0 deployment.apps/rook-ceph-operator) \n"+
-				"- Delete the deployment for the failed mon (kubectl -n rook-ceph get pod -l app=rook-ceph-mon) \n"+
-				"- Edit the configmap rook-ceph-mon-endpoints and (carefully) remove the failed mon from the list (kubect -n rook-ceph edit configmaps rook-ceph-mon-endpoints) \n"+
-				"- Start the Rook operator (kubectl -n rook-ceph scale --replicas=1 deployment.apps/rook-ceph-operator) \n "+
-				"- Ensure that Ceph came back in a healthy state (kubectl -n rook-ceph exec deployment.apps/rook-ceph-operator -- ceph status) ", rookVersion)
+				"It's worth noting that using this version of Rook to manage nodes may result in an unhealthy Ceph cluster.\n"+
+				"If new nodes are added, it is recommended to check the status of Ceph (using the command 'kubectl -n rook-ceph exec deployment.apps/rook-ceph-operator -- ceph status'). \n"+
+				"If Ceph is found to be unhealthy, please check the topic: \n"+
+				"https://community.replicated.com/t/managing-nodes-when-the-previous-rook-version-is-in-use-might-leave-ceph-in-an-unhealthy-state-where-mon-pods-are-not-rescheduled/1099", rookVersion)
 		}
 	}
 
