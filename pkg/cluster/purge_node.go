@@ -42,7 +42,15 @@ func (c *Controller) PurgeNode(ctx context.Context, name string, rook bool, rook
 	maybeMaster := true
 	if node != nil {
 		labels := node.ObjectMeta.GetLabels()
-		_, oldLabel := labels[kubeadmconstants.LabelNodeRoleOldControlPlane]
+
+		// Note that the latest version no longer has the following label
+		// TODO: remove this const when we be able to no longer provide support/use old kubedmin versions
+		// Keep the label here allow the latest ekco versions works with old KURL releases
+		// LabelNodeRoleOldControlPlane specifies that a node hosts control-plane components
+		// DEPRECATED: https://github.com/kubernetes/kubeadm/issues/2200
+		const LabelNodeRoleOldControlPlane = "node-role.kubernetes.io/master"
+
+		_, oldLabel := labels[LabelNodeRoleOldControlPlane]
 		_, newLabel := labels[kubeadmconstants.LabelNodeRoleControlPlane]
 		if !oldLabel && !newLabel {
 			maybeMaster = false
