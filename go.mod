@@ -15,7 +15,7 @@ require (
 	github.com/spf13/cobra v1.6.1
 	github.com/spf13/viper v1.10.1
 	github.com/stretchr/testify v1.8.0
-	go.etcd.io/etcd/client/v3 v3.5.5
+	go.etcd.io/etcd/client/v3 v3.5.7
 	go.uber.org/zap v1.24.0
 	go.undefinedlabs.com/scopeagent v0.1.12
 	gopkg.in/yaml.v2 v2.4.0
@@ -180,8 +180,8 @@ require (
 	github.com/undefinedlabs/go-mpatch v0.0.0-20200122175732-0044123dbb98 // indirect
 	github.com/vmihailenco/msgpack v4.0.4+incompatible // indirect
 	github.com/vmware/govmomi v0.29.0 // indirect
-	go.etcd.io/etcd/api/v3 v3.5.5 // indirect
-	go.etcd.io/etcd/client/pkg/v3 v3.5.5 // indirect
+	go.etcd.io/etcd/api/v3 v3.5.7 // indirect
+	go.etcd.io/etcd/client/pkg/v3 v3.5.7 // indirect
 	go.mongodb.org/mongo-driver v1.10.3 // indirect
 	go.uber.org/atomic v1.10.0 // indirect
 	go.uber.org/multierr v1.8.0 // indirect
