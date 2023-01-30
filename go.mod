@@ -10,10 +10,10 @@ require (
 	github.com/google/martian v2.1.0+incompatible
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/pkg/errors v0.9.1
-	github.com/projectcontour/contour v1.19.1
+	github.com/projectcontour/contour v1.23.2
 	github.com/rook/rook v1.10.6
 	github.com/spf13/cobra v1.6.1
-	github.com/spf13/viper v1.8.1
+	github.com/spf13/viper v1.10.1
 	github.com/stretchr/testify v1.8.0
 	go.etcd.io/etcd/client/v3 v3.5.5
 	go.uber.org/zap v1.24.0
@@ -150,7 +150,7 @@ require (
 	github.com/openshift/api v0.0.0-20210105115604-44119421ec6b // indirect
 	github.com/opentracing/opentracing-go v1.2.0 // indirect
 	github.com/packethost/packngo v0.28.0 // indirect
-	github.com/pelletier/go-toml v1.9.3 // indirect
+	github.com/pelletier/go-toml v1.9.4 // indirect
 	github.com/pelletier/go-toml/v2 v2.0.5 // indirect
 	github.com/petermattis/goid v0.0.0-20220824145935-af5520614cb6 // indirect
 	github.com/pierrec/lz4 v2.6.1+incompatible // indirect
