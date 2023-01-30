@@ -41,7 +41,7 @@ func TestEnableHAKotsadm(t *testing.T) {
 								Namespace: "default",
 							},
 							Spec: appsv1.StatefulSetSpec{
-								Replicas: pointer.Int32Ptr(1),
+								Replicas: pointer.Int32(1),
 								Template: corev1.PodTemplateSpec{
 									Spec: corev1.PodSpec{
 										Containers: []corev1.Container{

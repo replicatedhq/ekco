@@ -157,7 +157,7 @@ func (c *Controller) ScaleKotsadmRqlite(ctx context.Context, ns string, desiredS
 
 	c.Log.Infof("Scaling kotsadm-rqlite Statefulset to %d replicas", desiredScale)
 
-	kotsadmRqliteSts.Spec.Replicas = pointer.Int32Ptr(desiredScale)
+	kotsadmRqliteSts.Spec.Replicas = pointer.Int32(desiredScale)
 
 	for i, arg := range kotsadmRqliteSts.Spec.Template.Spec.Containers[0].Args {
 		if strings.HasPrefix(arg, "-bootstrap-expect") {
