@@ -1,6 +1,15 @@
 ---
 version: 2
 updates:
+  - package-ecosystem: "gomod"
+    directory: "/"
+    labels:
+      - "dependencies"
+      - "go"
+      - "type::chore"
+    schedule:
+      interval: "weekly"
+
   - package-ecosystem: "github-actions"
     directory: "/"
     labels:
