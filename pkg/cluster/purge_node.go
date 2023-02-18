@@ -228,11 +228,12 @@ func (c *Controller) removeKubeadmEndpoint(ctx context.Context, name string) (st
 }
 
 type k8s121ClusterStatus struct {
-	metav1.TypeMeta
-	APIEndpoints map[string]k8s121APIEndpoint
+	Kind         string                       `yaml:"kind"`
+	APIVersion   string                       `yaml:"apiVersion"`
+	APIEndpoints map[string]k8s121APIEndpoint `yaml:"apiEndpoints"`
 }
 
 type k8s121APIEndpoint struct {
-	AdvertiseAddress string
-	BindPort         int32
+	AdvertiseAddress string `yaml:"advertiseAddress"`
+	BindPort         int32  `yaml:"bindPort"`
 }
