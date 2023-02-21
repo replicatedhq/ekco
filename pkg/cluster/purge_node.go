@@ -10,7 +10,6 @@ import (
 	"gopkg.in/yaml.v2"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	k8syaml "k8s.io/apimachinery/pkg/util/yaml"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
@@ -105,13 +104,15 @@ func (c *Controller) PurgeNode(ctx context.Context, name string, rook bool, rook
 		// The following error cannot be faced in upper versions.
 		// We are adding here the steps to fix it manually.
 		// More info: https://github.com/rook/rook/issues/2262#issuecomment-460898915
-		if rookVersion.LT(semver.MustParse("1.4.9")) {
-			c.Log.Warnf("The Rook version used is %s and it is recommended to update the Rook version. \n"+
-				"More info: https://kurl.sh/docs/install-with-kurl/managing-nodes#rook-ceph-cluster-prerequisites \n"+
-				"It's worth noting that using this version of Rook to manage nodes may result in an unhealthy Ceph cluster.\n"+
-				"If new nodes are added, it is recommended to check the status of Ceph (using the command 'kubectl -n rook-ceph exec deployment.apps/rook-ceph-operator -- ceph status'). \n"+
-				"If Ceph is found to be unhealthy, please check the topic: \n"+
-				"https://community.replicated.com/t/managing-nodes-when-the-previous-rook-version-is-in-use-might-leave-ceph-in-an-unhealthy-state-where-mon-pods-are-not-rescheduled/1099", rookVersion)
+		if rookVersion != nil {
+			if rookVersion.LT(semver.MustParse("1.4.9")) {
+				c.Log.Warnf("The Rook version used is %s and it is recommended to update the Rook version. \n"+
+					"More info: https://kurl.sh/docs/install-with-kurl/managing-nodes#rook-ceph-cluster-prerequisites \n"+
+					"It's worth noting that using this version of Rook to manage nodes may result in an unhealthy Ceph cluster.\n"+
+					"If new nodes are added, it is recommended to check the status of Ceph (using the command 'kubectl -n rook-ceph exec deployment.apps/rook-ceph-operator -- ceph status'). \n"+
+					"If Ceph is found to be unhealthy, please check the topic: \n"+
+					"https://community.replicated.com/t/managing-nodes-when-the-previous-rook-version-is-in-use-might-leave-ceph-in-an-unhealthy-state-where-mon-pods-are-not-rescheduled/1099", rookVersion)
+			}
 		}
 	}
 
@@ -182,7 +183,6 @@ func (c *Controller) deleteK8sNode(ctx context.Context, name string) error {
 func (c *Controller) removeKubeadmEndpoint(ctx context.Context, name string) (string, []string, error) {
 	var ip string
 	var remainingIPs []string
-	var clusterStatus k8s121ClusterStatus
 
 	cm, err := c.Config.Client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(ctx, kubeadmconstants.KubeadmConfigConfigMap, metav1.GetOptions{})
 	if err != nil {
@@ -194,20 +194,20 @@ func (c *Controller) removeKubeadmEndpoint(ctx context.Context, name string) (st
 		return "", nil, nil
 	}
 
-	clusterStatus = k8s121ClusterStatus{}
-
-	if err := k8syaml.Unmarshal([]byte(cm.Data[clusterStatusConfigMapKey]), &clusterStatus); err != nil {
-		return "", nil, errors.Wrap(err, "unmarshal kubeadm-config ClusterStatus")
+	clusterStatus, err := unmarshalClusterStatus([]byte(cm.Data[clusterStatusConfigMapKey]))
+	if err != nil {
+		return "", nil, err
 	}
 
-	if clusterStatus.APIEndpoints == nil {
-		clusterStatus.APIEndpoints = map[string]k8s121APIEndpoint{}
+	apiEndpoints := clusterStatus.apiEndpoints()
+	if apiEndpoints == nil {
+		apiEndpoints = map[string]k8s121APIEndpoint{}
 	}
-	apiEndpoint, found := clusterStatus.APIEndpoints[name]
+	endpoint, found := apiEndpoints[name]
 	if found {
-		ip = apiEndpoint.AdvertiseAddress
-		delete(clusterStatus.APIEndpoints, name)
-		clusterStatusYaml, err := yaml.Marshal(clusterStatus)
+		ip = endpoint.advertiseAddress()
+		delete(apiEndpoints, name)
+		clusterStatusYaml, err := marshalClusterStatus(clusterStatus)
 		if err != nil {
 			return "", nil, err
 		}
@@ -220,20 +220,163 @@ func (c *Controller) removeKubeadmEndpoint(ctx context.Context, name string) (st
 		c.Log.Infof("Purge node %q: kubeadm-config API endpoint removed", name)
 	}
 
-	for _, apiEndpoint := range clusterStatus.APIEndpoints {
-		remainingIPs = append(remainingIPs, apiEndpoint.AdvertiseAddress)
+	for _, endpoint := range apiEndpoints {
+		remainingIPs = append(remainingIPs, endpoint.advertiseAddress())
 	}
 
 	return ip, remainingIPs, nil
 }
 
+// unmarshalClusterStatus takes a raw kubeadm.k8s.io/v1beta2 ClusterStatus config yaml
+// and converts it to a k8s121ClusterStatus object
+// NB: A previous commit (https://github.com/replicatedhq/ekco/commit/f3884ddafbde034e3b46d0c9a5b96b9a797cba6a)
+// introduced a bug where the kubeadm ClusterStatus config was being written as:
+// ---
+// apiendpoints:
+//
+//	rafael-kurl-ecko-purge-master:
+//	  advertiseaddress: 10.128.0.126
+//	  bindport: 6443
+//	rafael-kurl-ecko-purge-master-2:
+//	  advertiseaddress: 10.128.0.63
+//	  bindport: 6443
+//
+// typemeta:
+//
+//	apiversion: kubeadm.k8s.io/v1beta2
+//	kind: ClusterStatus
+//
+// unmarshalClusterStatus() will still decode the aforementioned erroneous YAML document
+func unmarshalClusterStatus(data []byte) (*k8s121ClusterStatus, error) {
+	clusterStatus := k8s121ClusterStatus{}
+	if err := yaml.Unmarshal([]byte(data), &clusterStatus); err != nil {
+		return nil, errors.Wrap(err, "failed to unmarshal kubeadm-config ClusterStatus")
+	}
+	return &clusterStatus, nil
+}
+
+// marshalClusterStatus takes a k8s121ClusterStatus object and converts it to a raw
+// kubeadm.k8s.io/v1beta2 ClusterStatus config YAML document
+// An example ClusterStatus config YAML:
+// ---
+// apiEndpoints:
+//
+//	rafael-kurl-ecko-purge-master:
+//	  advertiseAddress: 10.128.0.126
+//	  bindPort: 6443
+//	rafael-kurl-ecko-purge-master-2:
+//	  advertiseAddress: 10.128.0.63
+//	  bindPort: 6443
+//
+// apiVersion: kubeadm.k8s.io/v1beta2
+// kind: ClusterStatus
+func marshalClusterStatus(clusterStatus *k8s121ClusterStatus) ([]byte, error) {
+	// deepcopy map
+	apiEndpointsCopy := make(map[string]k8s121APIEndpoint)
+	csApiEndpoints := clusterStatus.apiEndpoints()
+	apiVersion := clusterStatus.apiVersion()
+	kind := clusterStatus.kind()
+
+	for k, v := range csApiEndpoints {
+		apiEndpointsCopy[k] = k8s121APIEndpoint{
+			AdvertiseAddress: v.advertiseAddress(),
+			BindPort:         v.bindPort(),
+		}
+	}
+
+	clusterStatusToWrite := k8s121ClusterStatus{
+		Kind:         kind,
+		APIVersion:   apiVersion,
+		APIEndpoints: apiEndpointsCopy,
+	}
+
+	clusterStatusYaml, err := yaml.Marshal(&clusterStatusToWrite)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to marshal kubeadm-config ClusterStatus")
+	}
+	return clusterStatusYaml, nil
+}
+
+// k8s121ClusterStatus represents a kubeadm.k8s.io/v1beta2 ClusterStatus config
+// It is used to decode the following YAML documents:
+// ---
+// apiendpoints:
+//
+//	rafael-kurl-ecko-purge-master:
+//	  advertiseaddress: 10.128.0.126
+//	  bindport: 6443
+//	rafael-kurl-ecko-purge-master-2:
+//	  advertiseaddress: 10.128.0.63
+//	  bindport: 6443
+//
+// typemeta:
+//
+//	apiversion: kubeadm.k8s.io/v1beta2
+//	kind: ClusterStatus
+//
+// ---
+// apiEndpoints:
+//
+//	rafael-kurl-ecko-purge-master:
+//	  advertiseAddress: 10.128.0.126
+//	  bindPort: 6443
+//	rafael-kurl-ecko-purge-master-2:
+//	  advertiseAddress: 10.128.0.63
+//	  bindPort: 6443
+//
+// apiVersion: kubeadm.k8s.io/v1beta2
+// kind: ClusterStatus
 type k8s121ClusterStatus struct {
-	Kind         string                       `yaml:"kind"`
-	APIVersion   string                       `yaml:"apiVersion"`
-	APIEndpoints map[string]k8s121APIEndpoint `yaml:"apiEndpoints"`
+	metav1.TypeMeta `yaml:",omitempty"`
+	Kind            string
+	APIVersion      string                       `yaml:"apiVersion"`
+	APIEndpoints    map[string]k8s121APIEndpoint `yaml:"apiEndpoints"`
+	APIEndpointsLC  map[string]k8s121APIEndpoint `yaml:"apiendpoints,omitempty"`
+}
+
+func (k k8s121ClusterStatus) kind() string {
+	kind := k.Kind
+	if k.TypeMeta.Kind != "" {
+		kind = k.TypeMeta.Kind
+	}
+	return kind
+}
+
+func (k k8s121ClusterStatus) apiVersion() string {
+	apiVersion := k.APIVersion
+	if k.TypeMeta.APIVersion != "" {
+		apiVersion = k.TypeMeta.APIVersion
+	}
+	return apiVersion
+}
+
+func (k k8s121ClusterStatus) apiEndpoints() map[string]k8s121APIEndpoint {
+	endpoints := k.APIEndpoints
+	if k.APIEndpointsLC != nil {
+		endpoints = k.APIEndpointsLC
+	}
+	return endpoints
 }
 
 type k8s121APIEndpoint struct {
-	AdvertiseAddress string `yaml:"advertiseAddress"`
-	BindPort         int32  `yaml:"bindPort"`
+	AdvertiseAddress   string `yaml:"advertiseAddress"`
+	AdvertiseAddressLC string `yaml:"advertiseaddress,omitempty"`
+	BindPort           int32  `yaml:"bindPort"`
+	BindPortLC         int32  `yaml:"bindport,omitempty"`
+}
+
+func (k k8s121APIEndpoint) advertiseAddress() string {
+	advertiseAddress := k.AdvertiseAddress
+	if k.AdvertiseAddressLC != "" {
+		advertiseAddress = k.AdvertiseAddressLC
+	}
+	return advertiseAddress
+}
+
+func (k k8s121APIEndpoint) bindPort() int32 {
+	port := k.BindPort
+	if k.BindPortLC != 0 {
+		port = k.BindPortLC
+	}
+	return port
 }
