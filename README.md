@@ -16,11 +16,11 @@ This method is very much out of sync and doesn't work.  The current best way to 
 modify the deployment to pull the docker container produced as part of development.
 
 Steps
-1. **make build-ttl.sh** - Build the docker container for the current developement environment and deploy it to ttl.sh
+1. **make build-ttl.sh** - Build the docker container for the current development environment and deploy it to ttl.sh
 2. Deploy a kurl cluster that includes ecko and any other requirements for testing.
 3. **kubectl edit -n kurl deployment/ekc-operator**
    1. Replace .spec.image with your ttl.sh image
-   2. Replace .spec.imagePullPolicy with "Always" 
+   2. Replace .spec.imagePullPolicy with "Always"
    3. **kubectl delete pod -l app=ekc-operator -n kurl** - Delete the pod in the deployment to pull the new image
 
 
