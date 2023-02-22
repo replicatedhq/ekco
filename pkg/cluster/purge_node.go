@@ -220,6 +220,38 @@ func (c *Controller) removeKubeadmEndpoint(ctx context.Context, name string) (st
 		c.Log.Infof("Purge node %q: kubeadm-config API endpoint removed", name)
 	}
 
+	// Detect a previously written malformed ClusterStatus config
+	// The malformed ClusterStatus YAML had all of its keys in lowercase. For exmaple:
+	// ---
+	// apiendpoints:
+	//
+	//	rafael-kurl-ecko-purge-master:
+	//	  advertiseaddress: 10.128.0.126
+	//	  bindport: 6443
+	//	rafael-kurl-ecko-purge-master-2:
+	//	  advertiseaddress: 10.128.0.63
+	//	  bindport: 6443
+	//
+	// typemeta:
+	//
+	//	apiversion: kubeadm.k8s.io/v1beta2
+	//	kind: ClusterStatus
+	//
+	if !found && clusterStatus.isMalformed() {
+		c.Log.Infof("Updating ClusterStatus config in %s configmap since it was malformed", kubeadmconstants.KubeadmConfigConfigMap)
+		validClusterStatusYaml, err := marshalClusterStatus(clusterStatus)
+		if err != nil {
+			return "", nil, errors.Wrap(err, "failed to marshal ClusterStatus")
+		}
+
+		// update configmap with valid ClusterStatus YAML
+		cm.Data[clusterStatusConfigMapKey] = string(validClusterStatusYaml)
+		_, err = c.Config.Client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Update(ctx, cm, metav1.UpdateOptions{})
+		if err != nil {
+			return "", nil, errors.Wrap(err, "failed to update kube-system kubeadm-config ConfigMap")
+		}
+	}
+
 	for _, endpoint := range apiEndpoints {
 		remainingIPs = append(remainingIPs, endpoint.advertiseAddress())
 	}
@@ -356,6 +388,10 @@ func (k k8s121ClusterStatus) apiEndpoints() map[string]k8s121APIEndpoint {
 		endpoints = k.APIEndpointsLC
 	}
 	return endpoints
+}
+
+func (k k8s121ClusterStatus) isMalformed() bool {
+	return k.TypeMeta.Kind != "" || k.TypeMeta.APIVersion != ""
 }
 
 type k8s121APIEndpoint struct {

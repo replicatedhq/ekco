@@ -133,6 +133,52 @@ apiEndpoints:
 				Data:     map[string]string{},
 			},
 		},
+		{
+			name: "when ClusterStatus is malformed then correct it as a no-op update (side effect)",
+			clusterResources: []runtime.Object{
+				&corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      kubeadmconstants.KubeadmConfigConfigMap,
+						Namespace: metav1.NamespaceSystem,
+					},
+					TypeMeta: metav1.TypeMeta{},
+					Data: map[string]string{
+						clusterStatusConfigMapKey: `
+apiendpoints:
+  master-test-1:
+    advertiseaddress: 10.128.0.126
+    bindport: 6443
+  master-test-2:
+    advertiseaddress: 10.128.0.63
+    bindport: 6443
+typemeta:
+  kind: ClusterStatus
+  apiversion: kubeadm.k8s.io/v1beta2
+`,
+					},
+				},
+			},
+			expectedRemainingIPs: []string{"10.128.0.126", "10.128.0.63"},
+			expectedConfigMap: corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      kubeadmconstants.KubeadmConfigConfigMap,
+					Namespace: metav1.NamespaceSystem,
+				},
+				TypeMeta: metav1.TypeMeta{},
+				Data: map[string]string{
+					clusterStatusConfigMapKey: `kind: ClusterStatus
+apiVersion: kubeadm.k8s.io/v1beta2
+apiEndpoints:
+  master-test-1:
+    advertiseAddress: 10.128.0.126
+    bindPort: 6443
+  master-test-2:
+    advertiseAddress: 10.128.0.63
+    bindPort: 6443
+`,
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
