@@ -10,8 +10,8 @@ require (
 	github.com/google/martian v2.1.0+incompatible
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/pkg/errors v0.9.1
-	github.com/projectcontour/contour v1.24.1
-	github.com/rook/rook v1.10.6
+	github.com/projectcontour/contour v1.24.2
+	github.com/rook/rook v1.11.2
 	github.com/spf13/cobra v1.6.1
 	github.com/spf13/viper v1.15.0
 	github.com/stretchr/testify v1.8.2
@@ -40,7 +40,7 @@ require (
 	github.com/coreos/go-systemd v0.0.0-20191104093116-d3cd4ed1dbcf // indirect
 	github.com/coreos/pkg v0.0.0-20220810130054-c7d1c02cb6cf // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
-	github.com/emicklei/go-restful/v3 v3.9.0 // indirect
+	github.com/emicklei/go-restful/v3 v3.10.0 // indirect
 	github.com/evanphx/json-patch v5.6.0+incompatible // indirect
 	github.com/evanphx/json-patch/v5 v5.6.0 // indirect
 	github.com/fatih/color v1.13.0 // indirect
@@ -79,7 +79,7 @@ require (
 	github.com/hashicorp/golang-lru v0.5.4 // indirect
 	github.com/hashicorp/hcl v1.0.1-vault-5 // indirect
 	github.com/hashicorp/vault v1.12.5 // indirect
-	github.com/hashicorp/vault/api v1.8.1 // indirect
+	github.com/hashicorp/vault/api v1.8.2 // indirect
 	github.com/hashicorp/vault/api/auth/approle v0.3.0 // indirect
 	github.com/hashicorp/vault/sdk v0.6.1-0.20230302210543-38f40f637f4f // indirect
 	github.com/hashicorp/yamux v0.1.1 // indirect
@@ -88,7 +88,7 @@ require (
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/klauspost/cpuid/v2 v2.0.9 // indirect
-	github.com/kube-object-storage/lib-bucket-provisioner v0.0.0-20221103224036-07dde5c41fdd // indirect
+	github.com/kube-object-storage/lib-bucket-provisioner v0.0.0-20221122204822-d1a8c34382f1 // indirect
 	github.com/leodido/go-urn v1.2.1 // indirect
 	github.com/libopenstorage/secrets v0.0.0-20220823020833-2ecadaf59d8a // indirect
 	github.com/magiconair/properties v1.8.7 // indirect
@@ -132,11 +132,11 @@ require (
 	go.uber.org/multierr v1.8.0 // indirect
 	golang.org/x/arch v0.0.0-20210923205945-b76863e36670 // indirect
 	golang.org/x/crypto v0.6.0 // indirect
-	golang.org/x/net v0.7.0 // indirect
+	golang.org/x/net v0.8.0 // indirect
 	golang.org/x/oauth2 v0.4.0 // indirect
-	golang.org/x/sys v0.5.0 // indirect
-	golang.org/x/term v0.5.0 // indirect
-	golang.org/x/text v0.7.0 // indirect
+	golang.org/x/sys v0.6.0 // indirect
+	golang.org/x/term v0.6.0 // indirect
+	golang.org/x/text v0.8.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.2.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
