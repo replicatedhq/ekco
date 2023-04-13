@@ -14,6 +14,7 @@ import (
 	"github.com/replicatedhq/ekco/pkg/ekcoops"
 	"github.com/replicatedhq/ekco/pkg/internallb"
 	"github.com/replicatedhq/ekco/pkg/logger"
+	"github.com/replicatedhq/ekco/pkg/server"
 	"github.com/replicatedhq/ekco/pkg/version"
 	"github.com/replicatedhq/ekco/pkg/webhook"
 	"github.com/spf13/cobra"
@@ -71,6 +72,8 @@ func OperatorCmd(v *viper.Viper) *cobra.Command {
 					return errors.Wrap(err, "delete webhook config")
 				}
 			}
+
+			go server.Serve(*config, clusterController.Config.Client)
 
 			operator := ekcoops.New(*config, clusterController.Config.Client, clusterController, log)
 
