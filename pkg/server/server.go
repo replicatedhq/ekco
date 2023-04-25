@@ -3,6 +3,8 @@ package server
 import (
 	"context"
 	"fmt"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	apitypes "k8s.io/apimachinery/pkg/types"
 	"log"
 	"net/http"
 	"sync"
@@ -70,6 +72,8 @@ func migrateStorage(config ekcoops.Config, client kubernetes.Interface) {
 		return
 	}
 
+	// TODO: pause the operator loop
+
 	migrationStatus = MIGRATION_STATUS_OBJECTSTORE
 	err := migrateObjectStorage(config, client)
 	if err != nil {
@@ -89,29 +93,98 @@ func migrateStorage(config ekcoops.Config, client kubernetes.Interface) {
 	migrationStatus = MIGRATION_STATUS_COMPLETED
 }
 
+// TODO move to 'minio' package, call from 'cluster' too
+func isMinioInUse(config ekcoops.Config, client kubernetes.Interface) (bool, error) {
+	// if the minio NS does not exist, it is not in use
+	_, err := client.CoreV1().Namespaces().Get(context.TODO(), config.MinioNamespace, metav1.GetOptions{})
+	if err != nil {
+		if k8serrors.IsNotFound(err) {
+			return false, nil
+		} else {
+			return false, fmt.Errorf("failed to get minio namespace %s: %v", config.MinioNamespace, err)
+		}
+	}
+
+	// if the minio deployment and statefulset do not exist, there is nothing to migrate
+	_, err = client.AppsV1().Deployments(config.MinioNamespace).Get(context.TODO(), "minio", metav1.GetOptions{})
+	if err == nil {
+		return true, nil
+	} else {
+		if !k8serrors.IsNotFound(err) {
+			return false, fmt.Errorf("failed to get minio deployment in %s: %v", config.MinioNamespace, err)
+		}
+	}
+
+	_, err = client.AppsV1().StatefulSets(config.MinioNamespace).Get(context.TODO(), "ha-minio", metav1.GetOptions{})
+	if err != nil {
+		if k8serrors.IsNotFound(err) {
+			return false, nil
+		} else {
+			return false, fmt.Errorf("failed to get minio statefulset in %s: %v", config.MinioNamespace, err)
+		}
+	}
+
+	return true, nil
+}
+
 // check if minio is in use
 // if so, disable the minio service to prevent race conditions with files being updated during the migration
 // then, migrate all data from minio to rook
-// then, delete the minio namespace and contents
+// then, update secrets in the cluster to point to the new rook object store
+// finally, delete the minio namespace and contents
+// TODO factor out, call from cluster package too
 func migrateObjectStorage(config ekcoops.Config, client kubernetes.Interface) error {
-	// TODO: check if minio is in use
+	minioInUse, err := isMinioInUse(config, client)
+	if err != nil {
+		return fmt.Errorf("failed to check if minio is in use: %v", err)
+	}
+	if !minioInUse {
+		return nil
+	}
 
-	// TODO: replace with actual, live minio creds
+	// discover the IP address of the existing minio pod to migrate from
+	minioPodIP := ""
+	minioPods, err := client.CoreV1().Pods(config.MinioNamespace).List(context.TODO(), metav1.ListOptions{LabelSelector: "app=minio"})
+	if err != nil {
+		return fmt.Errorf("list minio pods: %w", err)
+	}
+	if len(minioPods.Items) == 0 {
+		return fmt.Errorf("unable to find existing minio pod to migrate from")
+	}
+	minioPodIP = minioPods.Items[0].Status.PodIP
+
+	// get the minio credentials to be used for the migration
+	credentialSecret, err := client.CoreV1().Secrets(config.MinioNamespace).Get(context.TODO(), "minio-credentials", metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("retrieve minio credentials: %w", err)
+	}
+
+	minioAccessKey := string(credentialSecret.Data["MINIO_ACCESS_KEY"])
+	minioSecretKey := string(credentialSecret.Data["MINIO_SECRET_KEY"])
+
+	// TODO: replace with actual, live rook creds
 	endpoint := "play.min.io"
 	accessKeyID := "Q3AM3UQ867SPQQA43P2F"
 	secretAccessKey := "zuf+tfteSlswRu7BJ86wekitnifILbZam1KYY3TG"
-	// TODO: rook creds
 
-	// TODO: disable minio service
+	// disable minio service
+	doesNotExistSelector := `
+[ { "op": "replace", "path": "/spec/selector", "value": {"doesnotexist": "doesnotexist"} } ]
+`
+	_, err = client.CoreV1().Services(config.MinioNamespace).Patch(context.TODO(), "minio", apitypes.JSONPatchType, []byte(doesNotExistSelector), metav1.PatchOptions{})
+	if err != nil {
+		return fmt.Errorf("disable existing minio service: %w", err)
+	}
 
 	// Initialize minio client object.
-	minioClient, err := minio.New(endpoint, &minio.Options{
-		Creds: credentials.NewStaticV4(accessKeyID, secretAccessKey, ""),
+	minioClient, err := minio.New(fmt.Sprintf("%s:9000", minioPodIP), &minio.Options{
+		Creds: credentials.NewStaticV4(minioAccessKey, minioSecretKey, ""),
 	})
 	if err != nil {
 		return fmt.Errorf("failed to initialize minio client: %v", err)
 	}
 
+	// Initialize rook client object.
 	rookClient, err := minio.New(endpoint, &minio.Options{
 		Creds: credentials.NewStaticV4(accessKeyID, secretAccessKey, ""),
 	})
@@ -132,7 +205,23 @@ func migrateObjectStorage(config ekcoops.Config, client kubernetes.Interface) er
 		migrationLogs += fmt.Sprintf("synced %s objects in bucket %s\n", numObjects, bucket.Name)
 	}
 
-	// TODO: delete minio
+	// TODO update secrets in the cluster to point to the new rook object store
+	return nil
+
+	err = client.AppsV1().StatefulSets(config.MinioNamespace).Delete(context.TODO(), "ha-minio", metav1.DeleteOptions{})
+	if err != nil && !k8serrors.IsNotFound(err) {
+		return fmt.Errorf("failed to delete minio statefulset: %v", err)
+	}
+
+	err = client.AppsV1().Deployments(config.MinioNamespace).Delete(context.TODO(), "minio", metav1.DeleteOptions{})
+	if err != nil && !k8serrors.IsNotFound(err) {
+		return fmt.Errorf("failed to delete minio deployment: %v", err)
+	}
+
+	err = client.CoreV1().Namespaces().Delete(context.TODO(), config.MinioNamespace, metav1.DeleteOptions{})
+	if err != nil && !k8serrors.IsNotFound(err) {
+		return fmt.Errorf("failed to delete minio namespace: %v", err)
+	}
 
 	return nil
 }
@@ -148,7 +237,7 @@ func syncBucket(ctx context.Context, src *minio.Client, dst *minio.Client, bucke
 		return count, fmt.Errorf("Failed to check if bucket %q exists in destination: %v", bucket, err)
 	}
 	if !exists {
-		if err := dst.MakeBucket(ctx, bucket, ""); err != nil {
+		if err := dst.MakeBucket(ctx, bucket, minio.MakeBucketOptions{}); err != nil {
 			return count, fmt.Errorf("Failed to make bucket %q in destination: %v", bucket, err)
 		}
 	}
