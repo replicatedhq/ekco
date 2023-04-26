@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"regexp"
+	"strings"
 	"sync"
 
 	"github.com/minio/minio-go/v7"
@@ -324,12 +325,20 @@ func syncBucket(ctx context.Context, src *minio.Client, dst *minio.Client, bucke
 
 	exists, err := dst.BucketExists(ctx, bucket)
 	if err != nil {
-		return count, fmt.Errorf("Failed to check if bucket %q exists in destination: %v", bucket, err)
+		return count, fmt.Errorf("failed to check if bucket %q exists in destination: %v", bucket, err)
 	}
 	if !exists {
 		if err := dst.MakeBucket(ctx, bucket, minio.MakeBucketOptions{}); err != nil {
-			return count, fmt.Errorf("Failed to make bucket %q in destination: %v", bucket, err)
+			return count, fmt.Errorf("failed to make bucket %q in destination: %v", bucket, err)
 		}
+	}
+
+	_, err = dst.PutObject(ctx, bucket, "test", strings.NewReader("test"), 4, minio.PutObjectOptions{
+		ContentType:     "text/plain",
+		ContentEncoding: "utf-8",
+	})
+	if err != nil {
+		return count, fmt.Errorf("failed to put test object in destination: %v", err)
 	}
 
 	srcObjectInfoChan := src.ListObjects(ctx, bucket, minio.ListObjectsOptions{})
@@ -337,7 +346,7 @@ func syncBucket(ctx context.Context, src *minio.Client, dst *minio.Client, bucke
 	for srcObjectInfo := range srcObjectInfoChan {
 		srcObject, err := src.GetObject(ctx, bucket, srcObjectInfo.Key, minio.GetObjectOptions{})
 		if err != nil {
-			return count, fmt.Errorf("Get %s from source: %v", srcObjectInfo.Key, err)
+			return count, fmt.Errorf("get %s from source: %v", srcObjectInfo.Key, err)
 		}
 
 		_, err = dst.PutObject(ctx, bucket, srcObjectInfo.Key, srcObject, srcObjectInfo.Size, minio.PutObjectOptions{
