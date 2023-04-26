@@ -74,6 +74,8 @@ func migrateStorage(config ekcoops.Config, client kubernetes.Interface) {
 		return
 	}
 
+	fmt.Printf("starting storage migration\n")
+
 	// TODO: pause the operator loop
 
 	migrationStatus = MIGRATION_STATUS_OBJECTSTORE
@@ -84,6 +86,8 @@ func migrateStorage(config ekcoops.Config, client kubernetes.Interface) {
 		return
 	}
 
+	fmt.Printf("starting pvmigrate\n")
+
 	migrationStatus = MIGRATION_STATUS_PVCMIGRATE
 	err = migrateStorageClasses(config, client)
 	if err != nil {
@@ -91,6 +95,8 @@ func migrateStorage(config ekcoops.Config, client kubernetes.Interface) {
 		migrationLogs = fmt.Sprintf("failed to migrate storage classes: %v", err)
 		return
 	}
+
+	fmt.Printf("storage migration completed\n")
 
 	migrationStatus = MIGRATION_STATUS_COMPLETED
 }
@@ -202,12 +208,15 @@ func migrateObjectStorage(config ekcoops.Config, client kubernetes.Interface) er
 		return fmt.Errorf("failed to initialize rook client: %v", err)
 	}
 
+	fmt.Printf("determining buckets to migrate\n")
+
 	minioBuckets, err := minioClient.ListBuckets(context.TODO())
 	if err != nil {
 		return fmt.Errorf("failed to list minio buckets: %v", err)
 	}
 
 	for _, bucket := range minioBuckets {
+		fmt.Printf("migrating bucket %s\n", bucket.Name)
 		numObjects, err := syncBucket(context.TODO(), minioClient, rookClient, bucket.Name)
 		if err != nil {
 			return fmt.Errorf("failed to sync bucket %s: %v", bucket.Name, err)
@@ -216,6 +225,7 @@ func migrateObjectStorage(config ekcoops.Config, client kubernetes.Interface) er
 	}
 
 	// update secrets in the cluster to point to the new rook object store
+	fmt.Printf("updating secrets in the cluster to point to the new rook object store\n")
 
 	// if kubernetes_resource_exists default secret kotsadm-s3
 	kotsadmS3, err := client.CoreV1().Secrets("default").Get(context.TODO(), "kotsadm-s3", metav1.GetOptions{})
