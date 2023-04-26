@@ -292,7 +292,7 @@ func migrateObjectStorage(config ekcoops.Config, client kubernetes.Interface) er
 			return fmt.Errorf("failed to update registry-s3-secret secret in kurl namespace: %v", err)
 		}
 
-		err = util.RestartDeployment(context.TODO(), client, "registry", "kurl")
+		err = util.RestartDeployment(context.TODO(), client, "kurl", "registry")
 		if err != nil {
 			return fmt.Errorf("failed to restart registry deployment after migrating object store: %v", err)
 		}
@@ -350,8 +350,7 @@ func syncBucket(ctx context.Context, src *minio.Client, dst *minio.Client, bucke
 		})
 		_ = srcObject.Close()
 		if err != nil {
-			fmt.Printf("failed to copy object %s to destination: %v\n", srcObjectInfo.Key, err)
-			//return count, fmt.Errorf("failed to copy object %s to destination: %v", srcObjectInfo.Key, err)
+			return count, fmt.Errorf("failed to copy object %s to destination: %v", srcObjectInfo.Key, err)
 		} else {
 			fmt.Printf("copied object %s to destination\n", srcObjectInfo.Key)
 		}
