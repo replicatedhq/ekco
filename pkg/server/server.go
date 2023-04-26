@@ -221,7 +221,7 @@ func migrateObjectStorage(config ekcoops.Config, client kubernetes.Interface) er
 		if err != nil {
 			return fmt.Errorf("failed to sync bucket %s: %v", bucket.Name, err)
 		}
-		migrationLogs += fmt.Sprintf("synced %s objects in bucket %s\n", numObjects, bucket.Name)
+		migrationLogs += fmt.Sprintf("synced %d objects in bucket %s\n", numObjects, bucket.Name)
 	}
 
 	// update secrets in the cluster to point to the new rook object store
@@ -344,9 +344,9 @@ func syncBucket(ctx context.Context, src *minio.Client, dst *minio.Client, bucke
 			ContentType:     srcObjectInfo.ContentType,
 			ContentEncoding: srcObjectInfo.Metadata.Get("Content-Encoding"),
 		})
-		srcObject.Close()
+		_ = srcObject.Close()
 		if err != nil {
-			return count, fmt.Errorf("Failed to copy object %s to destination: %v", srcObjectInfo.Key, err)
+			return count, fmt.Errorf("failed to copy object %s to destination: %v", srcObjectInfo.Key, err)
 		}
 
 		count++
