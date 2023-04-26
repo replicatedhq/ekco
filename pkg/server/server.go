@@ -3,17 +3,19 @@ package server
 import (
 	"context"
 	"fmt"
-	k8serrors "k8s.io/apimachinery/pkg/api/errors"
-	apitypes "k8s.io/apimachinery/pkg/types"
 	"log"
 	"net/http"
+	"regexp"
 	"sync"
 
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 	"github.com/replicatedhq/ekco/pkg/ekcoops"
+	"github.com/replicatedhq/ekco/pkg/util"
 	"github.com/replicatedhq/pvmigrate/pkg/migrate"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 )
 
@@ -162,10 +164,18 @@ func migrateObjectStorage(config ekcoops.Config, client kubernetes.Interface) er
 	minioAccessKey := string(credentialSecret.Data["MINIO_ACCESS_KEY"])
 	minioSecretKey := string(credentialSecret.Data["MINIO_SECRET_KEY"])
 
-	// TODO: replace with actual, live rook creds
-	endpoint := "play.min.io"
-	accessKeyID := "Q3AM3UQ867SPQQA43P2F"
-	secretAccessKey := "zuf+tfteSlswRu7BJ86wekitnifILbZam1KYY3TG"
+	rookService, err := client.CoreV1().Services("rook-ceph").Get(context.TODO(), "rook-ceph-rgw-rook-ceph-store", metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("retrieve rook object store endpoint: %w", err)
+	}
+	rookEndpoint := rookService.Spec.ClusterIP
+
+	rookSecret, err := client.CoreV1().Secrets("rook-ceph").Get(context.TODO(), "rook-ceph-object-user-rook-ceph-store-kurl", metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("retrieve rook object store credentials: %w", err)
+	}
+	rookAccessKey := string(rookSecret.Data["AccessKey"])
+	rookSecretKey := string(rookSecret.Data["SecretKey"])
 
 	// disable minio service
 	doesNotExistSelector := `
@@ -185,8 +195,8 @@ func migrateObjectStorage(config ekcoops.Config, client kubernetes.Interface) er
 	}
 
 	// Initialize rook client object.
-	rookClient, err := minio.New(endpoint, &minio.Options{
-		Creds: credentials.NewStaticV4(accessKeyID, secretAccessKey, ""),
+	rookClient, err := minio.New(rookEndpoint, &minio.Options{
+		Creds: credentials.NewStaticV4(rookAccessKey, rookSecretKey, ""),
 	})
 	if err != nil {
 		return fmt.Errorf("failed to initialize rook client: %v", err)
@@ -205,7 +215,7 @@ func migrateObjectStorage(config ekcoops.Config, client kubernetes.Interface) er
 		migrationLogs += fmt.Sprintf("synced %s objects in bucket %s\n", numObjects, bucket.Name)
 	}
 
-	// TODO update secrets in the cluster to point to the new rook object store
+	// update secrets in the cluster to point to the new rook object store
 
 	// if kubernetes_resource_exists default secret kotsadm-s3
 	kotsadmS3, err := client.CoreV1().Secrets("default").Get(context.TODO(), "kotsadm-s3", metav1.GetOptions{})
@@ -215,23 +225,68 @@ func migrateObjectStorage(config ekcoops.Config, client kubernetes.Interface) er
 		}
 	}
 	if kotsadmS3 != nil {
-		kotsadmS3.Data["access-key-id"] = []byte(accessKeyID)
-		kotsadmS3.Data["secret-access-key"] = []byte(secretAccessKey)
+		kotsadmS3.Data["access-key-id"] = []byte(rookAccessKey)
+		kotsadmS3.Data["secret-access-key"] = []byte(rookSecretKey)
 		kotsadmS3.Data["endpoint"] = []byte("http://rook-ceph-rgw-rook-ceph-store.rook-ceph")
-		kotsadmS3.Data["object-store-cluster-ip"] = []byte("") // TODO
+		kotsadmS3.Data["object-store-cluster-ip"] = []byte(rookEndpoint)
 
 		_, err = client.CoreV1().Secrets("default").Update(context.TODO(), kotsadmS3, metav1.UpdateOptions{})
 		if err != nil {
 			return fmt.Errorf("failed to update kotsadm-s3 secret in default namespace: %v", err)
 		}
-		// TODO restart kotsadm pod (deployment or statefulset)
+
+		err = util.RestartDeployment(context.TODO(), client, "default", "kotsadm")
+		if err != nil {
+			return fmt.Errorf("failed to restart kotsadm deployment after migrating object store: %v", err)
+		}
+		err = util.RestartStatefulset(context.TODO(), client, "default", "kotsadm")
+		if err != nil {
+			return fmt.Errorf("failed to restart kotsadm statefulset after migrating object store: %v", err)
+		}
 	}
 
-	// if kubernetes_resource_exists kurl configmap registry-config
+	// if the 'registry-config' configmap and the 'registry-s3-secret' secret exists in the kurl namespace
+	registryConfig, err := client.CoreV1().ConfigMaps("kurl").Get(context.TODO(), "registry-config", metav1.GetOptions{})
+	if err != nil {
+		if !k8serrors.IsNotFound(err) {
+			return fmt.Errorf("failed to get registry-config configmap in kurl namespace: %v", err)
+		}
+	}
+	registrySecret, err := client.CoreV1().Secrets("kurl").Get(context.TODO(), "registry-s3-secret", metav1.GetOptions{})
+	if err != nil {
+		if !k8serrors.IsNotFound(err) {
+			return fmt.Errorf("failed to get registry-s3-secret secret in kurl namespace: %v", err)
+		}
+	}
+	if registryConfig != nil && registrySecret != nil {
+		existingConfig := registryConfig.Data["config.yml"]
+		newConfig := regexp.MustCompile(`regionendpoint: http.*`).ReplaceAllString(existingConfig, fmt.Sprintf("regionendpoint: http://%s/", "TODO ROOK OBJECT STORE CLUSTER IP"))
+		registryConfig.Data["config.yml"] = newConfig
 
-	// if kubernetes_resource_exists velero backupstoragelocation default
+		_, err = client.CoreV1().ConfigMaps("kurl").Update(context.TODO(), registryConfig, metav1.UpdateOptions{})
+		if err != nil {
+			return fmt.Errorf("failed to update registry-config configmap in kurl namespace: %v", err)
+		}
 
-	// if kubernetes_resource_exists velero secret cloud-credentials
+		registrySecret.StringData["access-key-id"] = rookAccessKey
+		registrySecret.StringData["secret-access-key"] = rookSecretKey
+		registrySecret.StringData["object-store-cluster-ip"] = rookEndpoint
+		registrySecret.StringData["object-store-hostname"] = "http://rook-ceph-rgw-rook-ceph-store.rook-ceph"
+
+		_, err = client.CoreV1().Secrets("kurl").Update(context.TODO(), registrySecret, metav1.UpdateOptions{})
+		if err != nil {
+			return fmt.Errorf("failed to update registry-s3-secret secret in kurl namespace: %v", err)
+		}
+
+		err = util.RestartDeployment(context.TODO(), client, "registry", "kurl")
+		if err != nil {
+			return fmt.Errorf("failed to restart registry deployment after migrating object store: %v", err)
+		}
+	}
+
+	// if kubernetes_resource_exists velero backupstoragelocation default TODO
+
+	// if kubernetes_resource_exists velero secret cloud-credentials TODO
 
 	err = client.AppsV1().StatefulSets(config.MinioNamespace).Delete(context.TODO(), "ha-minio", metav1.DeleteOptions{})
 	if err != nil && !k8serrors.IsNotFound(err) {
