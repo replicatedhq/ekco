@@ -6,7 +6,6 @@ import (
 	"log"
 	"net/http"
 	"regexp"
-	"strings"
 	"sync"
 
 	"github.com/minio/minio-go/v7"
@@ -333,14 +332,6 @@ func syncBucket(ctx context.Context, src *minio.Client, dst *minio.Client, bucke
 		}
 	}
 
-	_, err = dst.PutObject(ctx, bucket, "test", strings.NewReader("test"), 4, minio.PutObjectOptions{
-		ContentType:     "text/plain",
-		ContentEncoding: "utf-8",
-	})
-	if err != nil {
-		return count, fmt.Errorf("failed to put test object in destination: %v", err)
-	}
-
 	srcObjectInfoChan := src.ListObjects(ctx, bucket, minio.ListObjectsOptions{})
 
 	for srcObjectInfo := range srcObjectInfoChan {
@@ -355,7 +346,10 @@ func syncBucket(ctx context.Context, src *minio.Client, dst *minio.Client, bucke
 		})
 		_ = srcObject.Close()
 		if err != nil {
-			return count, fmt.Errorf("failed to copy object %s to destination: %v", srcObjectInfo.Key, err)
+			fmt.Printf("failed to copy object %s to destination: %v\n", srcObjectInfo.Key, err)
+			//			return count, fmt.Errorf("failed to copy object %s to destination: %v", srcObjectInfo.Key, err)
+		} else {
+			fmt.Printf("copied object %s to destination\n", srcObjectInfo.Key)
 		}
 
 		count++
