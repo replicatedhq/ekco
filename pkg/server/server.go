@@ -278,6 +278,10 @@ func migrateObjectStorage(config ekcoops.Config, client kubernetes.Interface) er
 			return fmt.Errorf("failed to update registry-config configmap in kurl namespace: %v", err)
 		}
 
+		if registrySecret.StringData == nil {
+			registrySecret.StringData = map[string]string{}
+		}
+
 		registrySecret.StringData["access-key-id"] = rookAccessKey
 		registrySecret.StringData["secret-access-key"] = rookSecretKey
 		registrySecret.StringData["object-store-cluster-ip"] = rookEndpoint
@@ -298,20 +302,20 @@ func migrateObjectStorage(config ekcoops.Config, client kubernetes.Interface) er
 
 	// if kubernetes_resource_exists velero secret cloud-credentials TODO
 
-	err = client.AppsV1().StatefulSets(config.MinioNamespace).Delete(context.TODO(), "ha-minio", metav1.DeleteOptions{})
-	if err != nil && !k8serrors.IsNotFound(err) {
-		return fmt.Errorf("failed to delete minio statefulset: %v", err)
-	}
-
-	err = client.AppsV1().Deployments(config.MinioNamespace).Delete(context.TODO(), "minio", metav1.DeleteOptions{})
-	if err != nil && !k8serrors.IsNotFound(err) {
-		return fmt.Errorf("failed to delete minio deployment: %v", err)
-	}
-
-	err = client.CoreV1().Namespaces().Delete(context.TODO(), config.MinioNamespace, metav1.DeleteOptions{})
-	if err != nil && !k8serrors.IsNotFound(err) {
-		return fmt.Errorf("failed to delete minio namespace: %v", err)
-	}
+	//err = client.AppsV1().StatefulSets(config.MinioNamespace).Delete(context.TODO(), "ha-minio", metav1.DeleteOptions{})
+	//if err != nil && !k8serrors.IsNotFound(err) {
+	//	return fmt.Errorf("failed to delete minio statefulset: %v", err)
+	//}
+	//
+	//err = client.AppsV1().Deployments(config.MinioNamespace).Delete(context.TODO(), "minio", metav1.DeleteOptions{})
+	//if err != nil && !k8serrors.IsNotFound(err) {
+	//	return fmt.Errorf("failed to delete minio deployment: %v", err)
+	//}
+	//
+	//err = client.CoreV1().Namespaces().Delete(context.TODO(), config.MinioNamespace, metav1.DeleteOptions{})
+	//if err != nil && !k8serrors.IsNotFound(err) {
+	//	return fmt.Errorf("failed to delete minio namespace: %v", err)
+	//}
 
 	return nil
 }
@@ -332,7 +336,7 @@ func syncBucket(ctx context.Context, src *minio.Client, dst *minio.Client, bucke
 		}
 	}
 
-	srcObjectInfoChan := src.ListObjects(ctx, bucket, minio.ListObjectsOptions{})
+	srcObjectInfoChan := src.ListObjects(ctx, bucket, minio.ListObjectsOptions{Recursive: true})
 
 	for srcObjectInfo := range srcObjectInfoChan {
 		srcObject, err := src.GetObject(ctx, bucket, srcObjectInfo.Key, minio.GetObjectOptions{})
@@ -347,7 +351,7 @@ func syncBucket(ctx context.Context, src *minio.Client, dst *minio.Client, bucke
 		_ = srcObject.Close()
 		if err != nil {
 			fmt.Printf("failed to copy object %s to destination: %v\n", srcObjectInfo.Key, err)
-			//			return count, fmt.Errorf("failed to copy object %s to destination: %v", srcObjectInfo.Key, err)
+			//return count, fmt.Errorf("failed to copy object %s to destination: %v", srcObjectInfo.Key, err)
 		} else {
 			fmt.Printf("copied object %s to destination\n", srcObjectInfo.Key)
 		}
