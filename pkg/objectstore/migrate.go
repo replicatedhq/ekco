@@ -45,6 +45,10 @@ func SyncAllBuckets(ctx context.Context, sourceEndpoint, sourceAccessKey, source
 	}
 
 	for _, bucket := range minioBuckets {
+		if logs != nil {
+			logs <- fmt.Sprintf("Syncing objects in %s", bucket.Name)
+		}
+
 		numObjects, err := syncBucket(ctx, minioClient, rookClient, bucket.Name)
 		if err != nil {
 			return fmt.Errorf("failed to sync bucket %s: %v", bucket.Name, err)

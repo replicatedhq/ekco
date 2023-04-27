@@ -166,7 +166,7 @@ func migrateObjectStorage(ctx context.Context, config ekcoops.Config, client kub
 			case <-ctx.Done():
 				return
 			case logLine := <-logsChan:
-				migrationLogs += logLine
+				migrationLogs += logLine + "\n"
 			}
 		}
 	}()
