@@ -221,6 +221,8 @@ func migrateStorageClasses(ctx context.Context, config ekcoops.Config, client ku
 
 	migrationStatus = MIGRATION_STATUS_PVCMIGRATE
 
+	// TODO: scale down prometheus-operator first
+
 	err := migrate.Migrate(ctx, fileLog, client, options)
 	if err != nil {
 		return fmt.Errorf("run pvmigrate: %v", err)
