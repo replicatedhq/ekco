@@ -121,7 +121,7 @@ func (c *Controller) MigrateMinioData(ctx context.Context, utilImage string, ns 
 		return fmt.Errorf("failed to enable minio service: %w", err)
 	}
 
-	// delete the minio deployment, pvc and the migration pod
+	// delete the minio deployment and pvc
 	err = c.Config.Client.AppsV1().Deployments(ns).Delete(ctx, "minio", metav1.DeleteOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to clean up minio deployment: %w", err)
@@ -130,27 +130,9 @@ func (c *Controller) MigrateMinioData(ctx context.Context, utilImage string, ns 
 	if err != nil {
 		return fmt.Errorf("failed to clean up minio pvc: %w", err)
 	}
-	backgroundProp := metav1.DeletePropagationBackground
-	err = c.Config.Client.BatchV1().Jobs(ns).Delete(ctx, "migrate-minio-ha", metav1.DeleteOptions{PropagationPolicy: &backgroundProp})
-	if err != nil {
-		return fmt.Errorf("failed to clean up minio migration job: %w", err)
-	}
 
 	c.Log.Infof("Successfully migrated to HA MinIO")
 	return nil
-}
-
-func (c *Controller) waitForJobCompletion(ctx context.Context, jobName string, jobNS string) error {
-	for {
-		runningJob, err := c.Config.Client.BatchV1().Jobs(jobNS).Get(ctx, jobName, metav1.GetOptions{})
-		if err != nil {
-			return fmt.Errorf("failed to get job %s in %s: %w", jobName, jobNS, err)
-		}
-		if runningJob.Status.Succeeded > 0 {
-			return nil
-		}
-		time.Sleep(time.Second * 5)
-	}
 }
 
 // MaybeRebalanceMinioServers
