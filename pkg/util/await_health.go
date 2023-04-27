@@ -31,16 +31,35 @@ func AwaitDeploymentReady(ctx context.Context, client kubernetes.Interface, name
 	}
 }
 
-// AwaitStatefulsetReady waits for a statefulset to have all replicas ready and available
-func AwaitStatefulsetReady(ctx context.Context, client kubernetes.Interface, namespace string, name string) error {
+// AwaitStatefulSetReady waits for a statefulset to have all replicas ready and available
+func AwaitStatefulSetReady(ctx context.Context, client kubernetes.Interface, namespace string, name string) error {
 	for {
-		ss, err := client.AppsV1().StatefulSets(namespace).Get(ctx, name, metav1.GetOptions{})
+		sts, err := client.AppsV1().StatefulSets(namespace).Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
 			return fmt.Errorf("failed to get StatefulSet %s in %s: %v", name, namespace, err)
 		}
-		if ss.Status.ReadyReplicas == ss.Status.Replicas &&
-			ss.Status.AvailableReplicas == ss.Status.Replicas &&
-			ss.Status.UpdatedReplicas == ss.Status.Replicas {
+		if sts.Status.ReadyReplicas == sts.Status.Replicas &&
+			sts.Status.AvailableReplicas == sts.Status.Replicas &&
+			sts.Status.UpdatedReplicas == sts.Status.Replicas {
+			return nil
+		}
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(time.Second):
+		}
+	}
+}
+
+// AwaitDaemonSetReady waits for a daemonset to have all replicas ready and available
+func AwaitDaemonSetReady(ctx context.Context, client kubernetes.Interface, namespace string, name string) error {
+	for {
+		ds, err := client.AppsV1().DaemonSets(namespace).Get(ctx, name, metav1.GetOptions{})
+		if err != nil {
+			return fmt.Errorf("failed to get StatefulSet %s in %s: %v", name, namespace, err)
+		}
+		if ds.Status.NumberUnavailable == 0 {
 			return nil
 		}
 

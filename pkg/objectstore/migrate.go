@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"strings"
 
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
@@ -64,7 +65,7 @@ func SyncAllBuckets(ctx context.Context, sourceEndpoint, sourceAccessKey, source
 
 // UpdateConsumers updates the access key and secret key for all consumers of the object store.
 // it handles kotsadm, registry, and velero.
-func UpdateConsumers(ctx context.Context, client kubernetes.Interface, endpoint, hostname, accessKey, secretKey string) error {
+func UpdateConsumers(ctx context.Context, client kubernetes.Interface, endpoint, hostname, accessKey, secretKey, originalSecretKey string) error {
 	// if kubernetes_resource_exists default secret kotsadm-s3
 	kotsadmS3, err := client.CoreV1().Secrets("default").Get(ctx, "kotsadm-s3", metav1.GetOptions{})
 	if err != nil {
@@ -87,7 +88,7 @@ func UpdateConsumers(ctx context.Context, client kubernetes.Interface, endpoint,
 		if err != nil {
 			return fmt.Errorf("restart kotsadm deployment after migrating object store: %v", err)
 		}
-		err = util.RestartStatefulset(ctx, client, "default", "kotsadm")
+		err = util.RestartStatefulSet(ctx, client, "default", "kotsadm")
 		if err != nil {
 			return fmt.Errorf("restart kotsadm statefulset after migrating object store: %v", err)
 		}
@@ -136,9 +137,48 @@ func UpdateConsumers(ctx context.Context, client kubernetes.Interface, endpoint,
 		}
 	}
 
+	restartVelero := false
 	//TODO if kubernetes_resource_exists velero backupstoragelocation default
 
-	//TODO if kubernetes_resource_exists velero secret cloud-credentials
+	// if kubernetes_resource_exists velero secret cloud-credentials
+	veleroSecret, err := client.CoreV1().Secrets("velero").Get(ctx, "cloud-credentials", metav1.GetOptions{})
+	if err != nil {
+		if !k8serrors.IsNotFound(err) {
+			return fmt.Errorf("get cloud-credentials secret in velero namespace: %v", err)
+		}
+	}
+	if veleroSecret != nil {
+		cloud, ok := veleroSecret.Data["cloud"]
+
+		// check if this is using the original secret key and thus should be updated
+		// if it's a custom endpoint, we don't want to overwrite it
+		if ok && strings.Contains(string(cloud), originalSecretKey) {
+			restartVelero = true
+
+			// update 'cloud' by replacing the aws access key and secret key
+			cloudString := regexp.MustCompile(`aws_access_key_id=.*`).ReplaceAllString(string(cloud), fmt.Sprintf("aws_access_key_id=%s", accessKey))
+			cloudString = regexp.MustCompile(`aws_secret_access_key=.*`).ReplaceAllString(cloudString, fmt.Sprintf("aws_secret_access_key=%s", secretKey))
+
+			veleroSecret.Data["cloud"] = []byte(cloudString)
+
+			_, err = client.CoreV1().Secrets("velero").Update(ctx, veleroSecret, metav1.UpdateOptions{})
+			if err != nil {
+				return fmt.Errorf("update cloud-credentials secret in velero namespace: %v", err)
+			}
+		}
+	}
+
+	if restartVelero {
+		err = util.RestartDaemonSet(ctx, client, "velero", "restic")
+		if err != nil {
+			return fmt.Errorf("restart velero restic daemonset after migrating object store: %v", err)
+		}
+
+		err = util.RestartDeployment(ctx, client, "velero", "velero")
+		if err != nil {
+			return fmt.Errorf("restart velero deployment after migrating object store: %v", err)
+		}
+	}
 
 	return nil
 }
