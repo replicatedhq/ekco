@@ -50,5 +50,39 @@ func RestartDeployment(ctx context.Context, client kubernetes.Interface, namespa
 
 // RestartStatefulset restarts a statefulset by deleting all of its pods, one at a time
 func RestartStatefulset(ctx context.Context, client kubernetes.Interface, namespace string, name string) error {
+	sts, err := client.AppsV1().StatefulSets(namespace).Get(ctx, name, metav1.GetOptions{})
+	if err != nil {
+		if k8serrors.IsNotFound(err) {
+			return nil
+		}
+		return fmt.Errorf("failed to get statefulset %s in %s: %v", name, namespace, err)
+	}
+
+	// get the selector for the statefulset
+	selector, err := metav1.LabelSelectorAsSelector(sts.Spec.Selector)
+	if err != nil {
+		return fmt.Errorf("failed to get selector for statefulset %s in %s: %v", name, namespace, err)
+	}
+
+	// get the pods for the statefulset
+	pods, err := client.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{LabelSelector: selector.String()})
+	if err != nil {
+		return fmt.Errorf("failed to get pods for statefulset %s in %s: %v", name, namespace, err)
+	}
+
+	for _, pod := range pods.Items {
+		// delete the pod
+		err := client.CoreV1().Pods(namespace).Delete(ctx, pod.Name, metav1.DeleteOptions{})
+		if err != nil {
+			return fmt.Errorf("failed to delete pod %s in %s: %v", pod.Name, namespace, err)
+		}
+
+		// wait for the statefulset to be ready again
+		err = AwaitStatefulsetReady(ctx, client, namespace, name)
+		if err != nil {
+			return fmt.Errorf("failed to wait for statefulset %s in %s to be ready: %v", name, namespace, err)
+		}
+	}
+
 	return nil
 }
