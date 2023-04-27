@@ -161,11 +161,13 @@ func migrateObjectStorage(ctx context.Context, config ekcoops.Config, client kub
 
 	logsChan := make(chan string)
 	go func() {
-		select {
-		case <-ctx.Done():
-			return
-		case logLine := <-logsChan:
-			migrationLogs += logLine
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case logLine := <-logsChan:
+				migrationLogs += logLine
+			}
 		}
 	}()
 
