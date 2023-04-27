@@ -1,8 +1,10 @@
 package server
 
 import (
+	"bufio"
 	"context"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"sync"
@@ -73,10 +75,13 @@ func migrateStorage(config ekcoops.Config, client kubernetes.Interface) {
 
 	migrationLogs += "starting storage migration\n"
 
+	ctx, cancel := context.WithCancel(context.Background()) // TODO maybe allow cancelling this somehow
+	defer cancel()
+
 	// TODO: pause the operator loop
 
 	migrationStatus = MIGRATION_STATUS_OBJECTSTORE
-	err := migrateObjectStorage(config, client)
+	err := migrateObjectStorage(ctx, config, client)
 	if err != nil {
 		migrationStatus = MIGRATION_STATUS_FAILED
 		migrationLogs += fmt.Sprintf("migrate object storage: %v", err)
@@ -86,7 +91,7 @@ func migrateStorage(config ekcoops.Config, client kubernetes.Interface) {
 	migrationLogs += "starting pvmigrate\n"
 
 	migrationStatus = MIGRATION_STATUS_PVCMIGRATE
-	err = migrateStorageClasses(config, client)
+	err = migrateStorageClasses(ctx, config, client)
 	if err != nil {
 		migrationStatus = MIGRATION_STATUS_FAILED
 		migrationLogs += fmt.Sprintf("migrate storage classes: %v", err)
@@ -98,15 +103,12 @@ func migrateStorage(config ekcoops.Config, client kubernetes.Interface) {
 	migrationStatus = MIGRATION_STATUS_COMPLETED
 }
 
-// TODO move to 'minio' package, call from 'cluster' too
-
 // check if minio is in use
 // if so, disable the minio service to prevent race conditions with files being updated during the migration
 // then, migrate all data from minio to rook
 // then, update secrets in the cluster to point to the new rook object store
 // finally, delete the minio namespace and contents
-// TODO factor out, call from cluster package too
-func migrateObjectStorage(config ekcoops.Config, client kubernetes.Interface) error {
+func migrateObjectStorage(ctx context.Context, config ekcoops.Config, client kubernetes.Interface) error {
 	minioInUse, err := objectstore.IsMinioInUse(context.TODO(), client, config.MinioNamespace)
 	if err != nil {
 		return fmt.Errorf("check if minio is in use: %v", err)
@@ -117,7 +119,7 @@ func migrateObjectStorage(config ekcoops.Config, client kubernetes.Interface) er
 
 	// discover the IP address of the existing minio pod to migrate from
 	minioPodIP := ""
-	minioPods, err := client.CoreV1().Pods(config.MinioNamespace).List(context.TODO(), metav1.ListOptions{LabelSelector: "app=minio"})
+	minioPods, err := client.CoreV1().Pods(config.MinioNamespace).List(ctx, metav1.ListOptions{LabelSelector: "app=minio"})
 	if err != nil {
 		return fmt.Errorf("list minio pods: %w", err)
 	}
@@ -127,7 +129,7 @@ func migrateObjectStorage(config ekcoops.Config, client kubernetes.Interface) er
 	minioPodIP = minioPods.Items[0].Status.PodIP
 
 	// get the minio credentials to be used for the migration
-	credentialSecret, err := client.CoreV1().Secrets(config.MinioNamespace).Get(context.TODO(), "minio-credentials", metav1.GetOptions{})
+	credentialSecret, err := client.CoreV1().Secrets(config.MinioNamespace).Get(ctx, "minio-credentials", metav1.GetOptions{})
 	if err != nil {
 		return fmt.Errorf("retrieve minio credentials: %w", err)
 	}
@@ -135,13 +137,13 @@ func migrateObjectStorage(config ekcoops.Config, client kubernetes.Interface) er
 	minioAccessKey := string(credentialSecret.Data["MINIO_ACCESS_KEY"])
 	minioSecretKey := string(credentialSecret.Data["MINIO_SECRET_KEY"])
 
-	rookService, err := client.CoreV1().Services("rook-ceph").Get(context.TODO(), "rook-ceph-rgw-rook-ceph-store", metav1.GetOptions{})
+	rookService, err := client.CoreV1().Services("rook-ceph").Get(ctx, "rook-ceph-rgw-rook-ceph-store", metav1.GetOptions{})
 	if err != nil {
 		return fmt.Errorf("retrieve rook object store endpoint: %w", err)
 	}
 	rookEndpoint := rookService.Spec.ClusterIP
 
-	rookSecret, err := client.CoreV1().Secrets("rook-ceph").Get(context.TODO(), "rook-ceph-object-user-rook-ceph-store-kurl", metav1.GetOptions{})
+	rookSecret, err := client.CoreV1().Secrets("rook-ceph").Get(ctx, "rook-ceph-object-user-rook-ceph-store-kurl", metav1.GetOptions{})
 	if err != nil {
 		return fmt.Errorf("retrieve rook object store credentials: %w", err)
 	}
@@ -152,36 +154,47 @@ func migrateObjectStorage(config ekcoops.Config, client kubernetes.Interface) er
 	doesNotExistSelector := `
 [ { "op": "replace", "path": "/spec/selector", "value": {"doesnotexist": "doesnotexist"} } ]
 `
-	_, err = client.CoreV1().Services(config.MinioNamespace).Patch(context.TODO(), "minio", apitypes.JSONPatchType, []byte(doesNotExistSelector), metav1.PatchOptions{})
+	_, err = client.CoreV1().Services(config.MinioNamespace).Patch(ctx, "minio", apitypes.JSONPatchType, []byte(doesNotExistSelector), metav1.PatchOptions{})
 	if err != nil {
 		return fmt.Errorf("disable existing minio service: %w", err)
 	}
 
+	logsChan := make(chan string)
+	go func() {
+		select {
+		case <-ctx.Done():
+			return
+		case logLine := <-logsChan:
+			migrationLogs += logLine
+		}
+	}()
+
 	// migrate all data from minio to rook
-	// TODO use progress writer
-	err = objectstore.SyncAllBuckets(context.TODO(), fmt.Sprintf("%s:9000", minioPodIP), minioAccessKey, minioSecretKey, rookEndpoint, rookAccessKey, rookSecretKey, nil)
+	err = objectstore.SyncAllBuckets(ctx, fmt.Sprintf("%s:9000", minioPodIP), minioAccessKey, minioSecretKey, rookEndpoint, rookAccessKey, rookSecretKey, logsChan)
 	if err != nil {
 		return fmt.Errorf("migrate data from minio to rook: %w", err)
 	}
 
 	// update secrets in the cluster to point to the new rook object store
 	migrationLogs += "updating secrets in the cluster to point to the new rook object store\n"
-	err = objectstore.UpdateConsumers(context.TODO(), client, rookEndpoint, "http://rook-ceph-rgw-rook-ceph-store.rook-ceph", rookAccessKey, rookSecretKey)
+	err = objectstore.UpdateConsumers(ctx, client, rookEndpoint, "http://rook-ceph-rgw-rook-ceph-store.rook-ceph", rookAccessKey, rookSecretKey)
 	if err != nil {
 		return fmt.Errorf("update secrets in the cluster to point to the new rook object store: %w", err)
 	}
 
-	err = client.AppsV1().StatefulSets(config.MinioNamespace).Delete(context.TODO(), "ha-minio", metav1.DeleteOptions{})
+	// delete the minio namespace and contents
+	migrationLogs += "deleting the minio namespace and contents\n"
+	err = client.AppsV1().StatefulSets(config.MinioNamespace).Delete(ctx, "ha-minio", metav1.DeleteOptions{})
 	if err != nil && !k8serrors.IsNotFound(err) {
 		return fmt.Errorf("delete minio statefulset: %v", err)
 	}
 
-	err = client.AppsV1().Deployments(config.MinioNamespace).Delete(context.TODO(), "minio", metav1.DeleteOptions{})
+	err = client.AppsV1().Deployments(config.MinioNamespace).Delete(ctx, "minio", metav1.DeleteOptions{})
 	if err != nil && !k8serrors.IsNotFound(err) {
 		return fmt.Errorf("delete minio deployment: %v", err)
 	}
 
-	err = client.CoreV1().Namespaces().Delete(context.TODO(), config.MinioNamespace, metav1.DeleteOptions{})
+	err = client.CoreV1().Namespaces().Delete(ctx, config.MinioNamespace, metav1.DeleteOptions{})
 	if err != nil && !k8serrors.IsNotFound(err) {
 		return fmt.Errorf("delete minio namespace: %v", err)
 	}
@@ -189,8 +202,15 @@ func migrateObjectStorage(config ekcoops.Config, client kubernetes.Interface) er
 	return nil
 }
 
-func migrateStorageClasses(config ekcoops.Config, client kubernetes.Interface) error {
-	fileLog := log.New(nil, "", 0) // TODO: save to logs string
+func migrateStorageClasses(ctx context.Context, config ekcoops.Config, client kubernetes.Interface) error {
+	logsReader, logsWriter := io.Pipe()
+	go func() {
+		bufReader := bufio.NewReader(logsReader)
+		for line, err := bufReader.ReadString('\n'); err == nil; {
+			migrationLogs += string(line) + "\n"
+		}
+	}()
+	fileLog := log.New(logsWriter, "", 0)
 
 	options := migrate.Options{
 		SourceSCName: "scaling",
@@ -201,12 +221,12 @@ func migrateStorageClasses(config ekcoops.Config, client kubernetes.Interface) e
 
 	migrationStatus = MIGRATION_STATUS_PVCMIGRATE
 
-	err := migrate.Migrate(context.TODO(), fileLog, client, options)
+	err := migrate.Migrate(ctx, fileLog, client, options)
 	if err != nil {
 		return fmt.Errorf("run pvmigrate: %v", err)
 	}
 
-	err = client.StorageV1().StorageClasses().Delete(context.TODO(), "scaling", metav1.DeleteOptions{})
+	err = client.StorageV1().StorageClasses().Delete(ctx, "scaling", metav1.DeleteOptions{})
 	if err != nil {
 		return fmt.Errorf("delete scaling storage class: %v", err)
 	}
