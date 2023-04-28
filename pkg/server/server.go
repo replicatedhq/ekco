@@ -11,6 +11,7 @@ import (
 
 	"github.com/replicatedhq/ekco/pkg/cluster"
 	"github.com/replicatedhq/ekco/pkg/ekcoops"
+	"github.com/replicatedhq/ekco/pkg/ekcoops/overrides"
 	"github.com/replicatedhq/ekco/pkg/objectstore"
 	"github.com/replicatedhq/ekco/pkg/util"
 	"github.com/replicatedhq/pvmigrate/pkg/migrate"
@@ -226,6 +227,9 @@ func migrateStorageClasses(ctx context.Context, config ekcoops.Config, controlle
 	}
 
 	migrationStatus = MIGRATION_STATUS_PVCMIGRATE
+
+	overrides.PausePrometheus()
+	defer overrides.ResumePrometheus()
 
 	err := util.ScalePrometheus(controllers.PrometheusV1, 0)
 	if err != nil {

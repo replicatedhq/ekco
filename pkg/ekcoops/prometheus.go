@@ -2,10 +2,16 @@ package ekcoops
 
 import (
 	"github.com/pkg/errors"
+	"github.com/replicatedhq/ekco/pkg/ekcoops/overrides"
 	"github.com/replicatedhq/ekco/pkg/util"
 )
 
 func (o *Operator) ReconcilePrometheus(nodeCount int) error {
+	if overrides.PrometheusPaused() {
+		o.log.Debug("Not updating Prometheus scale as that has been paused")
+		return nil
+	}
+
 	desiredPrometheusReplicas := min(2, int64(nodeCount))
 	o.log.Debugf("Ensuring k8s prometheus replicas are set to %d", desiredPrometheusReplicas)
 	err := util.ScalePrometheus(o.controller.Config.PrometheusV1, desiredPrometheusReplicas)
