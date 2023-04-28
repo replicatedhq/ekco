@@ -11,6 +11,7 @@ import (
 
 	"github.com/replicatedhq/ekco/pkg/ekcoops"
 	"github.com/replicatedhq/ekco/pkg/objectstore"
+	"github.com/replicatedhq/ekco/pkg/util"
 	"github.com/replicatedhq/pvmigrate/pkg/migrate"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -223,9 +224,12 @@ func migrateStorageClasses(ctx context.Context, config ekcoops.Config, client ku
 
 	migrationStatus = MIGRATION_STATUS_PVCMIGRATE
 
-	// TODO: scale down prometheus-operator first
+	err := util.ScaleDownPrometheus(ctx, client)
+	if err != nil {
+		return fmt.Errorf("scale down prometheus: %v", err)
+	}
 
-	err := migrate.Migrate(ctx, fileLog, client, options)
+	err = migrate.Migrate(ctx, fileLog, client, options)
 	if err != nil {
 		return fmt.Errorf("run pvmigrate: %v", err)
 	}
@@ -234,5 +238,11 @@ func migrateStorageClasses(ctx context.Context, config ekcoops.Config, client ku
 	if err != nil {
 		return fmt.Errorf("delete scaling storage class: %v", err)
 	}
+
+	err = util.ScaleUpPrometheus(ctx, client)
+	if err != nil {
+		return fmt.Errorf("scale up prometheus: %v", err)
+	}
+
 	return nil
 }
