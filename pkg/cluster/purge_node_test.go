@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"context"
+	"github.com/replicatedhq/ekco/pkg/cluster/types"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -186,7 +187,7 @@ apiEndpoints:
 			req := require.New(t)
 			logger, _ := zap.NewProduction()
 			client := clientsetfake.NewSimpleClientset(tt.clusterResources...)
-			c := NewController(ControllerConfig{
+			c := NewController(types.ControllerConfig{
 				Client: client,
 			}, logger.Sugar())
 

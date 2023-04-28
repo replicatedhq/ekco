@@ -3,12 +3,12 @@ package objectstore
 import (
 	"context"
 	"fmt"
+	"github.com/replicatedhq/ekco/pkg/cluster/types"
 	"regexp"
 	"strings"
 
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
-	"github.com/replicatedhq/ekco/pkg/cluster"
 	"github.com/replicatedhq/ekco/pkg/util"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -65,7 +65,7 @@ func SyncAllBuckets(ctx context.Context, sourceEndpoint, sourceAccessKey, source
 
 // UpdateConsumers updates the access key and secret key for all consumers of the object store.
 // it handles kotsadm, registry, and velero.
-func UpdateConsumers(ctx context.Context, controllers cluster.ControllerConfig, endpoint, hostname, accessKey, secretKey, originalHostname, originalSecretKey string) error {
+func UpdateConsumers(ctx context.Context, controllers types.ControllerConfig, endpoint, hostname, accessKey, secretKey, originalHostname, originalSecretKey string) error {
 	client := controllers.Client
 	// if kubernetes_resource_exists default secret kotsadm-s3
 	kotsadmS3, err := client.CoreV1().Secrets("default").Get(ctx, "kotsadm-s3", metav1.GetOptions{})

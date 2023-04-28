@@ -3,6 +3,7 @@ package cli
 import (
 	"github.com/pkg/errors"
 	"github.com/replicatedhq/ekco/pkg/cluster"
+	"github.com/replicatedhq/ekco/pkg/cluster/types"
 	"github.com/replicatedhq/ekco/pkg/ekcoops"
 	cephv1 "github.com/rook/rook/pkg/client/clientset/versioned/typed/ceph.rook.io/v1"
 	"github.com/spf13/viper"
@@ -62,7 +63,7 @@ func initClusterController(config *ekcoops.Config, log *zap.SugaredLogger) (*clu
 		Resource: "alertmanagers",
 	})
 
-	return cluster.NewController(cluster.ControllerConfig{
+	return cluster.NewController(types.ControllerConfig{
 		Client:                                client,
 		ClientConfig:                          clientConfig,
 		CephV1:                                rookcephclient,

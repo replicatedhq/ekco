@@ -4,6 +4,7 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
+	"github.com/replicatedhq/ekco/pkg/cluster/types"
 	"reflect"
 	"testing"
 
@@ -143,7 +144,7 @@ func TestController_SetCephCSIResources(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			clientset := fake.NewSimpleClientset(tt.resources...)
 			c := &Controller{
-				Config: ControllerConfig{
+				Config: types.ControllerConfig{
 					Client: clientset,
 				},
 				Log: logger.NewDiscardLogger(),
@@ -250,7 +251,7 @@ func TestController_GetRookVersion(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			clientset := fake.NewSimpleClientset(tt.resources...)
 			c := &Controller{
-				Config: ControllerConfig{
+				Config: types.ControllerConfig{
 					Client: clientset,
 				},
 				Log: logger.NewDiscardLogger(),
@@ -445,7 +446,7 @@ func TestController_UseNodesForStorage(t *testing.T) {
 			rookClientset := rookfake.NewSimpleClientset(tt.rookResources...)
 
 			c := &Controller{
-				Config: ControllerConfig{
+				Config: types.ControllerConfig{
 					Client: clientset,
 					CephV1: rookClientset.CephV1(),
 				},
@@ -624,7 +625,7 @@ func TestController_removeCephClusterStorageNode(t *testing.T) {
 			rookClientset := rookfake.NewSimpleClientset(tt.rookResources...)
 
 			c := &Controller{
-				Config: ControllerConfig{
+				Config: types.ControllerConfig{
 					Client: clientset,
 					CephV1: rookClientset.CephV1(),
 				},
@@ -768,7 +769,7 @@ func TestController_SetBlockPoolReplication(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			rookClientset := rookfake.NewSimpleClientset(tt.rookResources...)
 			c := &Controller{
-				Config: ControllerConfig{
+				Config: types.ControllerConfig{
 					CephV1: rookClientset.CephV1(),
 				},
 				Log: logger.NewDiscardLogger(),
@@ -857,7 +858,7 @@ func TestController_ReconcileMonCount(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			rookClientset := rookfake.NewSimpleClientset(tt.rookResources...)
 			c := &Controller{
-				Config: ControllerConfig{
+				Config: types.ControllerConfig{
 					CephV1: rookClientset.CephV1(),
 				},
 				Log: logger.NewDiscardLogger(),
@@ -970,7 +971,7 @@ func TestController_ReconcileMgrCount(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			rookClientset := rookfake.NewSimpleClientset(tt.rookResources...)
 			c := &Controller{
-				Config: ControllerConfig{
+				Config: types.ControllerConfig{
 					CephV1: rookClientset.CephV1(),
 				},
 				Log: logger.NewDiscardLogger(),
@@ -1138,7 +1139,7 @@ func TestController_SetFilesystemReplication(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			rookClientset := rookfake.NewSimpleClientset(tt.rookResources...)
 			c := &Controller{
-				Config: ControllerConfig{
+				Config: types.ControllerConfig{
 					CephV1: rookClientset.CephV1(),
 				},
 				Log: logger.NewDiscardLogger(),
@@ -1380,7 +1381,7 @@ func TestController_SetObjectStoreReplication(t *testing.T) {
 			clientset := fake.NewSimpleClientset(tt.resources...)
 			rookClientset := rookfake.NewSimpleClientset(tt.rookResources...)
 			c := &Controller{
-				Config: ControllerConfig{
+				Config: types.ControllerConfig{
 					Client: clientset,
 					CephV1: rookClientset.CephV1(),
 				},

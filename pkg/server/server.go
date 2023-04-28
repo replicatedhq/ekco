@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"github.com/replicatedhq/ekco/pkg/cluster/types"
 	"io"
 	"log"
 	"net/http"
@@ -68,7 +69,7 @@ func Serve(config ekcoops.Config, client *cluster.Controller) {
 	}
 }
 
-func migrateStorage(config ekcoops.Config, controllers cluster.ControllerConfig) {
+func migrateStorage(config ekcoops.Config, controllers types.ControllerConfig) {
 	migrateStorageMut.Lock()
 	defer migrateStorageMut.Unlock()
 	if migrationStatus == MIGRATION_STATUS_COMPLETED {
@@ -110,7 +111,7 @@ func migrateStorage(config ekcoops.Config, controllers cluster.ControllerConfig)
 // then, migrate all data from minio to rook
 // then, update secrets in the cluster to point to the new rook object store
 // finally, delete the minio namespace and contents
-func migrateObjectStorage(ctx context.Context, config ekcoops.Config, controllers cluster.ControllerConfig) error {
+func migrateObjectStorage(ctx context.Context, config ekcoops.Config, controllers types.ControllerConfig) error {
 	client := controllers.Client
 	minioInUse, err := objectstore.IsMinioInUse(context.TODO(), client, config.MinioNamespace)
 	if err != nil {
@@ -207,7 +208,7 @@ func migrateObjectStorage(ctx context.Context, config ekcoops.Config, controller
 	return nil
 }
 
-func migrateStorageClasses(ctx context.Context, config ekcoops.Config, controllers cluster.ControllerConfig) error {
+func migrateStorageClasses(ctx context.Context, config ekcoops.Config, controllers types.ControllerConfig) error {
 	client := controllers.Client
 
 	logsReader, logsWriter := io.Pipe()
