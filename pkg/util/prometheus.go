@@ -2,38 +2,72 @@ package util
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
-	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	"github.com/replicatedhq/ekco/pkg/k8s"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/dynamic"
 )
 
-// ScaleDownPrometheus scales down the prometheus-operator deployment to 0 replicas
-// we scale down the operator instead of patching the custom resource because this way we don't have to import the prometheus-operator CRD
-// the prometheus StatefulSet will be scaled down by pvmigrate (and then restored)
-func ScaleDownPrometheus(ctx context.Context, client kubernetes.Interface) error {
-	return scalePrometheusOperator(ctx, client, 0)
-}
+// ScalePrometheus scales the prometheus operator to the given number of replicas
+func ScalePrometheus(promClient dynamic.NamespaceableResourceInterface, replicas int64) error {
+	prometheus, _ := promClient.Namespace("monitoring").Get(context.TODO(), "k8s", metav1.GetOptions{})
+	if prometheus == nil {
+		return nil
+	}
 
-// ScaleUpPrometheus scales up the prometheus-operator deployment to 1 replica
-func ScaleUpPrometheus(ctx context.Context, client kubernetes.Interface) error {
-	return scalePrometheusOperator(ctx, client, 1)
-}
+	currentPrometheusReplicas, ok := prometheus.Object["spec"].(map[string]interface{})["replicas"].(int64)
+	if !ok {
+		return fmt.Errorf("failed to parse prometheus replicas")
+	}
 
-func scalePrometheusOperator(ctx context.Context, client kubernetes.Interface, replicas int32) error {
-	operator, err := client.AppsV1().Deployments("monitoring").Get(ctx, "prometheus-operator", metav1.GetOptions{})
-	if err != nil {
-		if k8serrors.IsNotFound(err) {
-			return nil
-		} else {
-			return fmt.Errorf("failed to get prometheus-operator deployment: %v", err)
+	if currentPrometheusReplicas != replicas {
+		prometheusPatch := []k8s.JSONPatchOperation{{
+			Op:    k8s.JSONPatchOpReplace,
+			Path:  "/spec/replicas",
+			Value: replicas,
+		}}
+		prometheusPayload, err := json.Marshal(prometheusPatch)
+		if err != nil {
+			return fmt.Errorf("failed to marshal json: %w", err)
+		}
+		_, err = promClient.Namespace("monitoring").Patch(context.TODO(), "k8s", types.JSONPatchType, prometheusPayload, metav1.PatchOptions{})
+		if err != nil {
+			return fmt.Errorf("failed to patch prometheus to %d replicas: %w", replicas, err)
 		}
 	}
-	operator.Spec.Replicas = &replicas
-	_, err = client.AppsV1().Deployments("monitoring").Update(ctx, operator, metav1.UpdateOptions{})
-	if err != nil {
-		return fmt.Errorf("failed to scale prometheus-operator deployment to %d replicas: %v", replicas, err)
+
+	return nil
+}
+
+// ScaleAlertManager scales the prometheus operator to the given number of replicas
+func ScaleAlertManager(alertClient dynamic.NamespaceableResourceInterface, replicas int64) error {
+	alertManager, _ := alertClient.Namespace("monitoring").Get(context.TODO(), "prometheus-alertmanager", metav1.GetOptions{})
+	if alertManager == nil {
+		return nil
+	}
+
+	currentAlertManagerReplicas, ok := alertManager.Object["spec"].(map[string]interface{})["replicas"].(int64)
+	if !ok {
+		return fmt.Errorf("failed to parse alert manager replicas")
+	}
+
+	if currentAlertManagerReplicas != replicas {
+		alertManagersPatch := []k8s.JSONPatchOperation{{
+			Op:    k8s.JSONPatchOpReplace,
+			Path:  "/spec/replicas",
+			Value: replicas,
+		}}
+		alertManagersPayload, err := json.Marshal(alertManagersPatch)
+		if err != nil {
+			return fmt.Errorf("failed to marshal json: %w", err)
+		}
+		_, err = alertClient.Namespace("monitoring").Patch(context.TODO(), "prometheus-alertmanager", types.JSONPatchType, alertManagersPayload, metav1.PatchOptions{})
+		if err != nil {
+			return fmt.Errorf("failed to patch alertmanager: %w", err)
+		}
 	}
 
 	return nil

@@ -73,7 +73,7 @@ func OperatorCmd(v *viper.Viper) *cobra.Command {
 				}
 			}
 
-			go server.Serve(*config, clusterController.Config.Client)
+			go server.Serve(*config, clusterController)
 
 			operator := ekcoops.New(*config, clusterController.Config.Client, clusterController, log)
 

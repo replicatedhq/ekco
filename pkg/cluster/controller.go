@@ -9,6 +9,7 @@ import (
 	"github.com/blang/semver"
 	"github.com/replicatedhq/ekco/pkg/k8s"
 	cephv1 "github.com/rook/rook/pkg/client/clientset/versioned/typed/ceph.rook.io/v1"
+	veleroclientv1 "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
 	"go.uber.org/zap"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
@@ -29,6 +30,7 @@ type ControllerConfig struct {
 	CephV1                                cephv1.CephV1Interface
 	AlertManagerV1                        dynamic.NamespaceableResourceInterface
 	PrometheusV1                          dynamic.NamespaceableResourceInterface
+	VeleroV1                              *veleroclientv1.VeleroV1Client
 	CertificatesDir                       string
 	RookPriorityClass                     string
 	RotateCerts                           bool

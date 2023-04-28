@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"sync"
 
+	"github.com/replicatedhq/ekco/pkg/cluster"
 	"github.com/replicatedhq/ekco/pkg/ekcoops"
 	"github.com/replicatedhq/ekco/pkg/objectstore"
 	"github.com/replicatedhq/ekco/pkg/util"
@@ -16,7 +17,6 @@ import (
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apitypes "k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/kubernetes"
 )
 
 const (
@@ -30,7 +30,7 @@ var migrateStorageMut = sync.Mutex{}
 var migrationStatus = ""
 var migrationLogs = ""
 
-func Serve(config ekcoops.Config, client kubernetes.Interface) {
+func Serve(config ekcoops.Config, client *cluster.Controller) {
 	http.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
@@ -52,7 +52,7 @@ func Serve(config ekcoops.Config, client kubernetes.Interface) {
 	})
 
 	http.HandleFunc("/storagemigration/approve", func(w http.ResponseWriter, r *http.Request) {
-		go migrateStorage(config, client)
+		go migrateStorage(config, client.Config)
 
 		w.WriteHeader(http.StatusOK)
 		_, err := w.Write([]byte("APPROVED"))
@@ -67,7 +67,7 @@ func Serve(config ekcoops.Config, client kubernetes.Interface) {
 	}
 }
 
-func migrateStorage(config ekcoops.Config, client kubernetes.Interface) {
+func migrateStorage(config ekcoops.Config, controllers cluster.ControllerConfig) {
 	migrateStorageMut.Lock()
 	defer migrateStorageMut.Unlock()
 	if migrationStatus == MIGRATION_STATUS_COMPLETED {
@@ -82,7 +82,7 @@ func migrateStorage(config ekcoops.Config, client kubernetes.Interface) {
 	// TODO: pause the operator loop
 
 	migrationStatus = MIGRATION_STATUS_OBJECTSTORE
-	err := migrateObjectStorage(ctx, config, client)
+	err := migrateObjectStorage(ctx, config, controllers)
 	if err != nil {
 		migrationStatus = MIGRATION_STATUS_FAILED
 		migrationLogs += fmt.Sprintf("migrate object storage: %v", err)
@@ -92,7 +92,7 @@ func migrateStorage(config ekcoops.Config, client kubernetes.Interface) {
 	migrationLogs += "starting pvmigrate\n"
 
 	migrationStatus = MIGRATION_STATUS_PVCMIGRATE
-	err = migrateStorageClasses(ctx, config, client)
+	err = migrateStorageClasses(ctx, config, controllers)
 	if err != nil {
 		migrationStatus = MIGRATION_STATUS_FAILED
 		migrationLogs += fmt.Sprintf("migrate storage classes: %v", err)
@@ -109,7 +109,8 @@ func migrateStorage(config ekcoops.Config, client kubernetes.Interface) {
 // then, migrate all data from minio to rook
 // then, update secrets in the cluster to point to the new rook object store
 // finally, delete the minio namespace and contents
-func migrateObjectStorage(ctx context.Context, config ekcoops.Config, client kubernetes.Interface) error {
+func migrateObjectStorage(ctx context.Context, config ekcoops.Config, controllers cluster.ControllerConfig) error {
+	client := controllers.Client
 	minioInUse, err := objectstore.IsMinioInUse(context.TODO(), client, config.MinioNamespace)
 	if err != nil {
 		return fmt.Errorf("check if minio is in use: %v", err)
@@ -180,7 +181,7 @@ func migrateObjectStorage(ctx context.Context, config ekcoops.Config, client kub
 
 	// update secrets in the cluster to point to the new rook object store
 	migrationLogs += "updating secrets in the cluster to point to the new rook object store\n"
-	err = objectstore.UpdateConsumers(ctx, client, rookEndpoint, "http://rook-ceph-rgw-rook-ceph-store.rook-ceph", rookAccessKey, rookSecretKey, fmt.Sprintf("minio.%s", config.MinioNamespace), minioSecretKey)
+	err = objectstore.UpdateConsumers(ctx, controllers, rookEndpoint, "http://rook-ceph-rgw-rook-ceph-store.rook-ceph", rookAccessKey, rookSecretKey, fmt.Sprintf("minio.%s", config.MinioNamespace), minioSecretKey)
 	if err != nil {
 		return fmt.Errorf("update secrets in the cluster to point to the new rook object store: %w", err)
 	}
@@ -205,7 +206,9 @@ func migrateObjectStorage(ctx context.Context, config ekcoops.Config, client kub
 	return nil
 }
 
-func migrateStorageClasses(ctx context.Context, config ekcoops.Config, client kubernetes.Interface) error {
+func migrateStorageClasses(ctx context.Context, config ekcoops.Config, controllers cluster.ControllerConfig) error {
+	client := controllers.Client
+
 	logsReader, logsWriter := io.Pipe()
 	go func() {
 		bufReader := bufio.NewReader(logsReader)
@@ -224,7 +227,7 @@ func migrateStorageClasses(ctx context.Context, config ekcoops.Config, client ku
 
 	migrationStatus = MIGRATION_STATUS_PVCMIGRATE
 
-	err := util.ScaleDownPrometheus(ctx, client)
+	err := util.ScalePrometheus(controllers.PrometheusV1, 0)
 	if err != nil {
 		return fmt.Errorf("scale down prometheus: %v", err)
 	}
@@ -239,7 +242,7 @@ func migrateStorageClasses(ctx context.Context, config ekcoops.Config, client ku
 		return fmt.Errorf("delete scaling storage class: %v", err)
 	}
 
-	err = util.ScaleUpPrometheus(ctx, client)
+	err = util.ScalePrometheus(controllers.PrometheusV1, 2)
 	if err != nil {
 		return fmt.Errorf("scale up prometheus: %v", err)
 	}

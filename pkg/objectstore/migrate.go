@@ -8,12 +8,10 @@ import (
 
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
+	"github.com/replicatedhq/ekco/pkg/cluster"
 	"github.com/replicatedhq/ekco/pkg/util"
-	veleroclient "github.com/vmware-tanzu/velero/pkg/client"
-	veleroclientv1 "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
 )
 
 // SyncAllBuckets syncs copies all objects in all buckets in object store to another, and returns progress via a channel.
@@ -67,7 +65,8 @@ func SyncAllBuckets(ctx context.Context, sourceEndpoint, sourceAccessKey, source
 
 // UpdateConsumers updates the access key and secret key for all consumers of the object store.
 // it handles kotsadm, registry, and velero.
-func UpdateConsumers(ctx context.Context, client kubernetes.Interface, endpoint, hostname, accessKey, secretKey, originalHostname, originalSecretKey string) error {
+func UpdateConsumers(ctx context.Context, controllers cluster.ControllerConfig, endpoint, hostname, accessKey, secretKey, originalHostname, originalSecretKey string) error {
+	client := controllers.Client
 	// if kubernetes_resource_exists default secret kotsadm-s3
 	kotsadmS3, err := client.CoreV1().Secrets("default").Get(ctx, "kotsadm-s3", metav1.GetOptions{})
 	if err != nil {
@@ -141,15 +140,7 @@ func UpdateConsumers(ctx context.Context, client kubernetes.Interface, endpoint,
 
 	restartVelero := false
 	// if kubernetes_resource_exists velero backupstoragelocation default
-	veleroConfig, err := veleroclient.Config("", "", "", 100, 100)
-	if err != nil {
-		return fmt.Errorf("get velero config: %v", err)
-	}
-	vclient, err := veleroclientv1.NewForConfig(veleroConfig)
-	if err != nil {
-		return fmt.Errorf("get velero client: %v", err)
-	}
-	veleroBSL, err := vclient.BackupStorageLocations("velero").Get(ctx, "default", metav1.GetOptions{})
+	veleroBSL, err := controllers.VeleroV1.BackupStorageLocations("velero").Get(ctx, "default", metav1.GetOptions{})
 	if err != nil {
 		if !k8serrors.IsNotFound(err) {
 			return fmt.Errorf("get velero backupstoragelocation in velero namespace: %v", err)
@@ -163,19 +154,19 @@ func UpdateConsumers(ctx context.Context, client kubernetes.Interface, endpoint,
 			veleroBSL.Spec.Config["s3Url"] = hostname
 			veleroBSL.Spec.Config["publicUrl"] = fmt.Sprintf("http://%s/", endpoint)
 
-			_, err = vclient.BackupStorageLocations("velero").Update(ctx, veleroBSL, metav1.UpdateOptions{})
+			_, err = controllers.VeleroV1.BackupStorageLocations("velero").Update(ctx, veleroBSL, metav1.UpdateOptions{})
 			if err != nil {
 				return fmt.Errorf("update velero backupstoragelocation in velero namespace: %v", err)
 			}
 
 			// update each restic repository
-			backupRepos, err := vclient.BackupRepositories("velero").List(ctx, metav1.ListOptions{LabelSelector: "velero.io/storage-location=default"})
+			backupRepos, err := controllers.VeleroV1.BackupRepositories("velero").List(ctx, metav1.ListOptions{LabelSelector: "velero.io/storage-location=default"})
 			if err != nil {
 				return fmt.Errorf("list velero backuprepositories in velero namespace: %v", err)
 			}
 			for _, backupRepo := range backupRepos.Items {
 				backupRepo.Spec.ResticIdentifier = strings.ReplaceAll(backupRepo.Spec.ResticIdentifier, originalHostname, hostname)
-				_, err = vclient.BackupRepositories("velero").Update(ctx, &backupRepo, metav1.UpdateOptions{})
+				_, err = controllers.VeleroV1.BackupRepositories("velero").Update(ctx, &backupRepo, metav1.UpdateOptions{})
 				if err != nil {
 					return fmt.Errorf("update velero backuprepository %s in velero namespace: %v", backupRepo.Name, err)
 				}
