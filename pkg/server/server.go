@@ -179,7 +179,7 @@ func migrateObjectStorage(ctx context.Context, config ekcoops.Config, client kub
 
 	// update secrets in the cluster to point to the new rook object store
 	migrationLogs += "updating secrets in the cluster to point to the new rook object store\n"
-	err = objectstore.UpdateConsumers(ctx, client, rookEndpoint, "http://rook-ceph-rgw-rook-ceph-store.rook-ceph", rookAccessKey, rookSecretKey, minioSecretKey)
+	err = objectstore.UpdateConsumers(ctx, client, rookEndpoint, "http://rook-ceph-rgw-rook-ceph-store.rook-ceph", rookAccessKey, rookSecretKey, fmt.Sprintf("minio.%s", config.MinioNamespace), minioSecretKey)
 	if err != nil {
 		return fmt.Errorf("update secrets in the cluster to point to the new rook object store: %w", err)
 	}
