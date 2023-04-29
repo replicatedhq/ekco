@@ -4,12 +4,12 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
-	"github.com/replicatedhq/ekco/pkg/cluster/types"
 	"reflect"
 	"testing"
 
 	"github.com/blang/semver"
 	"github.com/golang/mock/gomock"
+	"github.com/replicatedhq/ekco/pkg/cluster/types"
 	mock_k8s "github.com/replicatedhq/ekco/pkg/k8s/mock"
 	"github.com/replicatedhq/ekco/pkg/logger"
 	"github.com/replicatedhq/ekco/pkg/util"

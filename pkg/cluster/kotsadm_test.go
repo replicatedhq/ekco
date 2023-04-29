@@ -2,10 +2,10 @@ package cluster
 
 import (
 	"context"
-	"github.com/replicatedhq/ekco/pkg/cluster/types"
 	"reflect"
 	"testing"
 
+	"github.com/replicatedhq/ekco/pkg/cluster/types"
 	"go.uber.org/zap"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"

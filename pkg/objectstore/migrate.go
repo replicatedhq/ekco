@@ -3,12 +3,12 @@ package objectstore
 import (
 	"context"
 	"fmt"
-	"github.com/replicatedhq/ekco/pkg/cluster/types"
 	"regexp"
 	"strings"
 
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
+	"github.com/replicatedhq/ekco/pkg/cluster/types"
 	"github.com/replicatedhq/ekco/pkg/util"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

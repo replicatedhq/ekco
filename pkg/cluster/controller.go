@@ -1,11 +1,12 @@
 package cluster
 
 import (
+	"sync"
+
 	"github.com/blang/semver"
 	"github.com/replicatedhq/ekco/pkg/cluster/types"
 	"github.com/replicatedhq/ekco/pkg/k8s"
 	"go.uber.org/zap"
-	"sync"
 )
 
 const (
