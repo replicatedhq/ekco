@@ -49,6 +49,16 @@ func Serve(config ekcoops.Config, client *cluster.Controller) {
 	})
 
 	http.HandleFunc("/storagemigration/approve", func(w http.ResponseWriter, r *http.Request) {
+		authHeader := r.Header.Get("Authorization")
+		if authHeader != "Bearer "+config.StorageMigrationAuthToken {
+			w.WriteHeader(http.StatusUnauthorized)
+			_, err := w.Write([]byte("UNAUTHORIZED"))
+			if err != nil {
+				log.Printf("write unauthorized: %v", err)
+			}
+			return
+		}
+
 		go migrate.ObjectStorageAndPVCs(config, client.Config)
 
 		w.WriteHeader(http.StatusOK)

@@ -72,6 +72,7 @@ type Config struct {
 	AutoApproveKubeletCertSigningRequests bool          `mapstructure:"auto_approve_kubelet_csrs"`
 	RookMinimumNodeCount                  int           `mapstructure:"rook_minimum_node_count"`
 	RookStorageClass                      string        `mapstructure:"rook_storage_class"`
+	StorageMigrationAuthToken             string        `mapstructure:"storage_migration_auth_token"`
 
 	// options for HA minio
 	EnableHAMinio  bool   `mapstructure:"enable_ha_minio"`  // should minio be scaled to multiple replicas on 3+ nodes
