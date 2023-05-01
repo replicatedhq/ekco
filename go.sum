@@ -1711,8 +1711,8 @@ github.com/pquerna/cachecontrol v0.0.0-20180517163645-1555304b9b35/go.mod h1:prY
 github.com/pquerna/cachecontrol v0.1.0/go.mod h1:NrUG3Z7Rdu85UNR3vm7SOsl1nFIeSiQnrHV5K9mBcUI=
 github.com/pquerna/otp v1.2.1-0.20191009055518-468c2dd2b58d h1:PinQItctnaL2LtkaSM678+ZLLy5TajwOeXzWvYC7tII=
 github.com/pquerna/otp v1.2.1-0.20191009055518-468c2dd2b58d/go.mod h1:dkJfzwRKNiegxyNb54X/3fLwhCynbMspSyWKnvi1AEg=
-github.com/projectcontour/contour v1.24.3 h1:7mpFUHPuuZwb0U6pO4MaQ+W+Q+bk6TKulv3ZZ4E23rM=
-github.com/projectcontour/contour v1.24.3/go.mod h1:vIQFytyuuN1RRwRtugeagUIWpjsNgIf3FI222H77cCQ=
+github.com/projectcontour/contour v1.24.4 h1:53q7GZUxihESJryWW8xfBZXshU1rkVytfQo/tkJHnyk=
+github.com/projectcontour/contour v1.24.4/go.mod h1:vIQFytyuuN1RRwRtugeagUIWpjsNgIf3FI222H77cCQ=
 github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.44.1/go.mod h1:3WYi4xqXxGGXWDdQIITnLNmuDzO5n6wYva9spVhR4fg=
 github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.46.0/go.mod h1:3WYi4xqXxGGXWDdQIITnLNmuDzO5n6wYva9spVhR4fg=
 github.com/prometheus-operator/prometheus-operator/pkg/client v0.46.0/go.mod h1:k4BrWlVQQsvBiTcDnKEMgyh/euRxyxgrHdur/ZX/sdA=
