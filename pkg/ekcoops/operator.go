@@ -12,6 +12,7 @@ import (
 	multierror "github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 	"github.com/replicatedhq/ekco/pkg/cluster"
+	"github.com/replicatedhq/ekco/pkg/ekcoops/overrides"
 	"github.com/replicatedhq/ekco/pkg/rook"
 	"github.com/replicatedhq/ekco/pkg/util"
 	"go.uber.org/zap"
@@ -344,6 +345,11 @@ func (o *Operator) reconcileCertificateSigningRequests() error {
 }
 
 func (o *Operator) reconcileMinio() error {
+	if overrides.MinIOPaused() {
+		o.log.Debug("Not updating ha-minio as that has been paused")
+		return nil // minio management is paused while other migrations are in progress
+	}
+
 	exists, err := o.controller.DoesHAMinioExist(context.TODO(), o.config.MinioNamespace)
 	if err != nil {
 		return errors.Wrap(err, "determine if ha-minio exists to be managed")
@@ -386,6 +392,10 @@ func (o *Operator) reconcileMinio() error {
 }
 
 func (o *Operator) reconcileKotsadm() error {
+	if overrides.KotsadmPaused() {
+		o.log.Debug("Not updating kotsadm as that has been paused")
+		return nil // kotsadm management is paused while other migrations are in progress
+	}
 	nodes, err := o.client.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return errors.Wrap(err, "list nodes")

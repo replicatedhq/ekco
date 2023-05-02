@@ -17,6 +17,7 @@ import (
 	"github.com/replicatedhq/pvmigrate/pkg/migrate"
 	cephv1 "github.com/rook/rook/pkg/apis/ceph.rook.io/v1"
 	"github.com/rook/rook/pkg/daemon/ceph/client"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	types2 "k8s.io/apimachinery/pkg/types"
@@ -145,6 +146,9 @@ func migrateObjectStorage(ctx context.Context, minioNS string, controllers types
 		return nil
 	}
 
+	overrides.PauseMinIO()
+	defer overrides.ResumeMinIO()
+
 	// discover the IP address of the existing minio pod to migrate from
 	minioPodIP := ""
 	minioPods, err := client.CoreV1().Pods(minioNS).List(ctx, v1.ListOptions{LabelSelector: "app=minio"})
@@ -152,9 +156,25 @@ func migrateObjectStorage(ctx context.Context, minioNS string, controllers types
 		return fmt.Errorf("list minio pods: %w", err)
 	}
 	if len(minioPods.Items) == 0 {
-		return fmt.Errorf("unable to find existing minio pod to migrate from")
+		// while we may not have found minio running as a single pod, it may be running as a statefulset - which has a different label
+		minioPods, err = client.CoreV1().Pods(minioNS).List(ctx, v1.ListOptions{LabelSelector: "app=ha-minio"})
+		if err != nil {
+			return fmt.Errorf("list ha-minio pods: %w", err)
+		}
+
+		if len(minioPods.Items) == 0 {
+			return fmt.Errorf("unable to find existing minio pod to migrate from")
+		}
 	}
-	minioPodIP = minioPods.Items[0].Status.PodIP
+	for _, pod := range minioPods.Items {
+		if pod.Status.Phase == corev1.PodRunning {
+			minioPodIP = pod.Status.PodIP
+			break
+		}
+	}
+	if minioPodIP == "" {
+		return fmt.Errorf("unable to find running minio pod to migrate from")
+	}
 
 	// get the minio credentials to be used for the migration
 	credentialSecret, err := client.CoreV1().Secrets(minioNS).Get(ctx, "minio-credentials", v1.GetOptions{})
@@ -255,6 +275,8 @@ func migrateStorageClasses(ctx context.Context, config ekcoops.Config, controlle
 
 	overrides.PausePrometheus()
 	defer overrides.ResumePrometheus()
+	overrides.PauseKotsadm()
+	defer overrides.ResumeKotsadm()
 
 	err := util.ScalePrometheus(controllers.PrometheusV1, 0)
 	if err != nil {

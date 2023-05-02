@@ -16,7 +16,6 @@ func Serve(config ekcoops.Config, client *cluster.Controller) {
 	})
 
 	http.HandleFunc("/storagemigration/ready", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
 		_, message, err := migrate.IsMigrationReady(context.TODO(), config, client.Config)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
@@ -26,6 +25,7 @@ func Serve(config ekcoops.Config, client *cluster.Controller) {
 			}
 		}
 
+		w.WriteHeader(http.StatusOK)
 		_, err = w.Write([]byte(message))
 		if err != nil {
 			log.Printf("write ready status: %v", err)
