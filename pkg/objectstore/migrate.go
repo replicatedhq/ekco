@@ -242,7 +242,7 @@ func syncBucket(ctx context.Context, src *minio.Client, dst *minio.Client, bucke
 		}
 
 		if logs != nil {
-			logs <- fmt.Sprintf("Copying %s", srcObjectInfo.Key)
+			logs <- fmt.Sprintf("  - %s", srcObjectInfo.Key)
 		}
 
 		_, err = dst.PutObject(ctx, bucket, srcObjectInfo.Key, srcObject, srcObjectInfo.Size, minio.PutObjectOptions{
