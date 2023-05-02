@@ -251,10 +251,12 @@ func migrateStorageClasses(ctx context.Context, config ekcoops.Config, controlle
 	client := controllers.Client
 
 	logsReader, logsWriter := io.Pipe()
+	defer logsWriter.Close()
+	defer logsReader.Close()
 	go func() {
-		bufReader := bufio.NewReader(logsReader)
-		for line, err := bufReader.ReadString('\n'); err == nil; {
-			migrationLogs += string(line) + "\n"
+		bufScanner := bufio.NewScanner(logsReader)
+		for bufScanner.Scan() {
+			migrationLogs += bufScanner.Text() + "\n"
 		}
 	}()
 	fileLog := log.New(logsWriter, "", 0)
@@ -273,21 +275,25 @@ func migrateStorageClasses(ctx context.Context, config ekcoops.Config, controlle
 	overrides.PauseKotsadm()
 	defer overrides.ResumeKotsadm()
 
+	fileLog.Println("scaling down prometheus")
 	err := util.ScalePrometheus(controllers.PrometheusV1, 0)
 	if err != nil {
 		return fmt.Errorf("scale down prometheus: %v", err)
 	}
 
+	fileLog.Printf("migrating data from %q storageclass to %q\n", "scaling", config.RookStorageClass)
 	err = migrate.Migrate(ctx, fileLog, client, options)
 	if err != nil {
 		return fmt.Errorf("run pvmigrate: %v", err)
 	}
 
+	fileLog.Printf("deleting the (empty) %q storageclass\n", "scaling")
 	err = client.StorageV1().StorageClasses().Delete(ctx, "scaling", v1.DeleteOptions{})
 	if err != nil {
 		return fmt.Errorf("delete scaling storage class: %v", err)
 	}
 
+	fileLog.Println("scaling up prometheus")
 	err = util.ScalePrometheus(controllers.PrometheusV1, 2)
 	if err != nil {
 		return fmt.Errorf("scale up prometheus: %v", err)
