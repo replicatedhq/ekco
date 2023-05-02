@@ -50,7 +50,7 @@ func SyncAllBuckets(ctx context.Context, sourceEndpoint, sourceAccessKey, source
 			logs <- fmt.Sprintf("Syncing objects in %s", bucket.Name)
 		}
 
-		numObjects, err := syncBucket(ctx, minioClient, rookClient, bucket.Name)
+		numObjects, err := syncBucket(ctx, minioClient, rookClient, bucket.Name, logs)
 		if err != nil {
 			return fmt.Errorf("failed to sync bucket %s: %v", bucket.Name, err)
 		}
@@ -217,7 +217,7 @@ func UpdateConsumers(ctx context.Context, controllers types.ControllerConfig, en
 	return nil
 }
 
-func syncBucket(ctx context.Context, src *minio.Client, dst *minio.Client, bucket string) (int, error) {
+func syncBucket(ctx context.Context, src *minio.Client, dst *minio.Client, bucket string, logs chan<- string) (int, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -239,6 +239,10 @@ func syncBucket(ctx context.Context, src *minio.Client, dst *minio.Client, bucke
 		srcObject, err := src.GetObject(ctx, bucket, srcObjectInfo.Key, minio.GetObjectOptions{})
 		if err != nil {
 			return count, fmt.Errorf("get %s from source: %v", srcObjectInfo.Key, err)
+		}
+
+		if logs != nil {
+			logs <- fmt.Sprintf("Copying %s", srcObjectInfo.Key)
 		}
 
 		_, err = dst.PutObject(ctx, bucket, srcObjectInfo.Key, srcObject, srcObjectInfo.Size, minio.PutObjectOptions{
