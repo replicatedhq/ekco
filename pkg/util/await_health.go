@@ -14,7 +14,7 @@ func AwaitDeploymentReady(ctx context.Context, client kubernetes.Interface, name
 	for {
 		dep, err := client.AppsV1().Deployments(namespace).Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
-			return fmt.Errorf("failed to get deployment %s in %s: %v", name, namespace, err)
+			return fmt.Errorf("failed to get Deployment %s in %s: %v", name, namespace, err)
 		}
 		if dep.Status.ReadyReplicas == dep.Status.Replicas &&
 			dep.Status.AvailableReplicas == dep.Status.Replicas &&
@@ -57,7 +57,7 @@ func AwaitDaemonSetReady(ctx context.Context, client kubernetes.Interface, names
 	for {
 		ds, err := client.AppsV1().DaemonSets(namespace).Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
-			return fmt.Errorf("failed to get StatefulSet %s in %s: %v", name, namespace, err)
+			return fmt.Errorf("failed to get DaemonSet %s in %s: %v", name, namespace, err)
 		}
 		if ds.Status.NumberUnavailable == 0 {
 			return nil
