@@ -11,7 +11,7 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/minio/minio-go/v7 v7.0.52
 	github.com/pkg/errors v0.9.1
-	github.com/projectcontour/contour v1.24.3
+	github.com/projectcontour/contour v1.24.4
 	github.com/replicatedhq/pvmigrate v0.9.0
 	github.com/rook/rook v1.11.4
 	github.com/spf13/cobra v1.7.0
