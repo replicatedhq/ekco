@@ -244,11 +244,6 @@ func migrateObjectStorage(ctx context.Context, minioNS string, controllers types
 		return fmt.Errorf("delete minio deployment: %v", err)
 	}
 
-	err = client.CoreV1().Namespaces().Delete(ctx, minioNS, v1.DeleteOptions{})
-	if err != nil && !errors.IsNotFound(err) {
-		return fmt.Errorf("delete minio namespace: %v", err)
-	}
-
 	return nil
 }
 
