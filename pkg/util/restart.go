@@ -3,6 +3,7 @@ package util
 import (
 	"context"
 	"fmt"
+	"time"
 
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -19,30 +20,20 @@ func RestartDeployment(ctx context.Context, client kubernetes.Interface, namespa
 		return fmt.Errorf("failed to get Deployment %s in %s: %v", name, namespace, err)
 	}
 
-	// get the selector for the Deployment
-	selector, err := metav1.LabelSelectorAsSelector(dep.Spec.Selector)
+	// set a label on the Deployment to trigger a rolling restart
+	if dep.Spec.Template.ObjectMeta.Labels == nil {
+		dep.Spec.Template.ObjectMeta.Labels = map[string]string{}
+	}
+	dep.Spec.Template.ObjectMeta.Labels["kubectl.kubernetes.io/restartedAt"] = time.Now().String()
+	_, err = client.AppsV1().Deployments(namespace).Update(ctx, dep, metav1.UpdateOptions{})
 	if err != nil {
-		return fmt.Errorf("failed to get selector for Deployment %s in %s: %v", name, namespace, err)
+		return fmt.Errorf("failed to set restart label on Deployment %s in %s: %v", name, namespace, err)
 	}
 
-	// get the pods for the Deployment
-	pods, err := client.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{LabelSelector: selector.String()})
+	// wait for the Deployment to be ready again
+	err = AwaitDeploymentReady(ctx, client, namespace, name)
 	if err != nil {
-		return fmt.Errorf("failed to get pods for Deployment %s in %s: %v", name, namespace, err)
-	}
-
-	for _, pod := range pods.Items {
-		// delete the pod
-		err := client.CoreV1().Pods(namespace).Delete(ctx, pod.Name, metav1.DeleteOptions{})
-		if err != nil {
-			return fmt.Errorf("failed to delete pod %s in %s: %v", pod.Name, namespace, err)
-		}
-
-		// wait for the Deployment to be ready again
-		err = AwaitDeploymentReady(ctx, client, namespace, name)
-		if err != nil {
-			return fmt.Errorf("failed to wait for Deployment %s in %s to be ready: %v", name, namespace, err)
-		}
+		return fmt.Errorf("failed to wait for Deployment %s in %s to be ready: %v", name, namespace, err)
 	}
 
 	return nil
@@ -58,30 +49,19 @@ func RestartStatefulSet(ctx context.Context, client kubernetes.Interface, namesp
 		return fmt.Errorf("failed to get StatefulSet %s in %s: %v", name, namespace, err)
 	}
 
-	// get the selector for the StatefulSet
-	selector, err := metav1.LabelSelectorAsSelector(sts.Spec.Selector)
+	if sts.Spec.Template.ObjectMeta.Labels == nil {
+		sts.Spec.Template.ObjectMeta.Labels = map[string]string{}
+	}
+	sts.Spec.Template.ObjectMeta.Labels["kubectl.kubernetes.io/restartedAt"] = time.Now().String()
+	_, err = client.AppsV1().StatefulSets(namespace).Update(ctx, sts, metav1.UpdateOptions{})
 	if err != nil {
-		return fmt.Errorf("failed to get selector for StatefulSet %s in %s: %v", name, namespace, err)
+		return fmt.Errorf("failed to set restart label on StatefulSet %s in %s: %v", name, namespace, err)
 	}
 
-	// get the pods for the StatefulSet
-	pods, err := client.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{LabelSelector: selector.String()})
+	// wait for the StatefulSet to be ready again
+	err = AwaitStatefulSetReady(ctx, client, namespace, name)
 	if err != nil {
-		return fmt.Errorf("failed to get pods for StatefulSet %s in %s: %v", name, namespace, err)
-	}
-
-	for _, pod := range pods.Items {
-		// delete the pod
-		err := client.CoreV1().Pods(namespace).Delete(ctx, pod.Name, metav1.DeleteOptions{})
-		if err != nil {
-			return fmt.Errorf("failed to delete pod %s in %s: %v", pod.Name, namespace, err)
-		}
-
-		// wait for the StatefulSet to be ready again
-		err = AwaitStatefulSetReady(ctx, client, namespace, name)
-		if err != nil {
-			return fmt.Errorf("failed to wait for StatefulSet %s in %s to be ready: %v", name, namespace, err)
-		}
+		return fmt.Errorf("failed to wait for StatefulSet %s in %s to be ready: %v", name, namespace, err)
 	}
 
 	return nil
@@ -97,30 +77,19 @@ func RestartDaemonSet(ctx context.Context, client kubernetes.Interface, namespac
 		return fmt.Errorf("failed to get DaemonSet %s in %s: %v", name, namespace, err)
 	}
 
-	// get the selector for the DaemonSet
-	selector, err := metav1.LabelSelectorAsSelector(dep.Spec.Selector)
+	if dep.Spec.Template.ObjectMeta.Labels == nil {
+		dep.Spec.Template.ObjectMeta.Labels = map[string]string{}
+	}
+	dep.Spec.Template.ObjectMeta.Labels["kubectl.kubernetes.io/restartedAt"] = time.Now().String()
+	_, err = client.AppsV1().DaemonSets(namespace).Update(ctx, dep, metav1.UpdateOptions{})
 	if err != nil {
-		return fmt.Errorf("failed to get selector for DaemonSet %s in %s: %v", name, namespace, err)
+		return fmt.Errorf("failed to set restart label on DaemonSet %s in %s: %v", name, namespace, err)
 	}
 
-	// get the pods for the DaemonSet
-	pods, err := client.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{LabelSelector: selector.String()})
+	// wait for the DaemonSet to be ready again
+	err = AwaitDaemonSetReady(ctx, client, namespace, name)
 	if err != nil {
-		return fmt.Errorf("failed to get pods for DaemonSet %s in %s: %v", name, namespace, err)
-	}
-
-	for _, pod := range pods.Items {
-		// delete the pod
-		err := client.CoreV1().Pods(namespace).Delete(ctx, pod.Name, metav1.DeleteOptions{})
-		if err != nil {
-			return fmt.Errorf("failed to delete pod %s in %s: %v", pod.Name, namespace, err)
-		}
-
-		// wait for the DaemonSet to be ready again
-		err = AwaitDaemonSetReady(ctx, client, namespace, name)
-		if err != nil {
-			return fmt.Errorf("failed to wait for DaemonSet %s in %s to be ready: %v", name, namespace, err)
-		}
+		return fmt.Errorf("failed to wait for DaemonSet %s in %s to be ready: %v", name, namespace, err)
 	}
 
 	return nil
