@@ -50,12 +50,12 @@ func ObjectStorageAndPVCs(config ekcoops.Config, controllers types.ControllerCon
 	ready, reason, err := IsMigrationReady(ctx, config, controllers)
 	if err != nil {
 		migrationStatus = MIGRATION_STATUS_FAILED
-		migrationLogs += fmt.Sprintf("is migration ready: %v", err)
+		migrationLogs += fmt.Sprintf("is migration ready: %v\n", err)
 		return
 	}
 	if !ready {
 		migrationStatus = MIGRATION_STATUS_NOT_READY
-		migrationLogs += fmt.Sprintf("not ready: %s", reason)
+		migrationLogs += fmt.Sprintf("not ready: %s\n", reason)
 		return
 	}
 
@@ -65,7 +65,7 @@ func ObjectStorageAndPVCs(config ekcoops.Config, controllers types.ControllerCon
 	err = migrateObjectStorage(ctx, config.MinioNamespace, controllers)
 	if err != nil {
 		migrationStatus = MIGRATION_STATUS_FAILED
-		migrationLogs += fmt.Sprintf("migrate object storage: %v", err)
+		migrationLogs += fmt.Sprintf("failed to migrate object storage: %v\n", err)
 		return
 	}
 
@@ -75,7 +75,7 @@ func ObjectStorageAndPVCs(config ekcoops.Config, controllers types.ControllerCon
 	err = migrateStorageClasses(ctx, config, controllers)
 	if err != nil {
 		migrationStatus = MIGRATION_STATUS_FAILED
-		migrationLogs += fmt.Sprintf("migrate storage classes: %v", err)
+		migrationLogs += fmt.Sprintf("failed to migrate storage classes: %v\n", err)
 		return
 	}
 
@@ -138,7 +138,7 @@ func IsMigrationReady(ctx context.Context, config ekcoops.Config, controllers ty
 // finally, delete the minio namespace and contents
 func migrateObjectStorage(ctx context.Context, minioNS string, controllers types.ControllerConfig) error {
 	client := controllers.Client
-	minioInUse, err := objectstore.IsMinioInUse(context.TODO(), client, minioNS)
+	minioInUse, err := objectstore.IsMinioInUse(ctx, client, minioNS)
 	if err != nil {
 		return fmt.Errorf("check if minio is in use: %v", err)
 	}

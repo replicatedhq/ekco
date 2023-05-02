@@ -23,6 +23,7 @@ func Serve(config ekcoops.Config, client *cluster.Controller) {
 			if err != nil {
 				log.Printf("get ready status: %v", err)
 			}
+			return
 		}
 
 		w.WriteHeader(http.StatusOK)
@@ -70,6 +71,6 @@ func Serve(config ekcoops.Config, client *cluster.Controller) {
 
 	err := http.ListenAndServe(":8080", nil)
 	if err != nil {
-		log.Fatalf("start server: %v", err)
+		log.Fatalf("server exited: %v", err)
 	}
 }
