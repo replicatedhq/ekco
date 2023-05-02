@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
@@ -50,13 +51,14 @@ func SyncAllBuckets(ctx context.Context, sourceEndpoint, sourceAccessKey, source
 			logs <- fmt.Sprintf("Syncing objects in %s", bucket.Name)
 		}
 
+		startTime := time.Now()
 		numObjects, err := syncBucket(ctx, minioClient, rookClient, bucket.Name, logs)
 		if err != nil {
 			return fmt.Errorf("failed to sync bucket %s: %v", bucket.Name, err)
 		}
 
 		if logs != nil {
-			logs <- fmt.Sprintf("Copied %d objects in %s", numObjects, bucket.Name)
+			logs <- fmt.Sprintf("Copied %d objects in %s over %s", numObjects, bucket.Name, time.Since(startTime).String())
 		}
 	}
 
