@@ -76,12 +76,12 @@ func UpdateConsumers(ctx context.Context, controllers types.ControllerConfig, en
 		return err
 	}
 
-	err = updateRegistryObjectStore(ctx, client, logs, endpoint, accessKey, secretKey, hostname)
+	err = updateRegistryObjectStore(ctx, client, logs, accessKey, secretKey, hostname, endpoint)
 	if err != nil {
 		return err
 	}
 
-	err = updateVeleroObjectStore(ctx, controllers, logs, endpoint, hostname, accessKey, secretKey, originalHostname, originalSecretKey)
+	err = updateVeleroObjectStore(ctx, controllers, logs, accessKey, secretKey, hostname, endpoint, originalSecretKey, originalHostname)
 	if err != nil {
 		return err
 	}
@@ -131,7 +131,7 @@ func updateKotsadmObjectStore(ctx context.Context, client kubernetes.Interface, 
 	return nil
 }
 
-func updateRegistryObjectStore(ctx context.Context, client kubernetes.Interface, logs chan<- string, endpoint string, accessKey string, secretKey string, hostname string) error {
+func updateRegistryObjectStore(ctx context.Context, client kubernetes.Interface, logs chan<- string, accessKey string, secretKey string, hostname string, endpoint string) error {
 	// if the 'registry-config' configmap and the 'registry-s3-secret' secret exists in the kurl namespace
 	registryConfig, err := client.CoreV1().ConfigMaps("kurl").Get(ctx, "registry-config", metav1.GetOptions{})
 	if err != nil {
@@ -159,14 +159,10 @@ func updateRegistryObjectStore(ctx context.Context, client kubernetes.Interface,
 			return fmt.Errorf("update registry-config configmap in kurl namespace: %v", err)
 		}
 
-		if registrySecret.StringData == nil {
-			registrySecret.StringData = map[string]string{}
-		}
-
-		registrySecret.StringData["access-key-id"] = accessKey
-		registrySecret.StringData["secret-access-key"] = secretKey
-		registrySecret.StringData["object-store-cluster-ip"] = endpoint
-		registrySecret.StringData["object-store-hostname"] = hostname
+		registrySecret.Data["access-key-id"] = []byte(accessKey)
+		registrySecret.Data["secret-access-key"] = []byte(secretKey)
+		registrySecret.Data["object-store-cluster-ip"] = []byte(endpoint)
+		registrySecret.Data["object-store-hostname"] = []byte(hostname)
 
 		_, err = client.CoreV1().Secrets("kurl").Update(ctx, registrySecret, metav1.UpdateOptions{})
 		if err != nil {
@@ -189,7 +185,7 @@ func updateRegistryObjectStore(ctx context.Context, client kubernetes.Interface,
 	return nil
 }
 
-func updateVeleroObjectStore(ctx context.Context, controllers types.ControllerConfig, logs chan<- string, endpoint string, hostname string, accessKey string, secretKey string, originalHostname string, originalSecretKey string) error {
+func updateVeleroObjectStore(ctx context.Context, controllers types.ControllerConfig, logs chan<- string, accessKey string, secretKey string, hostname string, endpoint string, originalSecretKey string, originalHostname string) error {
 	client := controllers.Client
 	restartVelero := false
 	// if kubernetes_resource_exists velero backupstoragelocation default
