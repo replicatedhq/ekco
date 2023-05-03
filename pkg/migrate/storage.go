@@ -208,6 +208,16 @@ func migrateObjectStorage(ctx context.Context, minioNS string, controllers types
 	}
 
 	logsChan := make(chan string)
+	defer close(logsChan)
+	go func() {
+		for {
+			logLine, ok := <-logsChan
+			if !ok {
+				return
+			}
+			migrationLogs += logLine + "\n"
+		}
+	}()
 	go func() {
 		for {
 			select {
