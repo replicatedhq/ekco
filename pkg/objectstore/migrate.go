@@ -13,6 +13,7 @@ import (
 	"github.com/replicatedhq/ekco/pkg/util"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 )
 
 // SyncAllBuckets syncs copies all objects in all buckets in object store to another, and returns progress via a channel.
@@ -70,6 +71,25 @@ func SyncAllBuckets(ctx context.Context, sourceEndpoint, sourceAccessKey, source
 func UpdateConsumers(ctx context.Context, controllers types.ControllerConfig, endpoint, hostname, accessKey, secretKey, originalHostname, originalSecretKey string, logs chan<- string) error {
 	client := controllers.Client
 	// if kubernetes_resource_exists default secret kotsadm-s3
+	err := updateKotsadmObjectStore(ctx, client, logs, accessKey, secretKey, hostname, endpoint)
+	if err != nil {
+		return err
+	}
+
+	err = updateRegistryObjectStore(ctx, client, logs, endpoint, accessKey, secretKey, hostname)
+	if err != nil {
+		return err
+	}
+
+	err = updateVeleroObjectStore(ctx, controllers, logs, endpoint, hostname, accessKey, secretKey, originalHostname, originalSecretKey)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func updateKotsadmObjectStore(ctx context.Context, client kubernetes.Interface, logs chan<- string, accessKey string, secretKey string, hostname string, endpoint string) error {
 	kotsadmS3, err := client.CoreV1().Secrets("default").Get(ctx, "kotsadm-s3", metav1.GetOptions{})
 	if err != nil {
 		if !k8serrors.IsNotFound(err) {
@@ -108,7 +128,10 @@ func UpdateConsumers(ctx context.Context, controllers types.ControllerConfig, en
 			logs <- "Kotsadm restarted"
 		}
 	}
+	return nil
+}
 
+func updateRegistryObjectStore(ctx context.Context, client kubernetes.Interface, logs chan<- string, endpoint string, accessKey string, secretKey string, hostname string) error {
 	// if the 'registry-config' configmap and the 'registry-s3-secret' secret exists in the kurl namespace
 	registryConfig, err := client.CoreV1().ConfigMaps("kurl").Get(ctx, "registry-config", metav1.GetOptions{})
 	if err != nil {
@@ -163,7 +186,11 @@ func UpdateConsumers(ctx context.Context, controllers types.ControllerConfig, en
 			logs <- "Registry restarted"
 		}
 	}
+	return nil
+}
 
+func updateVeleroObjectStore(ctx context.Context, controllers types.ControllerConfig, logs chan<- string, endpoint string, hostname string, accessKey string, secretKey string, originalHostname string, originalSecretKey string) error {
+	client := controllers.Client
 	restartVelero := false
 	// if kubernetes_resource_exists velero backupstoragelocation default
 	veleroBSL, err := controllers.VeleroV1.BackupStorageLocations("velero").Get(ctx, "default", metav1.GetOptions{})
@@ -260,7 +287,6 @@ func UpdateConsumers(ctx context.Context, controllers types.ControllerConfig, en
 			logs <- "Velero restarted"
 		}
 	}
-
 	return nil
 }
 
