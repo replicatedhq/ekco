@@ -46,8 +46,6 @@ func Test_updateKotsadmObjectStore(t *testing.T) {
 				if !util.IsNotFoundErr(err) {
 					t.Fatalf("expected not found error, got %s", err.Error())
 				}
-
-				return
 			},
 		},
 		{
@@ -87,7 +85,6 @@ func Test_updateKotsadmObjectStore(t *testing.T) {
 				req.Equal("hostname", string(kotsadms3.Data["endpoint"]))
 				req.Equal("endpoint", string(kotsadms3.Data["object-store-cluster-ip"]))
 				req.Equal("untouched", string(kotsadms3.Data["untouched"]))
-				return
 			},
 		},
 	}
@@ -146,8 +143,6 @@ func Test_updateRegistryObjectStore(t *testing.T) {
 				if !util.IsNotFoundErr(err) {
 					t.Fatalf("expected not found error, got %s", err.Error())
 				}
-
-				return
 			},
 		},
 		{
@@ -236,7 +231,6 @@ version: 0.1`,
 				req.Equal("endpoint", string(secret.Data["object-store-cluster-ip"]))
 				req.Equal("hostname", string(secret.Data["object-store-hostname"]))
 				req.Equal("untouched", string(secret.Data["untouched"]))
-				return
 			},
 		},
 	}
