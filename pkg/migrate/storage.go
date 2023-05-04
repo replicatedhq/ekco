@@ -218,16 +218,6 @@ func migrateObjectStorage(ctx context.Context, minioNS string, controllers types
 			migrationLogs += logLine + "\n"
 		}
 	}()
-	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case logLine := <-logsChan:
-				migrationLogs += logLine + "\n"
-			}
-		}
-	}()
 
 	// migrate all data from minio to rook
 	err = objectstore.SyncAllBuckets(ctx, fmt.Sprintf("%s:9000", minioPodIP), minioAccessKey, minioSecretKey, rookEndpoint, rookAccessKey, rookSecretKey, logsChan)
