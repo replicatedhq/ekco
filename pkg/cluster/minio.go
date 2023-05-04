@@ -98,11 +98,13 @@ func (c *Controller) MigrateMinioData(ctx context.Context, utilImage string, ns 
 
 	// log progress as it happens
 	logsChan := make(chan string)
+	defer close(logsChan)
 	go func() {
-		select {
-		case <-ctx.Done():
-			return
-		case logLine := <-logsChan:
+		for {
+			logLine, ok := <-logsChan
+			if !ok {
+				return
+			}
 			c.Log.Infof(logLine)
 		}
 	}()
