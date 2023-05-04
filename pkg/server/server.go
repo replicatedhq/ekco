@@ -11,11 +11,13 @@ import (
 )
 
 func Serve(config ekcoops.Config, client *cluster.Controller) {
-	http.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+	mux := http.NewServeMux()
+
+	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	http.HandleFunc("/storagemigration/ready", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/storagemigration/ready", func(w http.ResponseWriter, r *http.Request) {
 		_, message, err := migrate.IsMigrationReady(context.TODO(), config, client.Config)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
@@ -33,7 +35,7 @@ func Serve(config ekcoops.Config, client *cluster.Controller) {
 		}
 	})
 
-	http.HandleFunc("/storagemigration/status", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/storagemigration/status", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, err := w.Write([]byte(migrate.GetMigrationStatus()))
 		if err != nil {
@@ -41,7 +43,7 @@ func Serve(config ekcoops.Config, client *cluster.Controller) {
 		}
 	})
 
-	http.HandleFunc("/storagemigration/logs", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/storagemigration/logs", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, err := w.Write([]byte(migrate.GetMigrationLogs()))
 		if err != nil {
@@ -49,7 +51,7 @@ func Serve(config ekcoops.Config, client *cluster.Controller) {
 		}
 	})
 
-	http.HandleFunc("/storagemigration/approve", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/storagemigration/approve", func(w http.ResponseWriter, r *http.Request) {
 		authHeader := r.Header.Get("Authorization")
 		if authHeader != "Bearer "+config.StorageMigrationAuthToken && config.StorageMigrationAuthToken != "" {
 			w.WriteHeader(http.StatusUnauthorized)
@@ -69,7 +71,7 @@ func Serve(config ekcoops.Config, client *cluster.Controller) {
 		}
 	})
 
-	err := http.ListenAndServe(":8080", nil)
+	err := http.ListenAndServe(":8080", mux)
 	if err != nil {
 		log.Fatalf("server exited: %v", err)
 	}
