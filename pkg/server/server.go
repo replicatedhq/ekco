@@ -73,6 +73,6 @@ func Serve(config ekcoops.Config, client *cluster.Controller) {
 
 	err := http.ListenAndServe(":8080", mux)
 	if err != nil {
-		log.Fatalf("server exited: %v", err)
+		log.Printf("server exited: %v", err)
 	}
 }
