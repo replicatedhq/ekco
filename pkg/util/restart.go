@@ -22,10 +22,10 @@ func RestartDeployment(ctx context.Context, client kubernetes.Interface, namespa
 	}
 
 	// set a label on the Deployment to trigger a rolling restart
-	if dep.Spec.Template.ObjectMeta.Labels == nil {
-		dep.Spec.Template.ObjectMeta.Labels = map[string]string{}
+	if dep.Spec.Template.ObjectMeta.Annotations == nil {
+		dep.Spec.Template.ObjectMeta.Annotations = map[string]string{}
 	}
-	dep.Spec.Template.ObjectMeta.Labels["ekco.kurl.sh/restartedAt"] = strings.Replace(time.Now().Format(time.RFC3339), ":", "-", -1)
+	dep.Spec.Template.ObjectMeta.Annotations["ekco.kurl.sh/restartedAt"] = strings.Replace(time.Now().Format(time.RFC3339), ":", "-", -1)
 	_, err = client.AppsV1().Deployments(namespace).Update(ctx, dep, metav1.UpdateOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to set restart label on Deployment %s in %s: %v", name, namespace, err)
@@ -50,10 +50,10 @@ func RestartStatefulSet(ctx context.Context, client kubernetes.Interface, namesp
 		return fmt.Errorf("failed to get StatefulSet %s in %s: %v", name, namespace, err)
 	}
 
-	if sts.Spec.Template.ObjectMeta.Labels == nil {
-		sts.Spec.Template.ObjectMeta.Labels = map[string]string{}
+	if sts.Spec.Template.ObjectMeta.Annotations == nil {
+		sts.Spec.Template.ObjectMeta.Annotations = map[string]string{}
 	}
-	sts.Spec.Template.ObjectMeta.Labels["ekco.kurl.sh/restartedAt"] = strings.Replace(time.Now().Format(time.RFC3339), ":", "-", -1)
+	sts.Spec.Template.ObjectMeta.Annotations["ekco.kurl.sh/restartedAt"] = strings.Replace(time.Now().Format(time.RFC3339), ":", "-", -1)
 	_, err = client.AppsV1().StatefulSets(namespace).Update(ctx, sts, metav1.UpdateOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to set restart label on StatefulSet %s in %s: %v", name, namespace, err)
@@ -78,10 +78,10 @@ func RestartDaemonSet(ctx context.Context, client kubernetes.Interface, namespac
 		return fmt.Errorf("failed to get DaemonSet %s in %s: %v", name, namespace, err)
 	}
 
-	if dep.Spec.Template.ObjectMeta.Labels == nil {
-		dep.Spec.Template.ObjectMeta.Labels = map[string]string{}
+	if dep.Spec.Template.ObjectMeta.Annotations == nil {
+		dep.Spec.Template.ObjectMeta.Annotations = map[string]string{}
 	}
-	dep.Spec.Template.ObjectMeta.Labels["ekco.kurl.sh/restartedAt"] = strings.Replace(time.Now().Format(time.RFC3339), ":", "-", -1)
+	dep.Spec.Template.ObjectMeta.Annotations["ekco.kurl.sh/restartedAt"] = strings.Replace(time.Now().Format(time.RFC3339), ":", "-", -1)
 	_, err = client.AppsV1().DaemonSets(namespace).Update(ctx, dep, metav1.UpdateOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to set restart label on DaemonSet %s in %s: %v", name, namespace, err)
