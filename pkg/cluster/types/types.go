@@ -16,7 +16,7 @@ type ControllerConfig struct {
 	CephV1                                cephv1.CephV1Interface
 	AlertManagerV1                        dynamic.NamespaceableResourceInterface
 	PrometheusV1                          dynamic.NamespaceableResourceInterface
-	VeleroV1                              *velerov1.VeleroV1Client
+	VeleroV1                              velerov1.VeleroV1Interface
 	CertificatesDir                       string
 	RookPriorityClass                     string
 	RotateCerts                           bool
