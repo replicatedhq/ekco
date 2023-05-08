@@ -25,6 +25,9 @@ type Config struct {
 	MaintainRookStorageNodes bool `mapstructure:"maintain_rook_storage_nodes"`
 	// when set, only nodes with this label will be added to the ceph cluster
 	RookStorageNodesLabel string `mapstructure:"rook_storage_nodes_label"`
+	// when set, only nodes in this array will be added to the ceph cluster with the corresponding
+	// config
+	RookStorageNodes string `mapstructure:"rook_storage_nodes"`
 	// names and levels of ceph pools to maintain if MaintainRookStorageNodes is enabled
 	CephBlockPool          string `mapstructure:"ceph_block_pool"`
 	CephFilesystem         string `mapstructure:"ceph_filesystem"`

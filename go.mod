@@ -149,13 +149,6 @@ require (
 	sigs.k8s.io/yaml v1.3.0 // indirect
 )
 
-replace (
-	// from https://github.com/rook/rook/blob/v1.10.6/go.mod
-	github.com/googleapis/gnostic => github.com/googleapis/gnostic v0.4.1
-	github.com/kubernetes-incubator/external-storage => github.com/libopenstorage/external-storage v0.20.4-openstorage-rc3
-	github.com/portworx/sched-ops => github.com/portworx/sched-ops v0.20.4-openstorage-rc3
-)
-
 // TODO: when controller-runtime past v0.14.6 is released, remove this line
 replace sigs.k8s.io/controller-runtime => sigs.k8s.io/controller-runtime v0.13.1-0.20230418125457-f83169592e24
 
@@ -194,7 +187,14 @@ replace (
 	k8s.io/sample-controller => k8s.io/sample-controller v0.26.1
 )
 
-// from https://github.com/rook/rook/blob/v1.10.6/go.mod
+// from https://github.com/rook/rook/blob/v1.11.5/go.mod
+replace (
+	github.com/googleapis/gnostic => github.com/googleapis/gnostic v0.4.1
+	github.com/kubernetes-incubator/external-storage => github.com/libopenstorage/external-storage v0.20.4-openstorage-rc3
+	github.com/portworx/sched-ops => github.com/portworx/sched-ops v0.20.4-openstorage-rc3
+)
+
+// from https://github.com/rook/rook/blob/v1.11.5/go.mod
 exclude (
 	// This tag doesn't exist, but is imported by github.com/portworx/sched-ops.
 	github.com/kubernetes-incubator/external-storage v0.20.4-openstorage-rc2

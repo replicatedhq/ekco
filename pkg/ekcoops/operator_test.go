@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/replicatedhq/ekco/pkg/util"
+	cephv1 "github.com/rook/rook/pkg/apis/ceph.rook.io/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -81,7 +82,9 @@ func TestOperatorIsDead(t *testing.T) {
 func Test_shouldUseNodeForStorage(t *testing.T) {
 	type args struct {
 		node                  corev1.Node
+		cephCluster           *cephv1.CephCluster
 		rookStorageNodesLabel string
+		manageNodes           bool
 	}
 	tests := []struct {
 		name string
@@ -147,10 +150,30 @@ func Test_shouldUseNodeForStorage(t *testing.T) {
 			},
 			want: false,
 		},
+		{
+			name: "ready and rook nodes array and in cephcluster",
+			args: args{
+				node:                  corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node1"}},
+				cephCluster:           &cephv1.CephCluster{Spec: cephv1.ClusterSpec{Storage: cephv1.StorageScopeSpec{Nodes: []cephv1.Node{{Name: "node1"}}}}},
+				rookStorageNodesLabel: "",
+				manageNodes:           true,
+			},
+			want: true,
+		},
+		{
+			name: "ready and rook nodes array and not in cephcluster",
+			args: args{
+				node:                  corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node2"}},
+				cephCluster:           &cephv1.CephCluster{Spec: cephv1.ClusterSpec{Storage: cephv1.StorageScopeSpec{Nodes: []cephv1.Node{{Name: "node1"}}}}},
+				rookStorageNodesLabel: "",
+				manageNodes:           true,
+			},
+			want: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := shouldUseNodeForStorage(tt.args.node, tt.args.rookStorageNodesLabel); got != tt.want {
+			if got := shouldUseNodeForStorage(tt.args.node, tt.args.cephCluster, tt.args.rookStorageNodesLabel, tt.args.manageNodes); got != tt.want {
 				t.Errorf("shouldUseNodeForStorage() = %v, want %v", got, tt.want)
 			}
 		})

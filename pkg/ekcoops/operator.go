@@ -14,6 +14,7 @@ import (
 	"github.com/replicatedhq/ekco/pkg/cluster"
 	"github.com/replicatedhq/ekco/pkg/rook"
 	"github.com/replicatedhq/ekco/pkg/util"
+	cephv1 "github.com/rook/rook/pkg/apis/ceph.rook.io/v1"
 	"go.uber.org/zap"
 	certificatesv1 "k8s.io/api/certificates/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -73,7 +74,7 @@ func (o *Operator) Reconcile(nodes []corev1.Node, doFullReconcile bool) error {
 	}
 
 	if rookVersion != nil {
-		err := o.reconcileRook(*rookVersion, nodes, doFullReconcile)
+		err := o.reconcileRook(ctx, *rookVersion, nodes, doFullReconcile)
 		if err != nil {
 			multiErr = multierror.Append(multiErr, err)
 		}
@@ -147,11 +148,17 @@ func (o *Operator) reconcileNode(node corev1.Node, readyMasters, readyWorkers in
 	return nil
 }
 
-func (o *Operator) reconcileRook(rookVersion semver.Version, nodes []corev1.Node, doFullReconcile bool) error {
+func (o *Operator) reconcileRook(ctx context.Context, rookVersion semver.Version, nodes []corev1.Node, doFullReconcile bool) error {
 	var multiErr error
 
 	if o.config.MaintainRookStorageNodes {
-		readyCount, err := o.ensureAllUsedForStorage(rookVersion, nodes)
+		shouldManageRookStorageNodesArray := false
+		if o.config.RookStorageNodes != "" {
+			// for now we do not care about the value of this flag, we just want to know if it is
+			// set and we allow rook to manage storage nodes
+			shouldManageRookStorageNodesArray = true
+		}
+		readyCount, err := o.ensureAllUsedForStorage(ctx, rookVersion, nodes, shouldManageRookStorageNodesArray)
 		if err != nil {
 			multiErr = multierror.Append(multiErr, errors.Wrapf(err, "ensure all ready nodes used for storage"))
 		} else {
@@ -206,16 +213,21 @@ func (o *Operator) isDead(node corev1.Node) bool {
 // ensureAlUsedForStorage will only append nodes. Removing nodes is only done during purge.
 // Filter out not ready nodes since Rook fails to ever start an OSD on a node unless it's ready at
 // the moment it detects the added node in the list.
-func (o *Operator) ensureAllUsedForStorage(rookVersion semver.Version, nodes []corev1.Node) (int, error) {
+func (o *Operator) ensureAllUsedForStorage(ctx context.Context, rookVersion semver.Version, nodes []corev1.Node, manageNodes bool) (int, error) {
 	var names []string
 
+	cluster, err := o.controller.GetCephCluster(ctx)
+	if err != nil {
+		return 0, errors.Wrapf(err, "get CephCluster config")
+	}
+
 	for _, node := range nodes {
-		if shouldUseNodeForStorage(node, o.config.RookStorageNodesLabel) {
+		if shouldUseNodeForStorage(node, cluster, o.config.RookStorageNodesLabel, manageNodes) {
 			names = append(names, node.Name)
 		}
 	}
 
-	return o.controller.UseNodesForStorage(rookVersion, names)
+	return o.controller.UseNodesForStorage(ctx, rookVersion, cluster, names, manageNodes)
 }
 
 // adjustPoolSizes changes ceph pool replication factors up and down
@@ -302,8 +314,18 @@ func (o *Operator) RotateCerts(force bool) error {
 	return nil
 }
 
-func shouldUseNodeForStorage(node corev1.Node, rookStorageNodesLabel string) bool {
+func shouldUseNodeForStorage(node corev1.Node, cluster *cephv1.CephCluster, rookStorageNodesLabel string, manageNodes bool) bool {
 	if !util.NodeIsReady(node) {
+		return false
+	}
+	if manageNodes {
+		// If the list of storage nodes is provided, use the actual cluster nodes as the source of
+		// truth
+		for _, rookNode := range cluster.Spec.Storage.Nodes {
+			if rookNode.Name == node.Name {
+				return true
+			}
+		}
 		return false
 	}
 	if rookStorageNodesLabel == "" {
