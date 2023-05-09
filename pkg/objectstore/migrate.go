@@ -18,6 +18,10 @@ import (
 
 // SyncAllBuckets syncs copies all objects in all buckets in object store to another, and returns progress via a channel.
 func SyncAllBuckets(ctx context.Context, sourceEndpoint, sourceAccessKey, sourceSecretKey, destEndpoint, destAccessKey, destSecretKey string, logs chan<- string) error {
+	if logs == nil {
+		logs = nilLogger()
+	}
+
 	// Initialize source client object.
 	minioClient, err := minio.New(sourceEndpoint, &minio.Options{
 		Creds: credentials.NewStaticV4(sourceAccessKey, sourceSecretKey, ""),
@@ -34,23 +38,17 @@ func SyncAllBuckets(ctx context.Context, sourceEndpoint, sourceAccessKey, source
 		return fmt.Errorf("failed to initialize rook client: %v", err)
 	}
 
-	if logs != nil {
-		logs <- "Initialized clients"
-	}
+	logs <- "Initialized clients"
 
 	minioBuckets, err := minioClient.ListBuckets(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to list minio buckets: %v", err)
 	}
 
-	if logs != nil {
-		logs <- fmt.Sprintf("Found %d buckets to sync", len(minioBuckets))
-	}
+	logs <- fmt.Sprintf("Found %d buckets to sync", len(minioBuckets))
 
 	for _, bucket := range minioBuckets {
-		if logs != nil {
-			logs <- fmt.Sprintf("Syncing objects in %s", bucket.Name)
-		}
+		logs <- fmt.Sprintf("Syncing objects in %s", bucket.Name)
 
 		startTime := time.Now()
 		numObjects, err := syncBucket(ctx, minioClient, rookClient, bucket.Name, logs)
@@ -58,9 +56,7 @@ func SyncAllBuckets(ctx context.Context, sourceEndpoint, sourceAccessKey, source
 			return fmt.Errorf("failed to sync bucket %s: %v", bucket.Name, err)
 		}
 
-		if logs != nil {
-			logs <- fmt.Sprintf("Copied %d objects in %s over %s", numObjects, bucket.Name, time.Since(startTime).String())
-		}
+		logs <- fmt.Sprintf("Copied %d objects in %s over %s", numObjects, bucket.Name, time.Since(startTime).String())
 	}
 
 	return nil
@@ -70,7 +66,10 @@ func SyncAllBuckets(ctx context.Context, sourceEndpoint, sourceAccessKey, source
 // it handles kotsadm, registry, and velero.
 func UpdateConsumers(ctx context.Context, controllers types.ControllerConfig, endpoint, hostname, accessKey, secretKey, originalHostname, originalSecretKey string, logs chan<- string) error {
 	client := controllers.Client
-	// if kubernetes_resource_exists default secret kotsadm-s3
+	if logs == nil {
+		logs = nilLogger()
+	}
+
 	err := updateKotsadmObjectStore(ctx, client, logs, accessKey, secretKey, hostname, endpoint)
 	if err != nil {
 		return err
@@ -90,6 +89,7 @@ func UpdateConsumers(ctx context.Context, controllers types.ControllerConfig, en
 }
 
 func updateKotsadmObjectStore(ctx context.Context, client kubernetes.Interface, logs chan<- string, accessKey string, secretKey string, hostname string, endpoint string) error {
+	// if kubernetes_resource_exists default secret kotsadm-s3
 	kotsadmS3, err := client.CoreV1().Secrets("default").Get(ctx, "kotsadm-s3", metav1.GetOptions{})
 	if err != nil {
 		if !k8serrors.IsNotFound(err) {
@@ -102,18 +102,14 @@ func updateKotsadmObjectStore(ctx context.Context, client kubernetes.Interface, 
 		kotsadmS3.Data["endpoint"] = []byte(hostname)
 		kotsadmS3.Data["object-store-cluster-ip"] = []byte(endpoint)
 
-		if logs != nil {
-			logs <- "Updating kotsadm-s3 secret to use new object store"
-		}
+		logs <- "Updating kotsadm-s3 secret to use new object store"
 
 		_, err = client.CoreV1().Secrets("default").Update(ctx, kotsadmS3, metav1.UpdateOptions{})
 		if err != nil {
 			return fmt.Errorf("update kotsadm-s3 secret in default namespace: %v", err)
 		}
 
-		if logs != nil {
-			logs <- "Restarting kotsadm"
-		}
+		logs <- "Restarting kotsadm"
 
 		err = util.RestartDeployment(ctx, client, "default", "kotsadm")
 		if err != nil {
@@ -124,9 +120,7 @@ func updateKotsadmObjectStore(ctx context.Context, client kubernetes.Interface, 
 			return fmt.Errorf("restart kotsadm statefulset after migrating object store: %v", err)
 		}
 
-		if logs != nil {
-			logs <- "Kotsadm restarted"
-		}
+		logs <- "Kotsadm restarted"
 	}
 	return nil
 }
@@ -146,9 +140,7 @@ func updateRegistryObjectStore(ctx context.Context, client kubernetes.Interface,
 		}
 	}
 	if registryConfig != nil && registrySecret != nil {
-		if logs != nil {
-			logs <- "Updating Registry to use new object store"
-		}
+		logs <- "Updating Registry to use new object store"
 
 		existingConfig := registryConfig.Data["config.yml"]
 		newConfig := regexp.MustCompile(`regionendpoint: http.*`).ReplaceAllString(existingConfig, fmt.Sprintf("regionendpoint: http://%s/", endpoint))
@@ -169,18 +161,14 @@ func updateRegistryObjectStore(ctx context.Context, client kubernetes.Interface,
 			return fmt.Errorf("update registry-s3-secret secret in kurl namespace: %v", err)
 		}
 
-		if logs != nil {
-			logs <- "Restarting Registry"
-		}
+		logs <- "Restarting Registry"
 
 		err = util.RestartDeployment(ctx, client, "kurl", "registry")
 		if err != nil {
 			return fmt.Errorf("restart registry deployment after migrating object store: %v", err)
 		}
 
-		if logs != nil {
-			logs <- "Registry restarted"
-		}
+		logs <- "Registry restarted"
 	}
 	return nil
 }
@@ -198,9 +186,7 @@ func updateVeleroObjectStore(ctx context.Context, controllers types.ControllerCo
 	if veleroBSL != nil {
 		veleroS3URL, ok := veleroBSL.Spec.Config["s3Url"]
 		if ok && strings.Contains(veleroS3URL, originalHostname) {
-			if logs != nil {
-				logs <- "Updating Velero backup locations to use new object store"
-			}
+			logs <- "Updating Velero backup locations to use new object store"
 
 			restartVelero = true
 
@@ -240,9 +226,7 @@ func updateVeleroObjectStore(ctx context.Context, controllers types.ControllerCo
 		// check if this is using the original secret key and thus should be updated
 		// if it's a custom endpoint, we don't want to overwrite it
 		if ok && strings.Contains(string(cloud), originalSecretKey) {
-			if logs != nil {
-				logs <- "Updating Velero cloud credentials to use new object store"
-			}
+			logs <- "Updating Velero cloud credentials to use new object store"
 
 			restartVelero = true
 
@@ -260,28 +244,22 @@ func updateVeleroObjectStore(ctx context.Context, controllers types.ControllerCo
 	}
 
 	if restartVelero {
-		if logs != nil {
-			logs <- "Restarting Velero's restic daemonset"
-		}
+		logs <- "Restarting Velero's restic daemonset"
 
 		err = util.RestartDaemonSet(ctx, client, "velero", "restic")
 		if err != nil {
 			return fmt.Errorf("restart velero restic daemonset after migrating object store: %v", err)
 		}
 
-		if logs != nil {
-			logs <- "Restic daemonset restarted"
-			logs <- "Restarting Velero"
-		}
+		logs <- "Restic daemonset restarted"
+		logs <- "Restarting Velero"
 
 		err = util.RestartDeployment(ctx, client, "velero", "velero")
 		if err != nil {
 			return fmt.Errorf("restart velero deployment after migrating object store: %v", err)
 		}
 
-		if logs != nil {
-			logs <- "Velero restarted"
-		}
+		logs <- "Velero restarted"
 	}
 	return nil
 }
@@ -307,9 +285,7 @@ func syncBucket(ctx context.Context, src *minio.Client, dst *minio.Client, bucke
 			return count, fmt.Errorf("get %s from source: %v", srcObjectInfo.Key, err)
 		}
 
-		if logs != nil {
-			logs <- fmt.Sprintf("  - %s", srcObjectInfo.Key)
-		}
+		logs <- fmt.Sprintf("  - %s", srcObjectInfo.Key)
 
 		_, err = dst.PutObject(ctx, bucket, srcObjectInfo.Key, srcObject, srcObjectInfo.Size, minio.PutObjectOptions{
 			ContentType:     srcObjectInfo.ContentType,
@@ -324,4 +300,14 @@ func syncBucket(ctx context.Context, src *minio.Client, dst *minio.Client, bucke
 	}
 
 	return count, nil
+}
+
+func nilLogger() chan<- string {
+	eternalReads := make(chan string)
+	go func() {
+		for {
+			<-eternalReads
+		}
+	}()
+	return eternalReads
 }
