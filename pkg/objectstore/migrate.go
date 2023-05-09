@@ -287,9 +287,6 @@ func updateVeleroObjectStore(ctx context.Context, controllers types.ControllerCo
 }
 
 func syncBucket(ctx context.Context, src *minio.Client, dst *minio.Client, bucket string, logs chan<- string) (int, error) {
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
 	count := 0
 
 	exists, err := dst.BucketExists(ctx, bucket)
