@@ -70,17 +70,17 @@ func UpdateConsumers(ctx context.Context, controllers types.ControllerConfig, en
 		logs = nilLogger()
 	}
 
-	err := updateKotsadmObjectStore(ctx, client, logs, accessKey, secretKey, hostname, endpoint)
-	if err != nil {
-		return err
-	}
-
-	err = updateRegistryObjectStore(ctx, client, logs, accessKey, secretKey, hostname, endpoint)
+	err := updateRegistryObjectStore(ctx, client, logs, accessKey, secretKey, hostname, endpoint)
 	if err != nil {
 		return err
 	}
 
 	err = updateVeleroObjectStore(ctx, controllers, logs, accessKey, secretKey, hostname, endpoint, originalSecretKey, originalHostname)
+	if err != nil {
+		return err
+	}
+
+	err = updateKotsadmObjectStore(ctx, client, logs, accessKey, secretKey, hostname, endpoint)
 	if err != nil {
 		return err
 	}
