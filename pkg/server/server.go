@@ -10,7 +10,7 @@ import (
 	"github.com/replicatedhq/ekco/pkg/migrate"
 )
 
-func Serve(config ekcoops.Config, client *cluster.Controller) {
+func Serve(ctx context.Context, config ekcoops.Config, client *cluster.Controller) error {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
@@ -18,7 +18,7 @@ func Serve(config ekcoops.Config, client *cluster.Controller) {
 	})
 
 	mux.HandleFunc("/storagemigration/ready", func(w http.ResponseWriter, r *http.Request) {
-		_, message, err := migrate.IsMigrationReady(context.TODO(), config, client.Config)
+		_, message, err := migrate.IsMigrationReady(r.Context(), config, client.Config)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			_, err := w.Write([]byte(err.Error()))
@@ -71,8 +71,11 @@ func Serve(config ekcoops.Config, client *cluster.Controller) {
 		}
 	})
 
-	err := http.ListenAndServe(":8080", mux)
-	if err != nil {
-		log.Printf("server exited: %v", err)
-	}
+	server := &http.Server{Addr: ":8080", Handler: mux}
+	go func() {
+		<-ctx.Done()
+		_ = server.Shutdown(context.Background())
+	}()
+
+	return server.ListenAndServe()
 }
