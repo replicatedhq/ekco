@@ -257,8 +257,8 @@ func migrateStorageClasses(ctx context.Context, config ekcoops.Config, controlle
 
 	logsReader, logsWriter := io.Pipe()
 	defer logsWriter.Close()
-	defer logsReader.Close()
 	go func() {
+		defer logsReader.Close()
 		bufScanner := bufio.NewScanner(logsReader)
 		for bufScanner.Scan() {
 			migrationLogs += bufScanner.Text() + "\n"
