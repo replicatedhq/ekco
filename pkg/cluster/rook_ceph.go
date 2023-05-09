@@ -62,47 +62,48 @@ func init() {
 
 // returns the number of nodes used for storage, which may be higher than the number of names passed in
 // if a node is currently not ready but has not been purged
-func (c *Controller) UseNodesForStorage(rookVersion semver.Version, names []string) (int, error) {
-	cluster, err := c.GetCephCluster(context.TODO())
-	if err != nil {
-		return 0, errors.Wrapf(err, "get CephCluster config")
-	}
-	var next []cephv1.Node
-	storageNodes := make(map[string]bool, len(cluster.Spec.Storage.Nodes))
-	for _, storageNode := range cluster.Spec.Storage.Nodes {
-		next = append(next, storageNode)
-		storageNodes[storageNode.Name] = true
-	}
-	changed := false
-	for _, name := range names {
-		if !storageNodes[name] {
-			c.Log.Infof("Adding node %q to CephCluster node storage list", name)
-			next = append(next, cephv1.Node{
-				Name: name,
+func (c *Controller) UseNodesForStorage(ctx context.Context, rookVersion semver.Version, cluster *cephv1.CephCluster, names []string, manageNodes bool) (int, error) {
+	// do not manage nodes if the user is managing them
+	if !manageNodes {
+		var next []cephv1.Node
+		storageNodes := make(map[string]bool, len(cluster.Spec.Storage.Nodes))
+		for _, storageNode := range cluster.Spec.Storage.Nodes {
+			next = append(next, storageNode)
+			storageNodes[storageNode.Name] = true
+		}
+		changed := false
+		for _, name := range names {
+			if !storageNodes[name] {
+				c.Log.Infof("Adding node %q to CephCluster node storage list", name)
+				next = append(next, cephv1.Node{
+					Name: name,
+				})
+				changed = true
+			}
+		}
+		if changed {
+			patches := []k8s.JSONPatchOperation{}
+			patches = append(patches, k8s.JSONPatchOperation{
+				Op:    k8s.JSONPatchOpReplace,
+				Path:  "/spec/storage/nodes",
+				Value: next,
 			})
-			changed = true
-		}
-	}
-	if changed {
-		patches := []k8s.JSONPatchOperation{}
-		patches = append(patches, k8s.JSONPatchOperation{
-			Op:    k8s.JSONPatchOpReplace,
-			Path:  "/spec/storage/nodes",
-			Value: next,
-		})
-		patches = append(patches, k8s.JSONPatchOperation{
-			Op:    k8s.JSONPatchOpReplace,
-			Path:  "/spec/storage/useAllNodes",
-			Value: false,
-		})
+			patches = append(patches, k8s.JSONPatchOperation{
+				Op:    k8s.JSONPatchOpReplace,
+				Path:  "/spec/storage/useAllNodes",
+				Value: false,
+			})
 
-		_, err = c.JSONPatchCephCluster(context.TODO(), patches)
-		if err != nil {
-			return 0, errors.Wrap(err, "patch CephCluster with new storage node list")
+			_, err := c.JSONPatchCephCluster(ctx, patches)
+			if err != nil {
+				return 0, errors.Wrap(err, "patch CephCluster with new storage node list")
+			}
 		}
+	} else {
+		c.Log.Debugf("EKCO is not managing CephCluster storage nodes")
 	}
 
-	return c.countUniqueHostsWithOSD(rookVersion)
+	return c.countUniqueHostsWithOSD(ctx, rookVersion)
 }
 
 func (c *Controller) removeCephClusterStorageNode(name string) error {
@@ -785,12 +786,12 @@ func (c *Controller) rookCephExecTarget(rookVersion semver.Version) (string, str
 	return "rook-ceph-tools", selector.String()
 }
 
-func (c *Controller) countUniqueHostsWithOSD(rookVersion semver.Version) (int, error) {
+func (c *Controller) countUniqueHostsWithOSD(ctx context.Context, rookVersion semver.Version) (int, error) {
 	container, rookLabels := c.rookCephExecTarget(rookVersion)
 	opts := metav1.ListOptions{
 		LabelSelector: rookLabels,
 	}
-	pods, err := c.Config.Client.CoreV1().Pods(RookCephNS).List(context.TODO(), opts)
+	pods, err := c.Config.Client.CoreV1().Pods(RookCephNS).List(ctx, opts)
 	if err != nil {
 		return 0, errors.Wrap(err, "list Rook pods")
 	}
@@ -799,7 +800,7 @@ func (c *Controller) countUniqueHostsWithOSD(rookVersion semver.Version) (int, e
 	}
 
 	cmd := []string{"ceph", "osd", "status"}
-	exitCode, stdout, stderr, err := c.SyncExecutor.ExecContainer(context.TODO(), RookCephNS, pods.Items[0].Name, container, cmd...)
+	exitCode, stdout, stderr, err := c.SyncExecutor.ExecContainer(ctx, RookCephNS, pods.Items[0].Name, container, cmd...)
 	if err != nil {
 		return 0, errors.Wrap(err, "exec ceph osd status")
 	}
