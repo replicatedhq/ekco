@@ -91,7 +91,9 @@ func Test_updateKotsadmObjectStore(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			req := require.New(t)
-			logs := nilLogger()
+			logs := func(fmt string, args ...interface{}) {
+				t.Logf(fmt, args...)
+			}
 
 			err := updateKotsadmObjectStore(context.TODO(), tt.client, logs, tt.accessKey, tt.secretKey, tt.hostname, tt.endpoint)
 			if tt.wantErr {
@@ -238,7 +240,9 @@ version: 0.1`,
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			req := require.New(t)
-			logs := nilLogger()
+			logs := func(fmt string, args ...interface{}) {
+				t.Logf(fmt, args...)
+			}
 
 			err := updateRegistryObjectStore(context.TODO(), tt.client, logs, tt.accessKey, tt.secretKey, tt.hostname, tt.endpoint)
 			if tt.wantErr {
@@ -356,7 +360,9 @@ aws_secret_access_key=secretKey`, string(sec.Data["cloud"]))
 		t.Run(tt.name, func(t *testing.T) {
 			req := require.New(t)
 			config := types.ControllerConfig{Client: tt.client, VeleroV1: tt.velero}
-			logs := nilLogger()
+			logs := func(fmt string, args ...interface{}) {
+				t.Logf(fmt, args...)
+			}
 
 			err := updateVeleroObjectStore(context.Background(), config, logs, tt.accessKey, tt.secretKey, tt.hostname, tt.endpoint, tt.originalSecretKey, tt.originalHostname)
 			if tt.wantErr {

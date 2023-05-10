@@ -96,20 +96,11 @@ func (c *Controller) MigrateMinioData(ctx context.Context, utilImage string, ns 
 
 	c.Log.Infof("Waiting for MinIO data to be migrated")
 
-	// log progress as it happens
-	logsChan := make(chan string)
-	defer close(logsChan)
-	go func() {
-		for {
-			logLine, ok := <-logsChan
-			if !ok {
-				return
-			}
-			c.Log.Infof(logLine)
-		}
-	}()
+	logFunc := func(fmt string, args ...interface{}) {
+		c.Log.Infof(fmt, args...)
+	}
 
-	err = objectstore.SyncAllBuckets(ctx, fmt.Sprintf("%s:9000", podIP), minioAccessKey, minioSecretKey, fmt.Sprintf("ha-minio.%s.svc.cluster.local", ns), minioAccessKey, minioSecretKey, logsChan)
+	err = objectstore.SyncAllBuckets(ctx, fmt.Sprintf("%s:9000", podIP), minioAccessKey, minioSecretKey, fmt.Sprintf("ha-minio.%s.svc.cluster.local", ns), minioAccessKey, minioSecretKey, logFunc)
 	if err != nil {
 		return fmt.Errorf("sync minio data: %w", err)
 	}

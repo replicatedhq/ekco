@@ -46,40 +46,40 @@ func ObjectStorageAndPVCs(config ekcoops.Config, controllers types.ControllerCon
 	ctx, cancel := context.WithCancel(context.Background()) // TODO maybe allow cancelling this somehow
 	defer cancel()
 
-	migrationLogs = "checking if the cluster is ready to migrate\n"
+	setLogs("checking if the cluster is ready to migrate\n")
 	ready, reason, err := IsMigrationReady(ctx, config, controllers)
 	if err != nil {
 		migrationStatus = MIGRATION_STATUS_FAILED
-		migrationLogs += fmt.Sprintf("is migration ready: %v\n", err)
+		addLogs("is migration ready: %v", err)
 		return
 	}
 	if !ready {
 		migrationStatus = MIGRATION_STATUS_NOT_READY
-		migrationLogs += fmt.Sprintf("not ready: %s\n", reason)
+		addLogs("not ready: %s", reason)
 		return
 	}
 
-	migrationLogs += "starting object storage migration\n"
+	addLogs("starting object storage migration")
 
 	migrationStatus = MIGRATION_STATUS_OBJECTSTORE
 	err = migrateObjectStorage(ctx, config.MinioNamespace, controllers)
 	if err != nil {
 		migrationStatus = MIGRATION_STATUS_FAILED
-		migrationLogs += fmt.Sprintf("failed to migrate object storage: %v\n", err)
+		addLogs("failed to migrate object storage: %v", err)
 		return
 	}
 
-	migrationLogs += "starting persistent volume migration\n"
+	addLogs("starting persistent volume migration")
 
 	migrationStatus = MIGRATION_STATUS_PVCMIGRATE
 	err = migrateStorageClasses(ctx, config, controllers)
 	if err != nil {
 		migrationStatus = MIGRATION_STATUS_FAILED
-		migrationLogs += fmt.Sprintf("failed to migrate storage classes: %v\n", err)
+		addLogs("failed to migrate storage classes: %v", err)
 		return
 	}
 
-	migrationLogs += "storage migration completed\n"
+	addLogs("storage migration completed")
 
 	migrationStatus = MIGRATION_STATUS_COMPLETED
 }
@@ -207,33 +207,21 @@ func migrateObjectStorage(ctx context.Context, minioNS string, controllers types
 		return fmt.Errorf("disable existing minio service: %w", err)
 	}
 
-	logsChan := make(chan string)
-	defer close(logsChan)
-	go func() {
-		for {
-			logLine, ok := <-logsChan
-			if !ok {
-				return
-			}
-			migrationLogs += logLine + "\n"
-		}
-	}()
-
 	// migrate all data from minio to rook
-	err = objectstore.SyncAllBuckets(ctx, fmt.Sprintf("%s:9000", minioPodIP), minioAccessKey, minioSecretKey, rookEndpoint, rookAccessKey, rookSecretKey, logsChan)
+	err = objectstore.SyncAllBuckets(ctx, fmt.Sprintf("%s:9000", minioPodIP), minioAccessKey, minioSecretKey, rookEndpoint, rookAccessKey, rookSecretKey, addLogs)
 	if err != nil {
 		return fmt.Errorf("migrate data from minio to rook: %w", err)
 	}
 
 	// update secrets in the cluster to point to the new rook object store
-	migrationLogs += "updating secrets in the cluster to point to the new rook object store\n"
-	err = objectstore.UpdateConsumers(ctx, controllers, rookEndpoint, "http://rook-ceph-rgw-rook-ceph-store.rook-ceph", rookAccessKey, rookSecretKey, fmt.Sprintf("minio.%s", minioNS), minioSecretKey, logsChan)
+	addLogs("updating secrets in the cluster to point to the new rook object store")
+	err = objectstore.UpdateConsumers(ctx, controllers, addLogs, rookEndpoint, "http://rook-ceph-rgw-rook-ceph-store.rook-ceph", rookAccessKey, rookSecretKey, fmt.Sprintf("minio.%s", minioNS), minioSecretKey)
 	if err != nil {
 		return fmt.Errorf("update secrets in the cluster to point to the new rook object store: %w", err)
 	}
 
 	// delete the minio namespace and contents
-	migrationLogs += "deleting the minio namespace and contents\n"
+	addLogs("deleting the minio namespace and contents")
 	err = client.AppsV1().StatefulSets(minioNS).Delete(ctx, "ha-minio", v1.DeleteOptions{})
 	if err != nil && !errors.IsNotFound(err) {
 		return fmt.Errorf("delete minio statefulset: %v", err)
@@ -257,11 +245,11 @@ func migrateStorageClasses(ctx context.Context, config ekcoops.Config, controlle
 
 	logsReader, logsWriter := io.Pipe()
 	defer logsWriter.Close()
-	defer logsReader.Close()
 	go func() {
+		defer logsReader.Close()
 		bufScanner := bufio.NewScanner(logsReader)
 		for bufScanner.Scan() {
-			migrationLogs += bufScanner.Text() + "\n"
+			addLogs(bufScanner.Text())
 		}
 	}()
 	fileLog := log.New(logsWriter, "", 0)
@@ -280,29 +268,37 @@ func migrateStorageClasses(ctx context.Context, config ekcoops.Config, controlle
 	overrides.PauseKotsadm()
 	defer overrides.ResumeKotsadm()
 
-	fileLog.Println("scaling down prometheus")
+	addLogs("scaling down prometheus")
 	err := util.ScalePrometheus(controllers.PrometheusV1, 0)
 	if err != nil {
 		return fmt.Errorf("scale down prometheus: %v", err)
 	}
 
-	fileLog.Printf("migrating data from %q storageclass to %q\n", "scaling", config.RookStorageClass)
+	addLogs("migrating data from %q storageclass to %q", "scaling", config.RookStorageClass)
 	err = migrate.Migrate(ctx, fileLog, client, options)
 	if err != nil {
 		return fmt.Errorf("run pvmigrate: %v", err)
 	}
 
-	fileLog.Printf("deleting the (empty) %q storageclass\n", "scaling")
+	addLogs("deleting the (empty) %q storageclass", "scaling")
 	err = client.StorageV1().StorageClasses().Delete(ctx, "scaling", v1.DeleteOptions{})
 	if err != nil {
 		return fmt.Errorf("delete scaling storage class: %v", err)
 	}
 
-	fileLog.Println("scaling up prometheus")
+	addLogs("scaling up prometheus")
 	err = util.ScalePrometheus(controllers.PrometheusV1, 2)
 	if err != nil {
 		return fmt.Errorf("scale up prometheus: %v", err)
 	}
 
 	return nil
+}
+
+func addLogs(format string, args ...interface{}) {
+	migrationLogs += fmt.Sprintf(format, args...) + "\n"
+}
+
+func setLogs(logs string) {
+	migrationLogs = logs
 }

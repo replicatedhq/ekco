@@ -6,6 +6,8 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
+type Logger func(fmt string, args ...interface{})
+
 func FromViper(v *viper.Viper) (*zap.SugaredLogger, error) {
 	level := zap.InfoLevel
 	if err := level.Set(v.GetString("log_level")); err != nil {
