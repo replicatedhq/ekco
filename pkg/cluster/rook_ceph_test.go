@@ -279,11 +279,12 @@ func TestController_UseNodesForStorage(t *testing.T) {
 	type args struct {
 		rookVersion semver.Version
 		names       []string
+		manageNodes bool
 	}
 	tests := []struct {
 		name                 string
 		nodes                []string
-		rookResources        []runtime.Object
+		cephCluster          *cephv1.CephCluster
 		args                 args
 		want                 int
 		wantStorageScopeSpec cephv1.StorageScopeSpec
@@ -292,17 +293,15 @@ func TestController_UseNodesForStorage(t *testing.T) {
 		{
 			name:  "storage nodes should change from useAllNodes to 1, rook version 1.9.12",
 			nodes: []string{"node1"},
-			rookResources: []runtime.Object{
-				&cephv1.CephCluster{
-					TypeMeta: metav1.TypeMeta{Kind: "CephCluster", APIVersion: "ceph.rook.io/v1"},
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "rook-ceph",
-						Namespace: "rook-ceph",
-					},
-					Spec: cephv1.ClusterSpec{
-						Storage: cephv1.StorageScopeSpec{
-							UseAllNodes: true,
-						},
+			cephCluster: &cephv1.CephCluster{
+				TypeMeta: metav1.TypeMeta{Kind: "CephCluster", APIVersion: "ceph.rook.io/v1"},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "rook-ceph",
+					Namespace: "rook-ceph",
+				},
+				Spec: cephv1.ClusterSpec{
+					Storage: cephv1.StorageScopeSpec{
+						UseAllNodes: true,
 					},
 				},
 			},
@@ -324,20 +323,18 @@ func TestController_UseNodesForStorage(t *testing.T) {
 		{
 			name:  "storage nodes should stay at 1, rook version 1.9.12",
 			nodes: []string{"node1"},
-			rookResources: []runtime.Object{
-				&cephv1.CephCluster{
-					TypeMeta: metav1.TypeMeta{Kind: "CephCluster", APIVersion: "ceph.rook.io/v1"},
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "rook-ceph",
-						Namespace: "rook-ceph",
-					},
-					Spec: cephv1.ClusterSpec{
-						Storage: cephv1.StorageScopeSpec{
-							UseAllNodes: false,
-							Nodes: []cephv1.Node{
-								{
-									Name: "node1",
-								},
+			cephCluster: &cephv1.CephCluster{
+				TypeMeta: metav1.TypeMeta{Kind: "CephCluster", APIVersion: "ceph.rook.io/v1"},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "rook-ceph",
+					Namespace: "rook-ceph",
+				},
+				Spec: cephv1.ClusterSpec{
+					Storage: cephv1.StorageScopeSpec{
+						UseAllNodes: false,
+						Nodes: []cephv1.Node{
+							{
+								Name: "node1",
 							},
 						},
 					},
@@ -361,20 +358,18 @@ func TestController_UseNodesForStorage(t *testing.T) {
 		{
 			name:  "storage nodes should increase from 1 to 3, rook version 1.9.12",
 			nodes: []string{"node1", "node2", "node3"},
-			rookResources: []runtime.Object{
-				&cephv1.CephCluster{
-					TypeMeta: metav1.TypeMeta{Kind: "CephCluster", APIVersion: "ceph.rook.io/v1"},
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "rook-ceph",
-						Namespace: "rook-ceph",
-					},
-					Spec: cephv1.ClusterSpec{
-						Storage: cephv1.StorageScopeSpec{
-							UseAllNodes: false,
-							Nodes: []cephv1.Node{
-								{
-									Name: "node1",
-								},
+			cephCluster: &cephv1.CephCluster{
+				TypeMeta: metav1.TypeMeta{Kind: "CephCluster", APIVersion: "ceph.rook.io/v1"},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "rook-ceph",
+					Namespace: "rook-ceph",
+				},
+				Spec: cephv1.ClusterSpec{
+					Storage: cephv1.StorageScopeSpec{
+						UseAllNodes: false,
+						Nodes: []cephv1.Node{
+							{
+								Name: "node1",
 							},
 						},
 					},
@@ -395,6 +390,130 @@ func TestController_UseNodesForStorage(t *testing.T) {
 					},
 					{
 						Name: "node3",
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name:  "rookNodes is not empty, one node in the cluster but three in the cephcluster should return 1, rook version 1.9.12",
+			nodes: []string{"node1"},
+			cephCluster: &cephv1.CephCluster{
+				TypeMeta: metav1.TypeMeta{Kind: "CephCluster", APIVersion: "ceph.rook.io/v1"},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "rook-ceph",
+					Namespace: "rook-ceph",
+				},
+				Spec: cephv1.ClusterSpec{
+					Storage: cephv1.StorageScopeSpec{
+						UseAllNodes: false,
+						Nodes: []cephv1.Node{
+							{
+								Name: "node1",
+								Selection: cephv1.Selection{
+									Devices: []cephv1.Device{
+										{
+											Name: "sdb",
+										},
+									},
+								},
+							},
+							{
+								Name: "node2",
+								Selection: cephv1.Selection{
+									Devices: []cephv1.Device{
+										{
+											Name: "sdc",
+										},
+									},
+								},
+							},
+							{
+								Name: "node3",
+								Selection: cephv1.Selection{
+									Devices: []cephv1.Device{
+										{
+											Name: "sdd",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			args: args{
+				rookVersion: semver.MustParse("1.9.12"),
+				names:       []string{"node1"},
+				manageNodes: true,
+			},
+			want: 1,
+			wantStorageScopeSpec: cephv1.StorageScopeSpec{
+				Nodes: []cephv1.Node{
+					{
+						Name: "node1",
+						Selection: cephv1.Selection{
+							Devices: []cephv1.Device{
+								{
+									Name: "sdb",
+								},
+							},
+						},
+					},
+					{
+						Name: "node2",
+						Selection: cephv1.Selection{
+							Devices: []cephv1.Device{
+								{
+									Name: "sdc",
+								},
+							},
+						},
+					},
+					{
+						Name: "node3",
+						Selection: cephv1.Selection{
+							Devices: []cephv1.Device{
+								{
+									Name: "sdd",
+								},
+							},
+						},
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name:  "rookNodes is not empty, does not match cephcluster, should prefer cephcluster, rook version 1.9.12",
+			nodes: []string{"node1"},
+			cephCluster: &cephv1.CephCluster{
+				TypeMeta: metav1.TypeMeta{Kind: "CephCluster", APIVersion: "ceph.rook.io/v1"},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "rook-ceph",
+					Namespace: "rook-ceph",
+				},
+				Spec: cephv1.ClusterSpec{
+					Storage: cephv1.StorageScopeSpec{
+						UseAllNodes: false,
+						Nodes: []cephv1.Node{
+							{
+								Name: "node1",
+							},
+						},
+					},
+				},
+			},
+			args: args{
+				rookVersion: semver.MustParse("1.9.12"),
+				names:       []string{"node1"},
+				manageNodes: true,
+			},
+			want: 1,
+			wantStorageScopeSpec: cephv1.StorageScopeSpec{
+				Nodes: []cephv1.Node{
+					{
+						Name: "node1",
 					},
 				},
 			},
@@ -443,7 +562,7 @@ func TestController_UseNodesForStorage(t *testing.T) {
 				Return(0, cephOSDStatusOut, "", nil)
 
 			clientset := fake.NewSimpleClientset(resources...)
-			rookClientset := rookfake.NewSimpleClientset(tt.rookResources...)
+			rookClientset := rookfake.NewSimpleClientset(tt.cephCluster)
 
 			c := &Controller{
 				Config: types.ControllerConfig{
@@ -453,7 +572,7 @@ func TestController_UseNodesForStorage(t *testing.T) {
 				SyncExecutor: m,
 				Log:          logger.NewDiscardLogger(),
 			}
-			got, err := c.UseNodesForStorage(tt.args.rookVersion, tt.args.names)
+			got, err := c.UseNodesForStorage(context.Background(), tt.args.rookVersion, tt.cephCluster, tt.args.names, tt.args.manageNodes)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Controller.UseNodesForStorage() error = %v, wantErr %v", err, tt.wantErr)
 				return

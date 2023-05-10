@@ -13,7 +13,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/projectcontour/contour v1.24.4
 	github.com/replicatedhq/pvmigrate v0.9.0
-	github.com/rook/rook v1.11.4
+	github.com/rook/rook v1.11.5
 	github.com/spf13/cobra v1.7.0
 	github.com/spf13/viper v1.15.0
 	github.com/stretchr/testify v1.8.2
@@ -161,8 +161,8 @@ require (
 	gopkg.in/square/go-jose.v2 v2.6.0 // indirect
 	gopkg.in/tomb.v2 v2.0.0-20161208151619-d5d1b5820637 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	k8s.io/apiextensions-apiserver v0.26.1 // indirect
-	k8s.io/cloud-provider v0.26.1 // indirect
+	k8s.io/apiextensions-apiserver v0.26.4 // indirect
+	k8s.io/cloud-provider v0.26.4 // indirect
 	k8s.io/cluster-bootstrap v0.27.1 // indirect
 	k8s.io/component-base v0.27.1 // indirect
 	k8s.io/klog/v2 v2.90.1 // indirect
@@ -172,13 +172,6 @@ require (
 	sigs.k8s.io/mcs-api v0.1.0 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.3 // indirect
 	sigs.k8s.io/yaml v1.3.0 // indirect
-)
-
-replace (
-	// from https://github.com/rook/rook/blob/v1.10.6/go.mod
-	github.com/googleapis/gnostic => github.com/googleapis/gnostic v0.4.1
-	github.com/kubernetes-incubator/external-storage => github.com/libopenstorage/external-storage v0.20.4-openstorage-rc3
-	github.com/portworx/sched-ops => github.com/portworx/sched-ops v0.20.4-openstorage-rc3
 )
 
 // TODO: when controller-runtime past v0.14.6 is released, remove this line
@@ -219,7 +212,14 @@ replace (
 	k8s.io/sample-controller => k8s.io/sample-controller v0.26.1
 )
 
-// from https://github.com/rook/rook/blob/v1.10.6/go.mod
+// from https://github.com/rook/rook/blob/v1.11.5/go.mod
+replace (
+	github.com/googleapis/gnostic => github.com/googleapis/gnostic v0.4.1
+	github.com/kubernetes-incubator/external-storage => github.com/libopenstorage/external-storage v0.20.4-openstorage-rc3
+	github.com/portworx/sched-ops => github.com/portworx/sched-ops v0.20.4-openstorage-rc3
+)
+
+// from https://github.com/rook/rook/blob/v1.11.5/go.mod
 exclude (
 	// This tag doesn't exist, but is imported by github.com/portworx/sched-ops.
 	github.com/kubernetes-incubator/external-storage v0.20.4-openstorage-rc2

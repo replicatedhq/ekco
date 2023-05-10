@@ -106,6 +106,7 @@ func OperatorCmd(v *viper.Viper) *cobra.Command {
 	cmd.Flags().Int("min_ready_worker_nodes", 0, "Minimum number of ready worker nodes required for auto-purge")
 	cmd.Flags().Bool("maintain_rook_storage_nodes", false, "Add and remove nodes to the ceph cluster and scale replication of pools")
 	cmd.Flags().String("rook_storage_nodes_label", "", "When set, only nodes with this label will be added to the ceph cluster")
+	cmd.Flags().String("rook_storage_nodes", "", "When set, only nodes in this array will be added to the ceph cluster with the corresponding config")
 	cmd.Flags().String("ceph_block_pool", "replicapool", "Name of CephBlockPool to manage if maintain_rook_storage_nodes is enabled")
 	cmd.Flags().String("ceph_filesystem", "rook-shared-fs", "Name of CephFilesystem to manage if maintain_rook_storage_nodes is enabled")
 	cmd.Flags().String("ceph_object_store", "replicated", "Name of CephObjectStore to manage if maintain_rook_storage_nodes is enabled")
