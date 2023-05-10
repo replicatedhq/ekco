@@ -8,8 +8,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/replicatedhq/ekco/pkg/objectstore"
 	"github.com/replicatedhq/ekco/pkg/util"
-	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apitypes "k8s.io/apimachinery/pkg/types"
@@ -94,57 +94,11 @@ func (c *Controller) MigrateMinioData(ctx context.Context, utilImage string, ns 
 	minioAccessKey := string(credentialSecret.Data["MINIO_ACCESS_KEY"])
 	minioSecretKey := string(credentialSecret.Data["MINIO_SECRET_KEY"])
 
-	// create a job that migrates data
-	migrateJob := batchv1.Job{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "apps/v1",
-			Kind:       "Job",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "migrate-minio-ha",
-			Labels: map[string]string{
-				"app": "minio-migration",
-			},
-		},
-		Spec: batchv1.JobSpec{
-			Template: corev1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						"app": "minio-migration",
-					},
-				},
-				Spec: corev1.PodSpec{
-					RestartPolicy: corev1.RestartPolicyOnFailure,
-					Containers: []corev1.Container{
-						{
-							Name:  "migrate-minio-ha",
-							Image: utilImage,
-							Command: []string{
-								"/usr/local/bin/kurl",
-								"sync-object-store",
-								fmt.Sprintf("--source_host=%s:9000", podIP),
-								fmt.Sprintf("--source_access_key_id=%s", minioAccessKey),
-								fmt.Sprintf("--source_access_key_secret=%s", minioSecretKey),
-								fmt.Sprintf("--dest_host=ha-minio.%s.svc.cluster.local", ns),
-								fmt.Sprintf("--dest_access_key_id=%s", minioAccessKey),
-								fmt.Sprintf("--dest_access_key_secret=%s", minioSecretKey),
-							},
-						},
-					},
-				},
-			},
-		},
-	}
-
-	_, err = c.Config.Client.BatchV1().Jobs(ns).Create(ctx, &migrateJob, metav1.CreateOptions{})
-	if err != nil {
-		return fmt.Errorf("failed to create minio migration job: %w", err)
-	}
-
 	c.Log.Infof("Waiting for MinIO data to be migrated")
-	err = c.waitForJobCompletion(ctx, "migrate-minio-ha", ns)
+
+	err = objectstore.SyncAllBuckets(ctx, fmt.Sprintf("%s:9000", podIP), minioAccessKey, minioSecretKey, fmt.Sprintf("ha-minio.%s.svc.cluster.local", ns), minioAccessKey, minioSecretKey, c.Log.Infof)
 	if err != nil {
-		return fmt.Errorf("failed to wait for migrate job to complete: %w", err)
+		return fmt.Errorf("sync minio data: %w", err)
 	}
 
 	c.Log.Infof("Enabling new HA MinIO service")
@@ -156,7 +110,7 @@ func (c *Controller) MigrateMinioData(ctx context.Context, utilImage string, ns 
 		return fmt.Errorf("failed to enable minio service: %w", err)
 	}
 
-	// delete the minio deployment, pvc and the migration pod
+	// delete the minio deployment and pvc
 	err = c.Config.Client.AppsV1().Deployments(ns).Delete(ctx, "minio", metav1.DeleteOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to clean up minio deployment: %w", err)
@@ -165,27 +119,9 @@ func (c *Controller) MigrateMinioData(ctx context.Context, utilImage string, ns 
 	if err != nil {
 		return fmt.Errorf("failed to clean up minio pvc: %w", err)
 	}
-	backgroundProp := metav1.DeletePropagationBackground
-	err = c.Config.Client.BatchV1().Jobs(ns).Delete(ctx, "migrate-minio-ha", metav1.DeleteOptions{PropagationPolicy: &backgroundProp})
-	if err != nil {
-		return fmt.Errorf("failed to clean up minio migration job: %w", err)
-	}
 
 	c.Log.Infof("Successfully migrated to HA MinIO")
 	return nil
-}
-
-func (c *Controller) waitForJobCompletion(ctx context.Context, jobName string, jobNS string) error {
-	for {
-		runningJob, err := c.Config.Client.BatchV1().Jobs(jobNS).Get(ctx, jobName, metav1.GetOptions{})
-		if err != nil {
-			return fmt.Errorf("failed to get job %s in %s: %w", jobName, jobNS, err)
-		}
-		if runningJob.Status.Succeeded > 0 {
-			return nil
-		}
-		time.Sleep(time.Second * 5)
-	}
 }
 
 // MaybeRebalanceMinioServers

@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/replicatedhq/ekco/pkg/cluster/types"
 	"go.uber.org/zap"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -88,7 +89,7 @@ func TestEnableHAKotsadm(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			logger, _ := zap.NewProduction()
-			c := NewController(ControllerConfig{
+			c := NewController(types.ControllerConfig{
 				Client: tt.args.clientset,
 			}, logger.Sugar())
 

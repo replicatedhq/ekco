@@ -1,11 +1,14 @@
 package cli
 
 import (
+	"fmt"
 	"github.com/pkg/errors"
 	"github.com/replicatedhq/ekco/pkg/cluster"
+	"github.com/replicatedhq/ekco/pkg/cluster/types"
 	"github.com/replicatedhq/ekco/pkg/ekcoops"
 	cephv1 "github.com/rook/rook/pkg/client/clientset/versioned/typed/ceph.rook.io/v1"
 	"github.com/spf13/viper"
+	veleroclientv1 "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
 	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
@@ -51,6 +54,11 @@ func initClusterController(config *ekcoops.Config, log *zap.SugaredLogger) (*clu
 		return nil, errors.Wrap(err, "failed creating Kubernetes client.")
 	}
 
+	vclient, err := veleroclientv1.NewForConfig(clientConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed creating Velero client: %v", err)
+	}
+
 	prometheusClient := dynamicClient.Resource(schema.GroupVersionResource{
 		Group:    "monitoring.coreos.com",
 		Version:  "v1",
@@ -62,13 +70,14 @@ func initClusterController(config *ekcoops.Config, log *zap.SugaredLogger) (*clu
 		Resource: "alertmanagers",
 	})
 
-	return cluster.NewController(cluster.ControllerConfig{
+	return cluster.NewController(types.ControllerConfig{
 		Client:                                client,
 		ClientConfig:                          clientConfig,
 		CephV1:                                rookcephclient,
 		CertificatesDir:                       config.CertificatesDir,
 		AlertManagerV1:                        alertManagerClient,
 		PrometheusV1:                          prometheusClient,
+		VeleroV1:                              vclient,
 		RookPriorityClass:                     config.RookPriorityClass,
 		RotateCerts:                           config.RotateCerts,
 		RotateCertsImage:                      config.RotateCertsImage,

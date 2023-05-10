@@ -14,6 +14,7 @@ import (
 	"github.com/replicatedhq/ekco/pkg/ekcoops"
 	"github.com/replicatedhq/ekco/pkg/internallb"
 	"github.com/replicatedhq/ekco/pkg/logger"
+	"github.com/replicatedhq/ekco/pkg/server"
 	"github.com/replicatedhq/ekco/pkg/version"
 	"github.com/replicatedhq/ekco/pkg/webhook"
 	"github.com/spf13/cobra"
@@ -72,12 +73,21 @@ func OperatorCmd(v *viper.Viper) *cobra.Command {
 				}
 			}
 
+			ctx, cancel := context.WithCancel(context.Background())
+
+			go func() {
+				err := server.Serve(ctx, *config, clusterController)
+				if err != nil {
+					log.Errorf("Server exited with error: %v", err)
+				}
+				cancel()
+			}()
+
 			operator := ekcoops.New(*config, clusterController.Config.Client, clusterController, log)
 
 			sigs := make(chan os.Signal, 1)
 			signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
 
-			ctx, cancel := context.WithCancel(context.Background())
 			go func() {
 				sig := <-sigs
 				log.Infof("Operator got signal %s, exiting on next poll", sig)

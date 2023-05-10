@@ -66,6 +66,9 @@ spec:
           env:
             - name: LOG_LEVEL
               value: debug
+          ports:
+            - containerPort: 8080
+              name: service
           volumeMounts:
             - name: ekco-config
               mountPath: /etc/ekco
@@ -73,6 +76,15 @@ spec:
             - name: certificates-dir
               mountPath: /etc/kubernetes/pki
               readOnly: true
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: service
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 1
+            successThreshold: 1
+            failureThreshold: 3
       volumes:
         - name: ekco-config
           configMap:

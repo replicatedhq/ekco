@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/replicatedhq/ekco/pkg/cluster/types"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 	corev1 "k8s.io/api/core/v1"
@@ -186,7 +187,7 @@ apiEndpoints:
 			req := require.New(t)
 			logger, _ := zap.NewProduction()
 			client := clientsetfake.NewSimpleClientset(tt.clusterResources...)
-			c := NewController(ControllerConfig{
+			c := NewController(types.ControllerConfig{
 				Client: client,
 			}, logger.Sugar())
 
