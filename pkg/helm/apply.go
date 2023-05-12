@@ -20,7 +20,10 @@ func ApplyChart(ctx context.Context, chartBytes io.Reader, values map[string]int
 	env.SetNamespace(namespace)
 
 	actConfig := action.Configuration{}
-	actConfig.Init(env.RESTClientGetter(), namespace, "", nil)
+	err = actConfig.Init(env.RESTClientGetter(), namespace, "", nil)
+	if err != nil {
+		return fmt.Errorf("unable to initialize helm configuration: %w", err)
+	}
 
 	act := action.NewInstall(&actConfig)
 	act.Namespace = namespace
