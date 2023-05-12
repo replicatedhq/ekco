@@ -10,7 +10,7 @@ import (
 	"helm.sh/helm/v3/pkg/cli"
 )
 
-func ApplyChart(chartBytes io.Reader, values, namespace string) error {
+func ApplyChart(ctx context.Context, chartBytes io.Reader, values map[string]interface{}, namespace, releaseName string) error {
 	chart, err := loader.LoadArchive(chartBytes)
 	if err != nil {
 		return err
@@ -24,8 +24,9 @@ func ApplyChart(chartBytes io.Reader, values, namespace string) error {
 
 	act := action.NewInstall(&actConfig)
 	act.Namespace = namespace
-	act.ReleaseName = "rook-ceph"
-	if _, err := act.RunWithContext(context.TODO(), chart, nil); err != nil {
+	act.ReleaseName = releaseName
+	act.Wait = false
+	if _, err := act.RunWithContext(ctx, chart, values); err != nil {
 		return fmt.Errorf("unable to install chart: %w", err)
 	}
 

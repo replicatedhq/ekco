@@ -7,8 +7,7 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
-	"github.com/replicatedhq/ekco/pkg/helm"
-	"github.com/replicatedhq/ekco/pkg/helm/chartfiles"
+	"io/fs"
 	"log"
 	"regexp"
 	"strconv"
@@ -18,6 +17,8 @@ import (
 	"github.com/blang/semver"
 	multierror "github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
+	"github.com/replicatedhq/ekco/pkg/helm"
+	"github.com/replicatedhq/ekco/pkg/helm/chartfiles"
 	"github.com/replicatedhq/ekco/pkg/k8s"
 	"github.com/replicatedhq/ekco/pkg/util"
 	cephv1 "github.com/rook/rook/pkg/apis/ceph.rook.io/v1"
@@ -423,7 +424,7 @@ func (c *Controller) SetFilesystemReplication(rookVersion semver.Version, cephVe
 		return false, nil
 	}
 
-	fs, err := c.Config.CephV1.CephFilesystems(RookCephNS).Get(context.TODO(), name, metav1.GetOptions{})
+	cephFilesystem, err := c.Config.CephV1.CephFilesystems(RookCephNS).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		if util.IsNotFoundErr(err) {
 			return false, nil
@@ -431,10 +432,10 @@ func (c *Controller) SetFilesystemReplication(rookVersion semver.Version, cephVe
 		return false, errors.Wrapf(err, "get Filesystem %s", name)
 	}
 	patches := []k8s.JSONPatchOperation{}
-	for i, pool := range fs.Spec.DataPools {
+	for i, pool := range cephFilesystem.Spec.DataPools {
 		current := int(pool.Replicated.Size)
 		if current < level {
-			fs.Spec.DataPools[i].Replicated.Size = uint(level)
+			cephFilesystem.Spec.DataPools[i].Replicated.Size = uint(level)
 			patches = append(patches, k8s.JSONPatchOperation{
 				Op:    k8s.JSONPatchOpReplace,
 				Path:  fmt.Sprintf("/spec/dataPools/%d/replicated/size", i),
@@ -442,9 +443,9 @@ func (c *Controller) SetFilesystemReplication(rookVersion semver.Version, cephVe
 			})
 		}
 	}
-	current := int(fs.Spec.MetadataPool.Replicated.Size)
+	current := int(cephFilesystem.Spec.MetadataPool.Replicated.Size)
 	if current < level {
-		fs.Spec.MetadataPool.Replicated.Size = uint(level)
+		cephFilesystem.Spec.MetadataPool.Replicated.Size = uint(level)
 		patches = append(patches, k8s.JSONPatchOperation{
 			Op:    k8s.JSONPatchOpReplace,
 			Path:  "/spec/metadataPool/replicated/size",
@@ -467,8 +468,8 @@ func (c *Controller) SetFilesystemReplication(rookVersion semver.Version, cephVe
 		return false, errors.Wrap(err, "json marshal patches")
 	}
 
-	c.Log.Debugf("Patching CephFilesystem %s with %s", fs.Name, string(patchData))
-	_, err = c.Config.CephV1.CephFilesystems(RookCephNS).Patch(context.TODO(), fs.Name, apitypes.JSONPatchType, patchData, metav1.PatchOptions{})
+	c.Log.Debugf("Patching CephFilesystem %s with %s", cephFilesystem.Name, string(patchData))
+	_, err = c.Config.CephV1.CephFilesystems(RookCephNS).Patch(context.TODO(), cephFilesystem.Name, apitypes.JSONPatchType, patchData, metav1.PatchOptions{})
 	if err != nil {
 		return false, errors.Wrapf(err, "patch Filesystem %s", name)
 	}
@@ -481,19 +482,19 @@ func (c *Controller) SetFilesystemReplication(rookVersion semver.Version, cephVe
 		// https://github.com/rook/rook/issues/3144
 		err := c.cephOSDPoolSetSize(rookVersion, cephVersion, RookCephSharedFSMetadataPool, level)
 		if err != nil {
-			return false, errors.Wrapf(err, "scale shared fs metadata pool size")
+			return false, errors.Wrapf(err, "scale shared cephFS metadata pool size")
 		}
 		err = c.cephOSDPoolSetMinSize(rookVersion, RookCephSharedFSMetadataPool, minSize)
 		if err != nil {
-			return false, errors.Wrapf(err, "scale shared fs metadata pool min_size")
+			return false, errors.Wrapf(err, "scale shared cephFS metadata pool min_size")
 		}
 		err = c.cephOSDPoolSetSize(rookVersion, cephVersion, RookCephSharedFSDataPool, level)
 		if err != nil {
-			return false, errors.Wrapf(err, "scale shared fs data pool size")
+			return false, errors.Wrapf(err, "scale shared cephFS data pool size")
 		}
 		err = c.cephOSDPoolSetMinSize(rookVersion, RookCephSharedFSDataPool, minSize)
 		if err != nil {
-			return false, errors.Wrapf(err, "scale shared fs data pool min_size")
+			return false, errors.Wrapf(err, "scale shared cephFS data pool min_size")
 		}
 	}
 
@@ -974,15 +975,18 @@ func (c *Controller) GetRookVersion(ctx context.Context) (*semver.Version, error
 }
 
 func (c *Controller) ensureCephClusterHelm(ctx context.Context, rookStorageClassName string) error {
-
-	fname := "rook-ceph-cluster-v1.11.4.tgz" // TODO dynamic
-	ebsfp, err := chartfiles.FS.Open(fname)
+	ebsfp, chartName, err := chartfiles.LatestChartByName("rook-ceph-cluster")
 	if err != nil {
-		return fmt.Errorf("unable to find %s: %w", fname, err)
+		return fmt.Errorf("unable to get rook-ceph-cluster chartfile: %w", err)
 	}
-	defer ebsfp.Close()
+	defer func(ebsfp fs.File) {
+		err := ebsfp.Close()
+		if err != nil {
+			c.Log.Warnf("unable to close rook-ceph-cluster chartfile: %v", err)
+		}
+	}(ebsfp)
 
-	err = helm.ApplyChart(ebsfp, "", "")
+	err = helm.ApplyChart(ctx, ebsfp, nil, "rook-ceph", chartName)
 	if err != nil {
 		return fmt.Errorf("unable to apply chart: %w", err)
 	}
