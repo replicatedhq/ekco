@@ -7,6 +7,8 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"github.com/replicatedhq/ekco/pkg/helm"
+	"github.com/replicatedhq/ekco/pkg/helm/chartfiles"
 	"log"
 	"regexp"
 	"strconv"
@@ -969,4 +971,39 @@ func (c *Controller) GetRookVersion(ctx context.Context) (*semver.Version, error
 		}
 	}
 	return nil, errors.New("rook-ceph-operator container not found in deployment")
+}
+
+func (c *Controller) ensureCephClusterHelm(ctx context.Context, rookStorageClassName string) error {
+
+	fname := "rook-ceph-cluster-v1.11.4.tgz" // TODO dynamic
+	ebsfp, err := chartfiles.FS.Open(fname)
+	if err != nil {
+		return fmt.Errorf("unable to find %s: %w", fname, err)
+	}
+	defer ebsfp.Close()
+
+	err = helm.ApplyChart(ebsfp, "", "")
+	if err != nil {
+		return fmt.Errorf("unable to apply chart: %w", err)
+	}
+	return nil
+}
+
+func (c *Controller) EnsureCephCluster(ctx context.Context, rookStorageClassName string) error {
+	cluster, err := c.GetCephCluster(ctx)
+	if err != nil {
+		if !util.IsNotFoundErr(err) {
+			return errors.Wrap(err, "get ceph cluster")
+		}
+	}
+	if cluster != nil {
+		return nil
+	}
+
+	err = c.ensureCephClusterHelm(ctx, rookStorageClassName)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

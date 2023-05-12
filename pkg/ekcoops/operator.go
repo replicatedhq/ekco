@@ -120,6 +120,12 @@ func (o *Operator) Reconcile(nodes []corev1.Node, doFullReconcile bool) error {
 		}
 	}
 
+	if o.config.RookMinimumNodeCount > 1 {
+		if err := o.reconcileRookCluster(); err != nil {
+			multiErr = multierror.Append(multiErr, errors.Wrap(err, "reconcile rook cluster"))
+		}
+	}
+
 	return multiErr
 }
 
@@ -430,5 +436,20 @@ func (o *Operator) reconcileKotsadm() error {
 		}
 	}
 
+	return nil
+}
+
+func (o *Operator) reconcileRookCluster() error {
+	nodes, err := o.client.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		return errors.Wrap(err, "list nodes")
+	}
+
+	if m, w := util.NodeReadyCounts(nodes.Items); m+w >= o.config.RookMinimumNodeCount {
+		err := o.controller.EnsureCephCluster(context.TODO(), o.config.RookStorageClass)
+		if err != nil {
+			return errors.Wrap(err, "ensure ceph cluster")
+		}
+	}
 	return nil
 }
