@@ -10,6 +10,9 @@ import (
 )
 
 func IsMinioInUse(ctx context.Context, client kubernetes.Interface, namespace string) (bool, error) {
+	if namespace == "" {
+		return false, nil
+	}
 	// if the minio NS does not exist, it is not in use
 	_, err := client.CoreV1().Namespaces().Get(ctx, namespace, metav1.GetOptions{})
 	if err != nil {
