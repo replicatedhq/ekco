@@ -47,15 +47,15 @@ func ObjectStorageAndPVCs(config ekcoops.Config, controllers types.ControllerCon
 	defer cancel()
 
 	setLogs("checking if the cluster is ready to migrate\n")
-	ready, reason, err := IsMigrationReady(ctx, config, controllers)
+	status, err := IsMigrationReady(ctx, config, controllers)
 	if err != nil {
 		migrationStatus = MIGRATION_STATUS_FAILED
 		addLogs("is migration ready: %v", err)
 		return
 	}
-	if !ready {
+	if !status.Ready {
 		migrationStatus = MIGRATION_STATUS_NOT_READY
-		addLogs("not ready: %s", reason)
+		addLogs("not ready: %s", status.Reason)
 		return
 	}
 
@@ -92,43 +92,57 @@ func GetMigrationLogs() string {
 	return migrationLogs
 }
 
-// IsMigrationReady returns true if the cluster is ready to migrate storage
-// this is true if Ceph is setup/healthy, the ceph storageclass is present in the cluster, and the ceph object store user exists
-func IsMigrationReady(ctx context.Context, config ekcoops.Config, controllers types.ControllerConfig) (bool, string, error) {
+// MigrationReadyStatus represents the status of the migration readiness check, includes
+// a reason and also the number of nodes in the cluster.
+type MigrationReadyResult struct {
+	Ready   bool   `json:"ready"`
+	Reason  string `json:"reason"`
+	NrNodes int    `json:"nrNodes"`
+}
+
+// IsMigrationReady returns if the cluster is ready to migrate storage.This is true if Ceph is setup/healthy, the ceph storageclass is
+// present in the cluster, and the ceph object store user exists. This function also returns the current of number of nodes in the cluster.
+func IsMigrationReady(ctx context.Context, config ekcoops.Config, controllers types.ControllerConfig) (*MigrationReadyResult, error) {
+	nodes, err := controllers.Client.CoreV1().Nodes().List(ctx, v1.ListOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("get nodes: %w", err)
+	}
+	nrnodes := len(nodes.Items)
+
 	// get the cephcluster - if it doesn't exist, we can't migrate
 	cephCluster, err := controllers.CephV1.CephClusters(cluster.RookCephNS).Get(ctx, cluster.CephClusterName, v1.GetOptions{})
 	if err != nil {
 		if errors.IsNotFound(err) {
-			return false, "ceph cluster not found", nil
+			return &MigrationReadyResult{NrNodes: nrnodes, Reason: "ceph cluster not found"}, nil
 		}
-		return false, "", fmt.Errorf("get ceph cluster: %w", err)
+		return nil, fmt.Errorf("get ceph cluster: %w", err)
 	}
 
 	if cephCluster.Status.Phase != cephv1.ConditionReady {
-		return false, fmt.Sprintf("ceph cluster was %s, not ready", cephCluster.Status.Phase), nil
+		return &MigrationReadyResult{NrNodes: nrnodes, Reason: fmt.Sprintf("ceph cluster was %s, not ready", cephCluster.Status.Phase)}, nil
 	} else if cephCluster.Status.CephStatus != nil && cephCluster.Status.CephStatus.Health != client.CephHealthOK {
-		return false, fmt.Sprintf("ceph cluster was %s, not healthy", cephCluster.Status.CephStatus.Health), nil
+		return &MigrationReadyResult{NrNodes: nrnodes, Reason: fmt.Sprintf("ceph cluster was %s, not healthy", cephCluster.Status.CephStatus.Health)}, nil
 	}
 
 	// get the ceph object store secret - if it doesn't exist, we can't migrate
 	_, err = controllers.Client.CoreV1().Secrets(cluster.RookCephNS).Get(ctx, "rook-ceph-object-user-rook-ceph-store-kurl", v1.GetOptions{})
 	if err != nil {
 		if errors.IsNotFound(err) {
-			return false, "ceph object store secret not found", nil
+			return &MigrationReadyResult{NrNodes: nrnodes, Reason: "ceph object store secret not found"}, nil
 		}
-		return false, "", fmt.Errorf("get ceph object store secret: %w", err)
+		return nil, fmt.Errorf("get ceph object store secret: %w", err)
 	}
 
 	// get the ceph storageclass - if it doesn't exist, we can't migrate
 	_, err = controllers.Client.StorageV1().StorageClasses().Get(ctx, config.RookStorageClass, v1.GetOptions{})
 	if err != nil {
 		if errors.IsNotFound(err) {
-			return false, fmt.Sprintf("rook storageclass %s not found", config.RookStorageClass), nil
+			return &MigrationReadyResult{NrNodes: nrnodes, Reason: fmt.Sprintf("rook storageclass %s not found", config.RookStorageClass)}, nil
 		}
-		return false, "", fmt.Errorf("get ceph storageclass: %w", err)
+		return nil, fmt.Errorf("get ceph storageclass: %w", err)
 	}
 
-	return true, "migration ready", nil
+	return &MigrationReadyResult{Ready: true, NrNodes: nrnodes, Reason: "migration ready"}, nil
 }
 
 // check if minio is in use
