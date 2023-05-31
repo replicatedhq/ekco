@@ -1,14 +1,15 @@
-package chartfiles
+package charts
 
 import (
 	"fmt"
+	"github.com/replicatedhq/ekco/pkg/helm/charts/rookcephcluster"
 	"io/fs"
 	"sort"
 	"strings"
 )
 
 func LatestChartByName(name string) (fs.File, string, error) {
-	files, err := FS.ReadDir(".")
+	files, err := rookcephcluster.FS.ReadDir(".")
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to read chartfiles: %w", err)
 	}
@@ -29,7 +30,7 @@ func LatestChartByName(name string) (fs.File, string, error) {
 		return chartOptions[i] > chartOptions[j]
 	})
 
-	file, err := FS.Open(chartOptions[0])
+	file, err := rookcephcluster.FS.Open(chartOptions[0])
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to open chartfile %s: %w", chartOptions[0], err)
 	}

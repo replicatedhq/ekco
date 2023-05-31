@@ -18,7 +18,7 @@ import (
 	multierror "github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 	"github.com/replicatedhq/ekco/pkg/helm"
-	"github.com/replicatedhq/ekco/pkg/helm/chartfiles"
+	"github.com/replicatedhq/ekco/pkg/helm/charts"
 	"github.com/replicatedhq/ekco/pkg/k8s"
 	"github.com/replicatedhq/ekco/pkg/util"
 	cephv1 "github.com/rook/rook/pkg/apis/ceph.rook.io/v1"
@@ -975,7 +975,7 @@ func (c *Controller) GetRookVersion(ctx context.Context) (*semver.Version, error
 }
 
 func (c *Controller) ensureCephClusterHelm(ctx context.Context, rookStorageClassName string) error {
-	ebsfp, chartName, err := chartfiles.LatestChartByName("rook-ceph-cluster")
+	ebsfp, chartName, err := charts.LatestChartByName("rook-ceph-cluster")
 	if err != nil {
 		return fmt.Errorf("unable to get rook-ceph-cluster chartfile: %w", err)
 	}

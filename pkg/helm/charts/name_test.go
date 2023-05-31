@@ -1,4 +1,4 @@
-package chartfiles
+package charts
 
 import (
 	"github.com/stretchr/testify/require"
