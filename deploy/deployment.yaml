@@ -21,6 +21,7 @@ data:
     certificates_dir: /etc/kubernetes/pki
     reconcile_interval: 1m
     rook_version: 1.4.3
+    rook_storage_class: distributed
 ---
 apiVersion: apps/v1
 kind: Deployment

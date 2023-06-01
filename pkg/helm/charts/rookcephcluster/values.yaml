@@ -435,7 +435,7 @@ ingress:
 # -- A list of CephBlockPool configurations to deploy
 # @default -- See [below](#ceph-block-pools)
 cephBlockPools:
-  - name: ceph-blockpool
+  - name: replicapool
     # see https://github.com/rook/rook/blob/master/Documentation/CRDs/Block-Storage/ceph-block-pool-crd.md#spec for available configuration
     spec:
       failureDomain: host
@@ -446,7 +446,7 @@ cephBlockPools:
       # enableRBDStats: true
     storageClass:
       enabled: true
-      name: ceph-block
+      name: distributed
       isDefault: true
       reclaimPolicy: Delete
       allowVolumeExpansion: true
@@ -498,7 +498,7 @@ cephBlockPools:
 # -- A list of CephFileSystem configurations to deploy
 # @default -- See [below](#ceph-file-systems)
 cephFileSystems:
-  - name: ceph-filesystem
+  - name: rook-shared-fs
     # see https://github.com/rook/rook/blob/master/Documentation/CRDs/Shared-Filesystem/ceph-filesystem-crd.md#filesystem-settings for available configuration
     spec:
       metadataPool:
@@ -509,24 +509,28 @@ cephFileSystems:
           replicated:
             size: 3
           # Optional and highly recommended, 'data0' by default, see https://github.com/rook/rook/blob/master/Documentation/CRDs/Shared-Filesystem/ceph-filesystem-crd.md#pools
-          name: data0
+          name: replicated
       metadataServer:
         activeCount: 1
         activeStandby: true
         resources:
           limits:
-            cpu: "2000m"
-            memory: "4Gi"
+            cpu: "500m"
+            memory: "1024Mi"
           requests:
-            cpu: "1000m"
-            memory: "4Gi"
+            cpu: "500m"
+            memory: "1024Mi"
         priorityClassName: system-cluster-critical
+        livenessProbe:
+          disabled: false
+        startupProbe:
+          disabled: false
     storageClass:
       enabled: true
       isDefault: false
-      name: ceph-filesystem
+      name: rook-cephfs
       # (Optional) specify a data pool to use, must be the name of one of the data pools above, 'data0' by default
-      pool: data0
+      pool: rook-shared-fs-replicated
       reclaimPolicy: Delete
       allowVolumeExpansion: true
       volumeBindingMode: "Immediate"
@@ -572,7 +576,7 @@ cephBlockPoolsVolumeSnapshotClass:
 # -- A list of CephObjectStore configurations to deploy
 # @default -- See [below](#ceph-object-stores)
 cephObjectStores:
-  - name: ceph-objectstore
+  - name: rook-ceph-store
     # see https://github.com/rook/rook/blob/master/Documentation/CRDs/Object-Storage/ceph-object-store-crd.md#object-store-settings for available configuration
     spec:
       metadataPool:
@@ -592,7 +596,7 @@ cephObjectStores:
             cpu: "2000m"
             memory: "2Gi"
           requests:
-            cpu: "1000m"
+            cpu: "300m"
             memory: "1Gi"
         # securePort: 443
         # sslCertificateRef:

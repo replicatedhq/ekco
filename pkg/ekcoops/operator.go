@@ -120,6 +120,8 @@ func (o *Operator) Reconcile(nodes []corev1.Node, doFullReconcile bool) error {
 		}
 	}
 
+	//TODO: Remove Debug statement
+	o.log.Infof("***DEBUG**: RookMinimumNodeCount=%d", o.config.RookMinimumNodeCount)
 	if o.config.RookMinimumNodeCount > 1 {
 		if err := o.reconcileRookCluster(); err != nil {
 			multiErr = multierror.Append(multiErr, errors.Wrap(err, "reconcile rook cluster"))
@@ -446,6 +448,7 @@ func (o *Operator) reconcileRookCluster() error {
 	}
 
 	if m, w := util.NodeReadyCounts(nodes.Items); m+w >= o.config.RookMinimumNodeCount {
+		o.log.Info("**DEBUG** Calling EnsureCephCluster()")
 		err := o.controller.EnsureCephCluster(context.TODO(), o.config.RookStorageClass)
 		if err != nil {
 			return errors.Wrap(err, "ensure ceph cluster")

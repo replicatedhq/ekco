@@ -975,7 +975,7 @@ func (c *Controller) GetRookVersion(ctx context.Context) (*semver.Version, error
 }
 
 func (c *Controller) ensureCephClusterHelm(ctx context.Context, rookStorageClassName string) error {
-	ebsfp, chartName, err := charts.LatestChartByName("rook-ceph-cluster")
+	cephClusterChartArchive, _, err := charts.LatestChartByName("rook-ceph-cluster")
 	if err != nil {
 		return fmt.Errorf("unable to get rook-ceph-cluster chartfile: %w", err)
 	}
@@ -984,24 +984,24 @@ func (c *Controller) ensureCephClusterHelm(ctx context.Context, rookStorageClass
 		if err != nil {
 			c.Log.Warnf("unable to close rook-ceph-cluster chartfile: %v", err)
 		}
-	}(ebsfp)
+	}(cephClusterChartArchive)
 
-	err = helm.ApplyChart(ctx, ebsfp, nil, "rook-ceph", chartName)
+	helmMgr, err := helm.NewHelmManager(ctx, "rook-ceph", c.Log)
 	if err != nil {
+		return fmt.Errorf("failed to initialize Helm Manager: %w", err)
+	}
+	if err = helmMgr.InstallChartArchive(cephClusterChartArchive, nil, "", "rook-ceph"); err != nil {
 		return fmt.Errorf("unable to apply chart: %w", err)
 	}
 	return nil
 }
 
 func (c *Controller) EnsureCephCluster(ctx context.Context, rookStorageClassName string) error {
-	cluster, err := c.GetCephCluster(ctx)
+	_, err := c.GetCephCluster(ctx)
 	if err != nil {
 		if !util.IsNotFoundErr(err) {
 			return errors.Wrap(err, "get ceph cluster")
 		}
-	}
-	if cluster != nil {
-		return nil
 	}
 
 	err = c.ensureCephClusterHelm(ctx, rookStorageClassName)
