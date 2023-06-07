@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"log"
 	"net/http"
 
@@ -18,7 +19,7 @@ func Serve(ctx context.Context, config ekcoops.Config, client *cluster.Controlle
 	})
 
 	mux.HandleFunc("/storagemigration/ready", func(w http.ResponseWriter, r *http.Request) {
-		_, message, err := migrate.IsMigrationReady(r.Context(), config, client.Config)
+		status, err := migrate.IsMigrationReady(r.Context(), config, client.Config)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			_, err := w.Write([]byte(err.Error()))
@@ -27,10 +28,16 @@ func Serve(ctx context.Context, config ekcoops.Config, client *cluster.Controlle
 			}
 			return
 		}
-
-		w.WriteHeader(http.StatusOK)
-		_, err = w.Write([]byte(message))
+		data, err := json.Marshal(status)
 		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			if _, err := w.Write([]byte(err.Error())); err != nil {
+				log.Printf("write json marshaling error: %v", err)
+			}
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		if _, err = w.Write(data); err != nil {
 			log.Printf("write ready status: %v", err)
 		}
 	})
