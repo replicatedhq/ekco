@@ -100,7 +100,7 @@ type MigrationReadyResult struct {
 	NrNodes int    `json:"nrNodes"`
 }
 
-// IsMigrationReady returns if the cluster is ready to migrate storage.This is true if Ceph is setup/healthy, the ceph storageclass is
+// IsMigrationReady returns if the cluster is ready to migrate storage. This is true if Ceph is setup/healthy, the ceph storageclass is
 // present in the cluster, and the ceph object store user exists. This function also returns the current of number of nodes in the cluster.
 func IsMigrationReady(ctx context.Context, config ekcoops.Config, controllers types.ControllerConfig) (*MigrationReadyResult, error) {
 	nodes, err := controllers.Client.CoreV1().Nodes().List(ctx, v1.ListOptions{})
