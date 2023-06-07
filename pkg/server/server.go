@@ -32,7 +32,7 @@ func Serve(ctx context.Context, config ekcoops.Config, client *cluster.Controlle
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			if _, err := w.Write([]byte(err.Error())); err != nil {
-				log.Printf("marshaling json: %v", err)
+				log.Printf("write json marshaling error: %v", err)
 			}
 			return
 		}
