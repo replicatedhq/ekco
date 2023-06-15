@@ -18,6 +18,30 @@ func Serve(ctx context.Context, config ekcoops.Config, client *cluster.Controlle
 		w.WriteHeader(http.StatusOK)
 	})
 
+	mux.HandleFunc("/storagemigration/cluster-ready", func(w http.ResponseWriter, r *http.Request) {
+		status, err := migrate.IsClusterReady(r.Context(), config, client.Config)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			_, err := w.Write([]byte(err.Error()))
+			if err != nil {
+				log.Printf("failed to write server response error: %v", err)
+			}
+			return
+		}
+		data, err := json.Marshal(status)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			if _, err := w.Write([]byte(err.Error())); err != nil {
+				log.Printf("failed to write json marshaling error: %v", err)
+			}
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		if _, err = w.Write(data); err != nil {
+			log.Printf("failed to write cluster-ready status response: %v", err)
+		}
+	})
+
 	mux.HandleFunc("/storagemigration/ready", func(w http.ResponseWriter, r *http.Request) {
 		status, err := migrate.IsMigrationReady(r.Context(), config, client.Config)
 		if err != nil {
@@ -43,10 +67,19 @@ func Serve(ctx context.Context, config ekcoops.Config, client *cluster.Controlle
 	})
 
 	mux.HandleFunc("/storagemigration/status", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		_, err := w.Write([]byte(migrate.GetMigrationStatus()))
+		status, err := migrate.GetMigrationStatus(r.Context(), client.Config)
 		if err != nil {
-			log.Printf("write status: %v", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			_, err := w.Write([]byte(err.Error()))
+			if err != nil {
+				log.Printf("failed to write migration status error: %v", err)
+			}
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		_, err = w.Write([]byte(status))
+		if err != nil {
+			log.Printf("failed to write api response for /storagemigration/status: %v", err)
 		}
 	})
 
