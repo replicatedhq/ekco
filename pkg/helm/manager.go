@@ -40,6 +40,7 @@ func NewHelmManager(ctx context.Context, namespace string, logger *zap.SugaredLo
 	return &HelmManager{ctx: ctx, actionConfig: &actConfig, logger: logger}, nil
 }
 
+// InstallChartArchive installs a packaged Helm chart (tgz) to a namespace with given values and release name
 func (hm *HelmManager) InstallChartArchive(chartBytes io.Reader, values map[string]interface{}, releaseName string, namespace string) error {
 	chart, err := loader.LoadArchive(chartBytes)
 	if err != nil {
@@ -56,8 +57,9 @@ func (hm *HelmManager) InstallChartArchive(chartBytes io.Reader, values map[stri
 	if err != nil {
 		return fmt.Errorf("failed to check if release %s is installed: %w", relName, err)
 	}
+
 	if installed != nil {
-		// nothing to do since CephCluster already installed
+		hm.logger.Infof("rook-ceph-cluster already installed with release name: %s", installed.Name)
 		return nil
 	}
 
@@ -79,6 +81,7 @@ func (hm *HelmManager) InstallChartArchive(chartBytes io.Reader, values map[stri
 	return nil
 }
 
+// GetRelease returns the Helm release for a release name
 func (hm *HelmManager) GetRelease(releaseName string) (*release.Release, error) {
 	actList := action.NewList(hm.actionConfig)
 	actList.StateMask = action.ListDeployed
@@ -86,17 +89,18 @@ func (hm *HelmManager) GetRelease(releaseName string) (*release.Release, error) 
 	if err != nil {
 		return nil, fmt.Errorf("failed to list installed releases: %w", err)
 	}
+
+	// no releases in the cluster
 	if len(releases) == 0 {
 		return nil, nil
 	}
 
-	var matchRelease *release.Release
 	for _, release := range releases {
 		if release.Name == releaseName {
-			matchRelease = release
+			return release, nil
 		}
 	}
 
-	return matchRelease, nil
-
+	//if we get here we couldn't find the release
+	return nil, nil
 }
