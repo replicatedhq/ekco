@@ -4,7 +4,7 @@ import (
 	"embed"
 	"fmt"
 
-	"gopkg.in/yaml.v2"
+	"sigs.k8s.io/yaml"
 )
 
 //go:embed *
