@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/replicatedhq/ekco/pkg/helm/charts/rookcephcluster"
+	"github.com/replicatedhq/ekco/pkg/helm/rookcephcluster"
 	"go.uber.org/zap"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart/loader"

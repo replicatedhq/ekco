@@ -8,11 +8,11 @@ import (
 )
 
 //go:embed *
-var FS embed.FS
+var valuesfs embed.FS
 
 // ValuesMap return the values.yaml files as a Map
 func ValuesMap() (map[string]interface{}, error) {
-	valuesData, err := FS.ReadFile("values.yaml")
+	valuesData, err := valuesfs.ReadFile("values.yaml")
 	if err != nil {
 		return nil, fmt.Errorf("Unable to read embedded rook-ceph-cluster values file: %w", err)
 	}

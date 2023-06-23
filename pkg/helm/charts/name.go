@@ -1,15 +1,18 @@
 package charts
 
 import (
+	"embed"
 	"fmt"
-	"github.com/replicatedhq/ekco/pkg/helm/charts/rookcephcluster"
 	"io/fs"
 	"sort"
 	"strings"
 )
 
+//go:embed *
+var chartfs embed.FS
+
 func LatestChartByName(name string) (fs.File, string, error) {
-	files, err := rookcephcluster.FS.ReadDir(".")
+	files, err := chartfs.ReadDir(".")
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to read chartfiles: %w", err)
 	}
@@ -30,7 +33,7 @@ func LatestChartByName(name string) (fs.File, string, error) {
 		return chartOptions[i] > chartOptions[j]
 	})
 
-	file, err := rookcephcluster.FS.Open(chartOptions[0])
+	file, err := chartfs.Open(chartOptions[0])
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to open chartfile %s: %w", chartOptions[0], err)
 	}
