@@ -120,7 +120,7 @@ func (o *Operator) Reconcile(nodes []corev1.Node, doFullReconcile bool) error {
 		}
 	}
 
-	if o.config.RookMinimumNodeCount > 1 {
+	if o.config.RookMinimumNodeCount > 2 {
 		if err := o.reconcileRookCluster(); err != nil {
 			multiErr = multierror.Append(multiErr, errors.Wrap(err, "reconcile rook cluster"))
 		}
