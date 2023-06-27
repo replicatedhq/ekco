@@ -19,14 +19,14 @@ cephClusterSpec:
     count: 3
     # The mons should be on unique nodes. For production, at least 3 nodes are recommended for this reason.
     # Mons should only be allowed on the same node for test environments where data loss is acceptable.
-    allowMultiplePerNode: true
+    allowMultiplePerNode: false
 
   mgr:
     # When higher availability of the mgr is needed, increase the count to 2.
     # In that case, one mgr will be active and one in standby. When Ceph updates which
     # mgr is active, Rook will update the mgr services to match the active mgr.
     count: 2
-    allowMultiplePerNode: true 
+    allowMultiplePerNode: false
     modules:
       # Several modules should not need to be included in this list. The "dashboard" and "monitoring" modules
       # are already enabled by other settings in the cluster CR.
