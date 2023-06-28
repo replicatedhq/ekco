@@ -169,9 +169,11 @@ func (o *Operator) reconcileRook(ctx context.Context, rookVersion semver.Version
 		if err != nil {
 			multiErr = multierror.Append(multiErr, errors.Wrapf(err, "ensure all ready nodes used for storage"))
 		} else {
-			err := o.adjustPoolReplicationLevels(rookVersion, readyCount, doFullReconcile)
-			if err != nil {
-				multiErr = multierror.Append(multiErr, errors.Wrapf(err, "adjust pool replication levels"))
+			if shouldManageCephPoolReplication(o.config) {
+				err := o.adjustPoolReplicationLevels(rookVersion, readyCount, doFullReconcile)
+				if err != nil {
+					multiErr = multierror.Append(multiErr, errors.Wrapf(err, "adjust pool replication levels"))
+				}
 			}
 			err = o.controller.ReconcileMonCount(context.TODO(), readyCount)
 			if err != nil {
@@ -181,6 +183,7 @@ func (o *Operator) reconcileRook(ctx context.Context, rookVersion semver.Version
 			if err != nil {
 				multiErr = multierror.Append(multiErr, errors.Wrapf(err, "reconcile mgr count"))
 			}
+
 		}
 	}
 
@@ -346,6 +349,13 @@ func shouldUseNodeForStorage(node corev1.Node, cluster *cephv1.CephCluster, rook
 	return false
 }
 
+func shouldManageCephPoolReplication(cfg Config) bool {
+	if cfg.RookMinimumNodeCount > 0 {
+		return false
+	}
+	return true
+}
+
 func (o *Operator) reconcileCertificateSigningRequests() error {
 	csrList, err := o.client.CertificatesV1().CertificateSigningRequests().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
@@ -446,6 +456,7 @@ func (o *Operator) reconcileRookCluster() error {
 	}
 
 	if m, w := util.NodeReadyCounts(nodes.Items); m+w >= o.config.RookMinimumNodeCount {
+		o.log.Debugf("reconcileRookCluster(): Rook minimum node count of %d has been met by this cluster.\n", o.config.RookMinimumNodeCount)
 		err := o.controller.EnsureCephCluster(context.TODO(), o.config.RookStorageClass)
 		if err != nil {
 			return errors.Wrap(err, "ensure ceph cluster")

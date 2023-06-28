@@ -28,6 +28,7 @@ require (
 	k8s.io/client-go v0.27.1
 	k8s.io/kubernetes v1.27.1
 	k8s.io/utils v0.0.0-20230406110748-d93618cff8a2
+	sigs.k8s.io/yaml v1.3.0
 )
 
 require (
@@ -226,7 +227,6 @@ require (
 	sigs.k8s.io/kustomize/kyaml v0.14.2 // indirect
 	sigs.k8s.io/mcs-api v0.1.0 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.3 // indirect
-	sigs.k8s.io/yaml v1.3.0 // indirect
 )
 
 // TODO: when controller-runtime past v0.14.6 is released, remove this line

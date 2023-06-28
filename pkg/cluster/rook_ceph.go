@@ -1004,10 +1004,28 @@ func (c *Controller) EnsureCephCluster(ctx context.Context, rookStorageClassName
 		}
 	}
 
-	err = c.ensureCephClusterHelm(ctx, rookStorageClassName)
-	if err != nil {
+	// create CephCluster
+	if err = c.ensureCephClusterHelm(ctx, rookStorageClassName); err != nil {
 		return err
 	}
 
+	// Create CephObjectStoreUser
+	objectStoreUser := &cephv1.CephObjectStoreUser{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "kurl",
+			Namespace: "rook-ceph",
+		},
+		Spec: cephv1.ObjectStoreUserSpec{
+			Store:       "rook-ceph-store",
+			DisplayName: "kurl",
+		},
+	}
+	if _, err := c.Config.CephV1.CephObjectStoreUsers(RookCephNS).Create(ctx, objectStoreUser, metav1.CreateOptions{}); err != nil {
+		if util.IsAlreadyExists(err) {
+			c.Log.Debugf("CephObjectStoreUser resource already exist")
+		} else {
+			return err
+		}
+	}
 	return nil
 }

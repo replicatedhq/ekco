@@ -59,7 +59,7 @@ func (hm *HelmManager) InstallChartArchive(chartBytes io.Reader, values map[stri
 	}
 
 	if installed != nil {
-		hm.logger.Infof("rook-ceph-cluster already installed with release name: %s", installed.Name)
+		hm.logger.Debugf("rook-ceph-cluster already installed with release name: %s", installed.Name)
 		return nil
 	}
 
