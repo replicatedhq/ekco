@@ -169,11 +169,9 @@ func (o *Operator) reconcileRook(ctx context.Context, rookVersion semver.Version
 		if err != nil {
 			multiErr = multierror.Append(multiErr, errors.Wrapf(err, "ensure all ready nodes used for storage"))
 		} else {
-			if shouldManageCephPoolReplication(o.config) {
-				err := o.adjustPoolReplicationLevels(rookVersion, readyCount, doFullReconcile)
-				if err != nil {
-					multiErr = multierror.Append(multiErr, errors.Wrapf(err, "adjust pool replication levels"))
-				}
+			err := o.adjustPoolReplicationLevels(rookVersion, readyCount, doFullReconcile)
+			if err != nil {
+				multiErr = multierror.Append(multiErr, errors.Wrapf(err, "adjust pool replication levels"))
 			}
 			err = o.controller.ReconcileMonCount(context.TODO(), readyCount)
 			if err != nil {
@@ -347,13 +345,6 @@ func shouldUseNodeForStorage(node corev1.Node, cluster *cephv1.CephCluster, rook
 		}
 	}
 	return false
-}
-
-func shouldManageCephPoolReplication(cfg Config) bool {
-	if cfg.RookMinimumNodeCount > 0 {
-		return false
-	}
-	return true
 }
 
 func (o *Operator) reconcileCertificateSigningRequests() error {
