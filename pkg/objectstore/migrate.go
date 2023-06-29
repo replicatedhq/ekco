@@ -88,6 +88,7 @@ func updateKotsadmObjectStore(ctx context.Context, client kubernetes.Interface, 
 		if !k8serrors.IsNotFound(err) {
 			return fmt.Errorf("get kotsadm-s3 secret in default namespace: %v", err)
 		}
+		return nil
 	}
 	if kotsadmS3 != nil {
 		kotsadmS3.Data["access-key-id"] = []byte(accessKey)
