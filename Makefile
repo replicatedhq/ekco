@@ -68,7 +68,7 @@ docker-image:
 		-f deploy/Dockerfile \
 		--build-arg git_sha="$(GIT_SHA)" \
 		--build-arg version="$(VERSION)" \
-		--build-arg rook_version="$(ROOK_VERSION)"
+		--build-arg rook_version="$(ROOK_VERSION)" \
 		.
 
 .PHONY: build-ttl.sh
@@ -78,7 +78,7 @@ build-ttl.sh: ## Build the EKCO Docker container and deploy it to ttl.sh for use
 		-f deploy/Dockerfile \
 		--build-arg git_sha=dev \
 		--build-arg version=dev \
-		--build-arg rook_version="$(ROOK_VERSION)"
+		--build-arg rook_version="$(ROOK_VERSION)" \
 		.
 	docker push ttl.sh/${CURRENT_USER}/ekco:12h
 
