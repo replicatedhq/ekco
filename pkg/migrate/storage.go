@@ -129,7 +129,7 @@ func IsMigrationReady(ctx context.Context, config ekcoops.Config, controllers ty
 	cephCluster, err := controllers.CephV1.CephClusters(cluster.RookCephNS).Get(ctx, cluster.CephClusterName, v1.GetOptions{})
 	if err != nil {
 		if errors.IsNotFound(err) {
-			return &MigrationReadyResult{Reason: fmt.Sprint("Ceph cluster not created")}, nil
+			return &MigrationReadyResult{Reason: "Ceph cluster not created"}, nil
 		}
 		return nil, fmt.Errorf("failed to get ceph cluster: %w", err)
 	}
