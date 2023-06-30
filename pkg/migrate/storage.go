@@ -31,6 +31,7 @@ const (
 	MIGRATION_STATUS_NOT_STARTED = "not started"
 	MIGRATION_STATUS_NOT_READY   = "not ready"
 )
+const DISTRIBUTED_STORAGE_CLASS_NAME = "distributed"
 
 var migrateStorageMut = sync.Mutex{}
 var migrationStatus = MIGRATION_STATUS_NOT_STARTED
@@ -84,52 +85,66 @@ func ObjectStorageAndPVCs(config ekcoops.Config, controllers types.ControllerCon
 	migrationStatus = MIGRATION_STATUS_COMPLETED
 }
 
-func GetMigrationStatus() string {
-	return migrationStatus
+func GetMigrationStatus(ctx context.Context, controllers types.ControllerConfig) (string, error) {
+
+	// if the migration already completed, the rook distributed storage class will be set to default
+	distributedSC, err := controllers.Client.StorageV1().StorageClasses().Get(ctx, DISTRIBUTED_STORAGE_CLASS_NAME, v1.GetOptions{})
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return migrationStatus, nil
+		}
+		return "", fmt.Errorf("failed to get ceph storageclass: %w", err)
+	}
+	if distributedSC.Annotations["storageclass.kubernetes.io/is-default-class"] == "true" {
+		return MIGRATION_STATUS_COMPLETED, nil
+	}
+
+	return migrationStatus, nil
 }
 
 func GetMigrationLogs() string {
 	return migrationLogs
 }
 
-// MigrationReadyStatus represents the status of the migration readiness check, includes
+// ClusterReadyResult represents the status of the cluster readiness check, namely whether
+// the total number of nodes in the cluster exceed or meet the minimum required number of nodes
+// for the migration to start.
+type ClusterReadyResult struct {
+	MigrationReadyResult
+	NrNodes         int `json:"nrNodes"`
+	RequiredNrNodes int `json:"requiredNrNodes"`
+}
+
+// MigrationReadyResult represents the status of the migration readiness check, includes
 // a reason, the total number of nodes in the cluster and the required number of nodes needed to start the migration.
 type MigrationReadyResult struct {
-	Ready           bool   `json:"ready"`
-	Reason          string `json:"reason"`
-	NrNodes         int    `json:"nrNodes"`
-	RequiredNrNodes int    `json:"requiredNrNodes"`
+	Ready  bool   `json:"ready"`
+	Reason string `json:"reason"`
 }
 
 // IsMigrationReady returns if the cluster is ready to migrate storage. This is true if Ceph is setup/healthy, the ceph storageclass is
 // present in the cluster, and the ceph object store user exists. This function also returns the current of number of nodes in the cluster.
 func IsMigrationReady(ctx context.Context, config ekcoops.Config, controllers types.ControllerConfig) (*MigrationReadyResult, error) {
-	nodes, err := controllers.Client.CoreV1().Nodes().List(ctx, v1.ListOptions{})
-	if err != nil {
-		return nil, fmt.Errorf("get nodes: %w", err)
-	}
-	nrnodes := len(nodes.Items)
-
 	// get the cephcluster - if it doesn't exist, we can't migrate
 	cephCluster, err := controllers.CephV1.CephClusters(cluster.RookCephNS).Get(ctx, cluster.CephClusterName, v1.GetOptions{})
 	if err != nil {
 		if errors.IsNotFound(err) {
-			return &MigrationReadyResult{RequiredNrNodes: config.RookMinimumNodeCount, NrNodes: nrnodes, Reason: "ceph cluster not found"}, nil
+			return nil, fmt.Errorf("ceph cluster not found")
 		}
 		return nil, fmt.Errorf("get ceph cluster: %w", err)
 	}
 
 	if cephCluster.Status.Phase != cephv1.ConditionReady {
-		return &MigrationReadyResult{RequiredNrNodes: config.RookMinimumNodeCount, NrNodes: nrnodes, Reason: fmt.Sprintf("ceph cluster was %s, not ready", cephCluster.Status.Phase)}, nil
+		return &MigrationReadyResult{Reason: fmt.Sprintf("ceph cluster was %s, not ready", cephCluster.Status.Phase)}, nil
 	} else if cephCluster.Status.CephStatus != nil && cephCluster.Status.CephStatus.Health != client.CephHealthOK {
-		return &MigrationReadyResult{RequiredNrNodes: config.RookMinimumNodeCount, NrNodes: nrnodes, Reason: fmt.Sprintf("ceph cluster was %s, not healthy", cephCluster.Status.CephStatus.Health)}, nil
+		return &MigrationReadyResult{Reason: fmt.Sprintf("ceph cluster was %s, not healthy", cephCluster.Status.CephStatus.Health)}, nil
 	}
 
 	// get the ceph object store secret - if it doesn't exist, we can't migrate
 	_, err = controllers.Client.CoreV1().Secrets(cluster.RookCephNS).Get(ctx, "rook-ceph-object-user-rook-ceph-store-kurl", v1.GetOptions{})
 	if err != nil {
 		if errors.IsNotFound(err) {
-			return &MigrationReadyResult{RequiredNrNodes: config.RookMinimumNodeCount, NrNodes: nrnodes, Reason: "ceph object store secret not found"}, nil
+			return nil, fmt.Errorf("ceph object store secret not found")
 		}
 		return nil, fmt.Errorf("get ceph object store secret: %w", err)
 	}
@@ -138,12 +153,40 @@ func IsMigrationReady(ctx context.Context, config ekcoops.Config, controllers ty
 	_, err = controllers.Client.StorageV1().StorageClasses().Get(ctx, config.RookStorageClass, v1.GetOptions{})
 	if err != nil {
 		if errors.IsNotFound(err) {
-			return &MigrationReadyResult{RequiredNrNodes: config.RookMinimumNodeCount, NrNodes: nrnodes, Reason: fmt.Sprintf("rook storageclass %s not found", config.RookStorageClass)}, nil
+			return nil, fmt.Errorf("rook storageclass %s not found", config.RookStorageClass)
 		}
 		return nil, fmt.Errorf("get ceph storageclass: %w", err)
 	}
 
-	return &MigrationReadyResult{Ready: true, Reason: "migration ready", NrNodes: nrnodes, RequiredNrNodes: config.RookMinimumNodeCount}, nil
+	return &MigrationReadyResult{Ready: true, Reason: "migration ready"}, nil
+}
+
+func IsClusterReady(ctx context.Context, config ekcoops.Config, controllers types.ControllerConfig) (*ClusterReadyResult, error) {
+	nodes, err := controllers.Client.CoreV1().Nodes().List(ctx, v1.ListOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to list nodes: %w", err)
+	}
+	nrnodes := len(nodes.Items)
+
+	// ensure the required number of nodes for the migration are met
+	if nrnodes < config.RookMinimumNodeCount {
+		return &ClusterReadyResult{
+			MigrationReadyResult: MigrationReadyResult{
+				Ready:  false,
+				Reason: fmt.Sprintf("required number of cluster nodes (%d) are not met", config.RookMinimumNodeCount),
+			},
+			RequiredNrNodes: config.RookMinimumNodeCount,
+			NrNodes:         nrnodes,
+		}, nil
+	}
+
+	return &ClusterReadyResult{
+		MigrationReadyResult: MigrationReadyResult{
+			Ready: true,
+		},
+		RequiredNrNodes: config.RookMinimumNodeCount,
+		NrNodes:         nrnodes,
+	}, nil
 }
 
 // check if minio is in use

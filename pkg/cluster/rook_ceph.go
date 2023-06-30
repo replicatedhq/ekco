@@ -7,6 +7,7 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"log"
 	"regexp"
 	"strconv"
@@ -16,6 +17,8 @@ import (
 	"github.com/blang/semver"
 	multierror "github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
+	"github.com/replicatedhq/ekco/pkg/helm"
+	"github.com/replicatedhq/ekco/pkg/helm/charts"
 	"github.com/replicatedhq/ekco/pkg/k8s"
 	"github.com/replicatedhq/ekco/pkg/util"
 	cephv1 "github.com/rook/rook/pkg/apis/ceph.rook.io/v1"
@@ -171,6 +174,23 @@ func (c *Controller) deleteK8sDeploymentOSD(name string) (string, error) {
 	}
 
 	return osdID, nil
+}
+
+// getBlockPoolReplicationLevel returns ceph block pool replication size
+func (c *Controller) GetBlockPoolReplicationLevel(name string) (int, error) {
+	if name == "" {
+		return 0, fmt.Errorf("name of CephBlockPool required")
+	}
+
+	pool, err := c.Config.CephV1.CephBlockPools(RookCephNS).Get(context.TODO(), name, metav1.GetOptions{})
+	if err != nil {
+		if util.IsNotFoundErr(err) {
+			return 0, nil
+		}
+		return 0, errors.Wrapf(err, "failed to get CephBlockPool %s", name)
+	}
+
+	return int(pool.Spec.Replicated.Size), nil
 }
 
 // SetBlockPoolReplicationLevel ignores NotFound errors.
@@ -421,7 +441,7 @@ func (c *Controller) SetFilesystemReplication(rookVersion semver.Version, cephVe
 		return false, nil
 	}
 
-	fs, err := c.Config.CephV1.CephFilesystems(RookCephNS).Get(context.TODO(), name, metav1.GetOptions{})
+	cephFilesystem, err := c.Config.CephV1.CephFilesystems(RookCephNS).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		if util.IsNotFoundErr(err) {
 			return false, nil
@@ -429,10 +449,10 @@ func (c *Controller) SetFilesystemReplication(rookVersion semver.Version, cephVe
 		return false, errors.Wrapf(err, "get Filesystem %s", name)
 	}
 	patches := []k8s.JSONPatchOperation{}
-	for i, pool := range fs.Spec.DataPools {
+	for i, pool := range cephFilesystem.Spec.DataPools {
 		current := int(pool.Replicated.Size)
 		if current < level {
-			fs.Spec.DataPools[i].Replicated.Size = uint(level)
+			cephFilesystem.Spec.DataPools[i].Replicated.Size = uint(level)
 			patches = append(patches, k8s.JSONPatchOperation{
 				Op:    k8s.JSONPatchOpReplace,
 				Path:  fmt.Sprintf("/spec/dataPools/%d/replicated/size", i),
@@ -440,9 +460,9 @@ func (c *Controller) SetFilesystemReplication(rookVersion semver.Version, cephVe
 			})
 		}
 	}
-	current := int(fs.Spec.MetadataPool.Replicated.Size)
+	current := int(cephFilesystem.Spec.MetadataPool.Replicated.Size)
 	if current < level {
-		fs.Spec.MetadataPool.Replicated.Size = uint(level)
+		cephFilesystem.Spec.MetadataPool.Replicated.Size = uint(level)
 		patches = append(patches, k8s.JSONPatchOperation{
 			Op:    k8s.JSONPatchOpReplace,
 			Path:  "/spec/metadataPool/replicated/size",
@@ -465,8 +485,8 @@ func (c *Controller) SetFilesystemReplication(rookVersion semver.Version, cephVe
 		return false, errors.Wrap(err, "json marshal patches")
 	}
 
-	c.Log.Debugf("Patching CephFilesystem %s with %s", fs.Name, string(patchData))
-	_, err = c.Config.CephV1.CephFilesystems(RookCephNS).Patch(context.TODO(), fs.Name, apitypes.JSONPatchType, patchData, metav1.PatchOptions{})
+	c.Log.Debugf("Patching CephFilesystem %s with %s", cephFilesystem.Name, string(patchData))
+	_, err = c.Config.CephV1.CephFilesystems(RookCephNS).Patch(context.TODO(), cephFilesystem.Name, apitypes.JSONPatchType, patchData, metav1.PatchOptions{})
 	if err != nil {
 		return false, errors.Wrapf(err, "patch Filesystem %s", name)
 	}
@@ -479,19 +499,19 @@ func (c *Controller) SetFilesystemReplication(rookVersion semver.Version, cephVe
 		// https://github.com/rook/rook/issues/3144
 		err := c.cephOSDPoolSetSize(rookVersion, cephVersion, RookCephSharedFSMetadataPool, level)
 		if err != nil {
-			return false, errors.Wrapf(err, "scale shared fs metadata pool size")
+			return false, errors.Wrapf(err, "scale shared cephFS metadata pool size")
 		}
 		err = c.cephOSDPoolSetMinSize(rookVersion, RookCephSharedFSMetadataPool, minSize)
 		if err != nil {
-			return false, errors.Wrapf(err, "scale shared fs metadata pool min_size")
+			return false, errors.Wrapf(err, "scale shared cephFS metadata pool min_size")
 		}
 		err = c.cephOSDPoolSetSize(rookVersion, cephVersion, RookCephSharedFSDataPool, level)
 		if err != nil {
-			return false, errors.Wrapf(err, "scale shared fs data pool size")
+			return false, errors.Wrapf(err, "scale shared cephFS data pool size")
 		}
 		err = c.cephOSDPoolSetMinSize(rookVersion, RookCephSharedFSDataPool, minSize)
 		if err != nil {
-			return false, errors.Wrapf(err, "scale shared fs data pool min_size")
+			return false, errors.Wrapf(err, "scale shared cephFS data pool min_size")
 		}
 	}
 
@@ -969,4 +989,60 @@ func (c *Controller) GetRookVersion(ctx context.Context) (*semver.Version, error
 		}
 	}
 	return nil, errors.New("rook-ceph-operator container not found in deployment")
+}
+
+func (c *Controller) ensureCephClusterHelm(ctx context.Context, rookStorageClassName string) error {
+	cephClusterChartArchive, _, err := charts.LatestChartByName("rook-ceph-cluster")
+	if err != nil {
+		return fmt.Errorf("unable to get rook-ceph-cluster chartfile: %w", err)
+	}
+	defer func(ebsfp fs.File) {
+		err := ebsfp.Close()
+		if err != nil {
+			c.Log.Warnf("unable to close rook-ceph-cluster chartfile: %v", err)
+		}
+	}(cephClusterChartArchive)
+
+	helmMgr, err := helm.NewHelmManager(ctx, "rook-ceph", c.Log)
+	if err != nil {
+		return fmt.Errorf("failed to initialize Helm Manager: %w", err)
+	}
+	if err = helmMgr.InstallChartArchive(cephClusterChartArchive, nil, "", "rook-ceph"); err != nil {
+		return fmt.Errorf("unable to apply chart: %w", err)
+	}
+	return nil
+}
+
+func (c *Controller) EnsureCephCluster(ctx context.Context, rookStorageClassName string) error {
+	_, err := c.GetCephCluster(ctx)
+	if err != nil {
+		if !util.IsNotFoundErr(err) {
+			return errors.Wrap(err, "get ceph cluster")
+		}
+	}
+
+	// create CephCluster
+	if err = c.ensureCephClusterHelm(ctx, rookStorageClassName); err != nil {
+		return err
+	}
+
+	// Create CephObjectStoreUser
+	objectStoreUser := &cephv1.CephObjectStoreUser{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "kurl",
+			Namespace: "rook-ceph",
+		},
+		Spec: cephv1.ObjectStoreUserSpec{
+			Store:       "rook-ceph-store",
+			DisplayName: "kurl",
+		},
+	}
+	if _, err := c.Config.CephV1.CephObjectStoreUsers(RookCephNS).Create(ctx, objectStoreUser, metav1.CreateOptions{}); err != nil {
+		if util.IsAlreadyExists(err) {
+			c.Log.Debugf("CephObjectStoreUser resource already exist")
+		} else {
+			return err
+		}
+	}
+	return nil
 }
