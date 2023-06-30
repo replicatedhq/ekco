@@ -176,6 +176,23 @@ func (c *Controller) deleteK8sDeploymentOSD(name string) (string, error) {
 	return osdID, nil
 }
 
+// getBlockPoolReplicationLevel returns ceph block pool replication size
+func (c *Controller) GetBlockPoolReplicationLevel(name string) (int, error) {
+	if name == "" {
+		return 0, fmt.Errorf("name of CephBlockPool required")
+	}
+
+	pool, err := c.Config.CephV1.CephBlockPools(RookCephNS).Get(context.TODO(), name, metav1.GetOptions{})
+	if err != nil {
+		if util.IsNotFoundErr(err) {
+			return 0, nil
+		}
+		return 0, errors.Wrapf(err, "failed to get CephBlockPool %s", name)
+	}
+
+	return int(pool.Spec.Replicated.Size), nil
+}
+
 // SetBlockPoolReplicationLevel ignores NotFound errors.
 func (c *Controller) SetBlockPoolReplication(rookVersion semver.Version, cephVersion *semver.Version, name string, level int, doFullReconcile bool) (bool, error) {
 	if name == "" {

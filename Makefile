@@ -6,6 +6,7 @@ VERSION_PACKAGE = github.com/replicatedhq/ekco/pkg/version
 VERSION ?= `git describe --tags --dirty`
 DATE = `date -u +"%Y-%m-%dT%H:%M:%SZ"`
 CURRENT_USER=$(shell id -u -n)
+ROOK_VERSION=1.11.8
 
 ifndef GIT_SHA
 GIT_TREE = $(shell git rev-parse --is-inside-work-tree 2>/dev/null)
@@ -67,6 +68,7 @@ docker-image:
 		-f deploy/Dockerfile \
 		--build-arg git_sha="$(GIT_SHA)" \
 		--build-arg version="$(VERSION)" \
+		--build-arg rook_version="$(ROOK_VERSION)"
 		.
 
 .PHONY: build-ttl.sh
@@ -76,6 +78,7 @@ build-ttl.sh: ## Build the EKCO Docker container and deploy it to ttl.sh for use
 		-f deploy/Dockerfile \
 		--build-arg git_sha=dev \
 		--build-arg version=dev \
+		--build-arg rook_version="$(ROOK_VERSION)"
 		.
 	docker push ttl.sh/${CURRENT_USER}/ekco:12h
 

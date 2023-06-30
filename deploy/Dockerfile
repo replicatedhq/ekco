@@ -2,6 +2,7 @@ FROM golang:1.19-buster AS build
 
 ARG git_sha=unknown
 ARG version=alpha
+ARG rook_version=1.11.8
 
 WORKDIR /go/src/github.com/replicatedhq/ekco
 COPY go.mod go.sum ./
@@ -14,7 +15,7 @@ COPY pkg pkg
 RUN curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
 RUN helm repo add rook-release https://charts.rook.io/release
 RUN helm repo update
-RUN helm pull rook-release/rook-ceph-cluster && mv rook-ceph-cluster-* pkg/helm/charts
+RUN helm pull rook-release/rook-ceph-cluster --version $rook_version && mv rook-ceph-cluster-* pkg/helm/charts
 
 RUN make build GIT_SHA=$git_sha VERSION=$version
 
