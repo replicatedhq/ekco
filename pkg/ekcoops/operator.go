@@ -158,7 +158,7 @@ func (o *Operator) reconcileNode(node corev1.Node, readyMasters, readyWorkers in
 func (o *Operator) reconcileRook(ctx context.Context, rookVersion semver.Version, nodes []corev1.Node, doFullReconcile bool) error {
 	var multiErr error
 
-	if o.shouldManageRookNodes(ctx, nodes) {
+	if o.config.MaintainRookStorageNodes {
 		shouldManageRookStorageNodesArray := false
 		if o.config.RookStorageNodes != "" {
 			// for now we do not care about the value of this flag, we just want to know if it is
@@ -320,23 +320,6 @@ func (o *Operator) RotateCerts(force bool) error {
 		o.log.Debugf("Not yet time to rotate certs")
 	}
 	return nil
-}
-
-func (o *Operator) shouldManageRookNodes(ctx context.Context, nodes []corev1.Node) bool {
-	readyNodes := 0
-	for _, node := range nodes {
-		if util.NodeIsReady(node) {
-			readyNodes++
-		}
-	}
-
-	// get CephBlockPool replica size
-	poolSize, err := o.controller.GetBlockPoolReplicationLevel(o.config.CephBlockPool)
-	if err != nil {
-		return false || o.config.MaintainRookStorageNodes
-	}
-
-	return (readyNodes < 3 && readyNodes <= poolSize) || o.config.MaintainRookStorageNodes
 }
 
 func shouldUseNodeForStorage(node corev1.Node, cluster *cephv1.CephCluster, rookStorageNodesLabel string, manageNodes bool) bool {
