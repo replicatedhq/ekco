@@ -19,6 +19,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/replicatedhq/ekco/pkg/helm"
 	"github.com/replicatedhq/ekco/pkg/helm/charts"
+	"github.com/replicatedhq/ekco/pkg/helm/rookcephcluster"
 	"github.com/replicatedhq/ekco/pkg/k8s"
 	"github.com/replicatedhq/ekco/pkg/util"
 	cephv1 "github.com/rook/rook/pkg/apis/ceph.rook.io/v1"
@@ -1007,7 +1008,17 @@ func (c *Controller) ensureCephClusterHelm(ctx context.Context, rookStorageClass
 	if err != nil {
 		return fmt.Errorf("failed to initialize Helm Manager: %w", err)
 	}
-	if err = helmMgr.InstallChartArchive(cephClusterChartArchive, nil, "", "rook-ceph"); err != nil {
+
+	chartValues, err := rookcephcluster.ValuesMap()
+	if err != nil {
+		return fmt.Errorf("failed to get rook-ceph chart values: %w", err)
+	}
+
+	if c.Config.RookCephImage != "" {
+		chartValues["cephClusterSpec.cephVersion.image"] = c.Config.RookCephImage
+	}
+
+	if err = helmMgr.InstallChartArchive(cephClusterChartArchive, chartValues, "", "rook-ceph"); err != nil {
 		return fmt.Errorf("unable to apply chart: %w", err)
 	}
 	return nil

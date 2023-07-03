@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/replicatedhq/ekco/pkg/helm/rookcephcluster"
 	"go.uber.org/zap"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart/loader"
@@ -68,13 +67,8 @@ func (hm *HelmManager) InstallChartArchive(chartBytes io.Reader, values map[stri
 	act.ReleaseName = relName
 	act.Wait = false
 
-	chartValues, err := rookcephcluster.ValuesMap()
-	if err != nil {
-		return fmt.Errorf("failed to get %s chart values: %w", chart.Name(), err)
-	}
-
 	// install chart
-	if _, err := act.RunWithContext(hm.ctx, chart, chartValues); err != nil {
+	if _, err := act.RunWithContext(hm.ctx, chart, values); err != nil {
 		return fmt.Errorf("failed to install %s chart: %w", chart.Name(), err)
 	}
 
