@@ -1918,8 +1918,8 @@ github.com/rogpeppe/go-internal v1.8.1/go.mod h1:JeRgkft04UBgHMgCIwADu4Pn6Mtm5d4
 github.com/rogpeppe/go-internal v1.9.0/go.mod h1:WtVeX8xhTBvf0smdhujwtBcq4Qrzq/fJaraNFVN+nFs=
 github.com/rogpeppe/go-internal v1.10.0 h1:TMyTOH3F/DB16zRVcYyreMH6GnZZrwQVAoYjRBZyWFQ=
 github.com/rogpeppe/go-internal v1.10.0/go.mod h1:UQnix2H7Ngw/k4C5ijL5+65zddjncjaFoBhdsK/akog=
-github.com/rook/rook v1.11.8 h1:xKCxIjFDvOfbWS087ryF0sQZRqJTM64GfmJGHJFmzxk=
-github.com/rook/rook v1.11.8/go.mod h1:4RohsipwRF3OPo+QgzI1GnImo/euZH6t91CtTpwPyhM=
+github.com/rook/rook v1.11.9 h1:/twnEDz6RW9oMlcVDaLYxhwbArTC/mhsf8V8j0y2s2w=
+github.com/rook/rook v1.11.9/go.mod h1:4RohsipwRF3OPo+QgzI1GnImo/euZH6t91CtTpwPyhM=
 github.com/rs/xid v1.2.1/go.mod h1:+uKXf+4Djp6Md1KODXJxgGQPKngRmWyn10oCKFzNHOQ=
 github.com/rs/xid v1.5.0 h1:mKX4bl4iPYJtEIxp6CYiUuLQ/8DYMoz0PUdtGgMFRVc=
 github.com/rs/xid v1.5.0/go.mod h1:trrq9SKmegXys3aeAKXMUTdJsYXVwGY3RLcfgqegfbg=
