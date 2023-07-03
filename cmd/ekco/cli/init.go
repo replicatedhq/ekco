@@ -100,5 +100,6 @@ func initClusterController(config *ekcoops.Config, log *zap.SugaredLogger) (*clu
 		HostTaskImage:                         config.HostTaskImage,
 		HostTaskNamespace:                     config.HostTaskNamespace,
 		AutoApproveKubeletCertSigningRequests: config.AutoApproveKubeletCertSigningRequests,
+		RookCephImage:                         config.RookCephImage,
 	}, log), nil
 }

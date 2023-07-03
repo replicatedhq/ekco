@@ -40,4 +40,5 @@ type ControllerConfig struct {
 	EnableInternalLoadBalancer            bool
 	InternalLoadBalancerHAProxyImage      string
 	AutoApproveKubeletCertSigningRequests bool
+	RookCephImage                         string
 }
