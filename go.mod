@@ -9,6 +9,7 @@ require (
 	github.com/golang/mock v1.6.0
 	github.com/google/martian v2.1.0+incompatible
 	github.com/hashicorp/go-multierror v1.1.1
+	github.com/imdario/mergo v0.3.15
 	github.com/minio/minio-go/v7 v7.0.59
 	github.com/pkg/errors v0.9.1
 	github.com/projectcontour/contour v1.25.0
@@ -117,7 +118,6 @@ require (
 	github.com/hashicorp/vault/api/auth/approle v0.4.0 // indirect
 	github.com/hashicorp/vault/sdk v0.9.0 // indirect
 	github.com/huandu/xstrings v1.4.0 // indirect
-	github.com/imdario/mergo v0.3.15 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/jmoiron/sqlx v1.3.5 // indirect
 	github.com/josharian/intern v1.0.0 // indirect

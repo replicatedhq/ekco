@@ -7,15 +7,9 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
-	"io/fs"
-	"log"
-	"regexp"
-	"strconv"
-	"strings"
-	"time"
-
 	"github.com/blang/semver"
 	multierror "github.com/hashicorp/go-multierror"
+	"github.com/imdario/mergo"
 	"github.com/pkg/errors"
 	"github.com/replicatedhq/ekco/pkg/helm"
 	"github.com/replicatedhq/ekco/pkg/helm/charts"
@@ -23,11 +17,17 @@ import (
 	"github.com/replicatedhq/ekco/pkg/k8s"
 	"github.com/replicatedhq/ekco/pkg/util"
 	cephv1 "github.com/rook/rook/pkg/apis/ceph.rook.io/v1"
+	"io/fs"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	apitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/utils/strings/slices"
+	"log"
+	"regexp"
+	"strconv"
+	"strings"
+	"time"
 )
 
 const (
@@ -1014,8 +1014,20 @@ func (c *Controller) ensureCephClusterHelm(ctx context.Context, rookStorageClass
 		return fmt.Errorf("failed to get rook-ceph chart values: %w", err)
 	}
 
+	var cephImageOverride map[string]interface{}
 	if c.Config.RookCephImage != "" {
-		chartValues["cephClusterSpec.cephVersion.image"] = c.Config.RookCephImage
+		cephImageOverride = map[string]interface{}{
+			"cephClusterSpec": map[string]interface{}{
+				"cephVersion": map[string]interface{}{
+					"image": c.Config.RookCephImage,
+				},
+			},
+		}
+
+		// merge with original values
+		if err := mergo.Merge(&chartValues, cephImageOverride, mergo.WithOverride); err != nil {
+			return fmt.Errorf("failed to merge cephClusterSpec.cephVersion.image value: %w", err)
+		}
 	}
 
 	if err = helmMgr.InstallChartArchive(cephClusterChartArchive, chartValues, "", "rook-ceph"); err != nil {
