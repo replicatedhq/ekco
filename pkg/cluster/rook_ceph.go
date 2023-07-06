@@ -1015,7 +1015,26 @@ func (c *Controller) ensureCephClusterHelm(ctx context.Context, rookStorageClass
 	}
 
 	if c.Config.RookCephImage != "" {
-		chartValues["cephClusterSpec.cephVersion.image"] = c.Config.RookCephImage
+		if chartValues["cephClusterSpec"] == nil {
+			chartValues["cephClusterSpec"] = make(map[string]interface{})
+		}
+
+		// use switch statements to edit the chartValues map
+		switch v := chartValues["cephClusterSpec"].(type) {
+		case map[string]interface{}:
+			if v["cephVersion"] == nil {
+				v["cephVersion"] = make(map[string]interface{})
+			}
+
+			switch v2 := v["cephVersion"].(type) {
+			case map[string]interface{}:
+				v2["image"] = c.Config.RookCephImage
+			default:
+				return fmt.Errorf("failed to cast chartValues[\"cephClusterSpec\"][\"cephVersion\"] to map[string]interface{}")
+			}
+		default:
+			return fmt.Errorf("failed to cast chartValues[\"cephClusterSpec\"] to map[string]interface{}")
+		}
 	}
 
 	if err = helmMgr.InstallChartArchive(cephClusterChartArchive, chartValues, "", "rook-ceph"); err != nil {
