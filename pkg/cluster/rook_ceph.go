@@ -1015,7 +1015,23 @@ func (c *Controller) ensureCephClusterHelm(ctx context.Context, rookStorageClass
 	}
 
 	if c.Config.RookCephImage != "" {
-		chartValues["cephClusterSpec.cephVersion.image"] = c.Config.RookCephImage
+		if chartValues["cephClusterSpec"] == nil {
+			chartValues["cephClusterSpec"] = make(map[string]interface{})
+		}
+		clusterSpec, ok := chartValues["cephClusterSpec"].(map[string]interface{})
+		if !ok {
+			return fmt.Errorf("failed to get parse cephClusterSpec as map[string]interface{}")
+		}
+
+		if clusterSpec["cephVersion"] == nil {
+			clusterSpec["cephVersion"] = make(map[string]interface{})
+		}
+		cephVersion, ok := clusterSpec["cephVersion"].(map[string]interface{})
+		if !ok {
+			return fmt.Errorf("failed to get parse cephVersion as map[string]interface{}")
+		}
+
+		cephVersion["image"] = c.Config.RookCephImage
 	}
 
 	if err = helmMgr.InstallChartArchive(cephClusterChartArchive, chartValues, "", "rook-ceph"); err != nil {
