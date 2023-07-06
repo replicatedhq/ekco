@@ -167,7 +167,9 @@ func (o *Operator) reconcileRook(ctx context.Context, rookVersion semver.Version
 		}
 		readyCount, err := o.ensureAllUsedForStorage(ctx, rookVersion, nodes, shouldManageRookStorageNodesArray)
 		if err != nil {
-			multiErr = multierror.Append(multiErr, errors.Wrapf(err, "ensure all ready nodes used for storage"))
+			if !util.IsNotFoundErr(err) {
+				multiErr = multierror.Append(multiErr, errors.Wrapf(err, "ensure all ready nodes used for storage"))
+			}
 		} else {
 			err := o.adjustPoolReplicationLevels(rookVersion, readyCount, doFullReconcile)
 			if err != nil {
