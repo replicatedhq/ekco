@@ -9,7 +9,7 @@ require (
 	github.com/golang/mock v1.6.0
 	github.com/google/martian v2.1.0+incompatible
 	github.com/hashicorp/go-multierror v1.1.1
-	github.com/minio/minio-go/v7 v7.0.59
+	github.com/minio/minio-go/v7 v7.0.60
 	github.com/pkg/errors v0.9.1
 	github.com/projectcontour/contour v1.25.0
 	github.com/replicatedhq/pvmigrate v0.9.0
