@@ -164,6 +164,15 @@ func (o *Operator) reconcileNode(node corev1.Node, readyMasters, readyWorkers in
 }
 
 func (o *Operator) reconcileRook(ctx context.Context, rookVersion semver.Version, nodes []corev1.Node, doFullReconcile bool) error {
+	// if there is no CephCluster, we don't need to do anything
+	_, err := o.controller.GetCephCluster(ctx)
+	if err != nil {
+		if !util.IsNotFoundErr(err) {
+			return errors.Wrapf(err, "get CephCluster")
+		}
+		return nil
+	}
+
 	var multiErr error
 
 	if o.config.MaintainRookStorageNodes {
