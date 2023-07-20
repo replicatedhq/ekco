@@ -23,6 +23,11 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
+var (
+	minioMutex   = &sync.Mutex{}
+	kotsadmMutex = &sync.Mutex{}
+)
+
 type Operator struct {
 	config     Config
 	client     kubernetes.Interface
@@ -109,9 +114,12 @@ func (o *Operator) Reconcile(nodes []corev1.Node, doFullReconcile bool) error {
 	}
 
 	if o.config.EnableHAMinio {
-		if err := o.reconcileMinio(); err != nil {
-			multiErr = multierror.Append(multiErr, errors.Wrap(err, "reconcile minio"))
-		}
+		go func() {
+			// run minio reconcile in the background as it can take ~unbounded time to migrate data
+			if err := o.reconcileMinio(context.Background()); err != nil {
+				o.log.Errorf("Failed to reconcile minio: %v", err)
+			}
+		}()
 	}
 
 	if o.config.EnableHAKotsadm {
@@ -375,13 +383,19 @@ func (o *Operator) reconcileCertificateSigningRequests() error {
 	return nil
 }
 
-func (o *Operator) reconcileMinio() error {
+func (o *Operator) reconcileMinio(ctx context.Context) error {
 	if overrides.MinIOPaused() {
 		o.log.Debug("Not updating ha-minio as that has been paused")
 		return nil // minio management is paused while other migrations are in progress
 	}
 
-	exists, err := o.controller.DoesHAMinioExist(context.TODO(), o.config.MinioNamespace)
+	// only one operator should manage minio at a time, and if it's not us then we should not do anything
+	if !minioMutex.TryLock() {
+		return nil
+	}
+	defer minioMutex.Unlock()
+
+	exists, err := o.controller.DoesHAMinioExist(ctx, o.config.MinioNamespace)
 	if err != nil {
 		return errors.Wrap(err, "determine if ha-minio exists to be managed")
 	}
@@ -389,32 +403,32 @@ func (o *Operator) reconcileMinio() error {
 		return nil // nothing to manage
 	}
 
-	nodes, err := o.client.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
+	nodes, err := o.client.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return errors.Wrap(err, "list nodes")
 	}
 
 	if m, w := util.NodeReadyCounts(nodes.Items); m+w >= 3 {
-		err = o.controller.ScaleMinioStatefulset(context.TODO(), o.config.MinioNamespace)
+		err = o.controller.ScaleMinioStatefulset(ctx, o.config.MinioNamespace)
 		if err != nil {
 			return errors.Wrap(err, "scale minio statefulset")
 		}
 
 		// possibly migrate from old non-replicated minio and remove it
-		_, err = o.client.AppsV1().Deployments(o.config.MinioNamespace).Get(context.TODO(), "minio", metav1.GetOptions{})
+		_, err = o.client.AppsV1().Deployments(o.config.MinioNamespace).Get(ctx, "minio", metav1.GetOptions{})
 		if err != nil {
 			if !util.IsNotFoundErr(err) {
 				return errors.Wrap(err, "get minio deployment")
 			}
 		} else {
-			err = o.controller.MigrateMinioData(context.TODO(), o.config.MinioUtilImage, o.config.MinioNamespace)
+			err = o.controller.MigrateMinioData(ctx, o.config.MinioUtilImage, o.config.MinioNamespace)
 			if err != nil {
 				return errors.Wrap(err, "migrate data to ha minio")
 			}
 		}
 	}
 
-	err = o.controller.MaybeRebalanceMinioServers(context.TODO(), o.config.MinioNamespace)
+	err = o.controller.MaybeRebalanceMinioServers(ctx, o.config.MinioNamespace)
 	if err != nil {
 		return errors.Wrap(err, "rebalance minio servers")
 	}
