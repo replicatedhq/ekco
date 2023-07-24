@@ -24,8 +24,7 @@ import (
 )
 
 var (
-	minioMutex   = &sync.Mutex{}
-	kotsadmMutex = &sync.Mutex{}
+	minioMutex = &sync.Mutex{}
 )
 
 type Operator struct {
