@@ -327,7 +327,7 @@ func migrateStorageClasses(ctx context.Context, config ekcoops.Config, controlle
 	defer overrides.ResumeKotsadm()
 
 	addLogs("scaling down prometheus")
-	err := util.ScalePrometheus(controllers.PrometheusV1, 0)
+	err := util.ScalePrometheus(ctx, controllers.PrometheusV1, 0)
 	if err != nil {
 		return fmt.Errorf("scale down prometheus: %v", err)
 	}
@@ -345,7 +345,7 @@ func migrateStorageClasses(ctx context.Context, config ekcoops.Config, controlle
 	}
 
 	addLogs("scaling up prometheus")
-	err = util.ScalePrometheus(controllers.PrometheusV1, 2)
+	err = util.ScalePrometheus(ctx, controllers.PrometheusV1, 2)
 	if err != nil {
 		return fmt.Errorf("scale up prometheus: %v", err)
 	}

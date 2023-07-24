@@ -16,7 +16,7 @@ import (
 	"k8s.io/client-go/util/cert"
 )
 
-func (c *Controller) RotateContourCerts() error {
+func (c *Controller) RotateContourCerts(ctx context.Context) error {
 	contourNamespace := c.Config.ContourNamespace
 	contourSecretName := c.Config.ContourCertSecret
 	envoySecretName := c.Config.EnvoyCertSecret
@@ -26,7 +26,7 @@ func (c *Controller) RotateContourCerts() error {
 		return nil
 	}
 
-	caCert, contourCert, envoyCert, err := c.readContourCerts(contourNamespace, contourSecretName, envoySecretName)
+	caCert, contourCert, envoyCert, err := c.readContourCerts(ctx, contourNamespace, contourSecretName, envoySecretName)
 	if err != nil {
 		return errors.Wrapf(err, "read contour certificates")
 	}
@@ -48,7 +48,7 @@ func (c *Controller) RotateContourCerts() error {
 		return nil
 	}
 
-	if err := c.updateContourCerts(contourNamespace, contourSecretName, envoySecretName); err != nil {
+	if err := c.updateContourCerts(ctx, contourNamespace, contourSecretName, envoySecretName); err != nil {
 		return errors.Wrap(err, "update certs")
 	}
 
@@ -56,7 +56,7 @@ func (c *Controller) RotateContourCerts() error {
 
 	// rollout restart envoy pods
 	envoyPatchPayload := fmt.Sprintf(`{"spec":{"template":{"metadata":{"annotations":{"kubectl.kubernetes.io/restartedAt":"%s"}}}}}`, time.Now().Format(time.RFC3339))
-	if _, err := c.Config.Client.AppsV1().DaemonSets(contourNamespace).Patch(context.TODO(), "envoy", k8stypes.StrategicMergePatchType, []byte(envoyPatchPayload), metav1.PatchOptions{}); err != nil {
+	if _, err := c.Config.Client.AppsV1().DaemonSets(contourNamespace).Patch(ctx, "envoy", k8stypes.StrategicMergePatchType, []byte(envoyPatchPayload), metav1.PatchOptions{}); err != nil {
 		return errors.Wrap(err, "restart envoy")
 	}
 
@@ -78,8 +78,8 @@ func (c *Controller) shouldRotateContourCerts(caCert, contourCert, envoyCert *x5
 	return envoyCertTTL <= c.Config.RotateCertsTTL
 }
 
-func (c *Controller) readContourCerts(contourNamespace, contourSecretName, envoySecretName string) (*x509.Certificate, *x509.Certificate, *x509.Certificate, error) {
-	contourSecret, err := c.Config.Client.CoreV1().Secrets(contourNamespace).Get(context.TODO(), contourSecretName, metav1.GetOptions{})
+func (c *Controller) readContourCerts(ctx context.Context, contourNamespace, contourSecretName, envoySecretName string) (*x509.Certificate, *x509.Certificate, *x509.Certificate, error) {
+	contourSecret, err := c.Config.Client.CoreV1().Secrets(contourNamespace).Get(ctx, contourSecretName, metav1.GetOptions{})
 	if err != nil {
 		if util.IsNotFoundErr(err) {
 			return nil, nil, nil, nil
@@ -87,7 +87,7 @@ func (c *Controller) readContourCerts(contourNamespace, contourSecretName, envoy
 		return nil, nil, nil, errors.Wrapf(err, "get secret %s/%s", contourNamespace, contourSecretName)
 	}
 
-	envoySecret, err := c.Config.Client.CoreV1().Secrets(contourNamespace).Get(context.TODO(), envoySecretName, metav1.GetOptions{})
+	envoySecret, err := c.Config.Client.CoreV1().Secrets(contourNamespace).Get(ctx, envoySecretName, metav1.GetOptions{})
 	if err != nil {
 		if util.IsNotFoundErr(err) {
 			return nil, nil, nil, nil
@@ -126,7 +126,7 @@ func (c *Controller) readContourCerts(contourNamespace, contourSecretName, envoy
 	return caCert, contourCert, envoyCert, nil
 }
 
-func (c *Controller) updateContourCerts(contourNamespace, contourSecretName, envoySecretName string) error {
+func (c *Controller) updateContourCerts(ctx context.Context, contourNamespace, contourSecretName, envoySecretName string) error {
 	generatedCerts, err := certs.GenerateCerts(
 		&certs.Configuration{
 			Lifetime:  certs.DefaultCertificateLifetime,
@@ -139,7 +139,7 @@ func (c *Controller) updateContourCerts(contourNamespace, contourSecretName, env
 	caCertKey := "ca.crt"
 
 	// contour cert secret
-	contourSecret, err := c.Config.Client.CoreV1().Secrets(contourNamespace).Get(context.TODO(), contourSecretName, metav1.GetOptions{})
+	contourSecret, err := c.Config.Client.CoreV1().Secrets(contourNamespace).Get(ctx, contourSecretName, metav1.GetOptions{})
 	if err != nil {
 		return errors.Wrapf(err, "get secret %s/%s", contourNamespace, contourSecretName)
 	}
@@ -148,12 +148,12 @@ func (c *Controller) updateContourCerts(contourNamespace, contourSecretName, env
 	contourSecret.Data[corev1.TLSCertKey] = generatedCerts.ContourCertificate
 	contourSecret.Data[corev1.TLSPrivateKeyKey] = generatedCerts.ContourPrivateKey
 
-	if _, err := c.Config.Client.CoreV1().Secrets(contourNamespace).Update(context.TODO(), contourSecret, metav1.UpdateOptions{}); err != nil {
+	if _, err := c.Config.Client.CoreV1().Secrets(contourNamespace).Update(ctx, contourSecret, metav1.UpdateOptions{}); err != nil {
 		return errors.Wrapf(err, "update secret %s/%s", contourNamespace, contourSecretName)
 	}
 
 	// envoy cert secret
-	envoySecret, err := c.Config.Client.CoreV1().Secrets(contourNamespace).Get(context.TODO(), envoySecretName, metav1.GetOptions{})
+	envoySecret, err := c.Config.Client.CoreV1().Secrets(contourNamespace).Get(ctx, envoySecretName, metav1.GetOptions{})
 	if err != nil {
 		return errors.Wrapf(err, "get secret %s/%s", contourNamespace, envoySecretName)
 	}
@@ -162,7 +162,7 @@ func (c *Controller) updateContourCerts(contourNamespace, contourSecretName, env
 	envoySecret.Data[corev1.TLSCertKey] = generatedCerts.EnvoyCertificate
 	envoySecret.Data[corev1.TLSPrivateKeyKey] = generatedCerts.EnvoyPrivateKey
 
-	if _, err := c.Config.Client.CoreV1().Secrets(contourNamespace).Update(context.TODO(), envoySecret, metav1.UpdateOptions{}); err != nil {
+	if _, err := c.Config.Client.CoreV1().Secrets(contourNamespace).Update(ctx, envoySecret, metav1.UpdateOptions{}); err != nil {
 		return errors.Wrapf(err, "update secret %s/%s", contourNamespace, envoySecretName)
 	}
 

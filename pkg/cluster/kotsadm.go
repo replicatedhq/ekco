@@ -20,12 +20,12 @@ const (
 	KotsadmRqliteHAReplicaCount = 3
 )
 
-func (c *Controller) RotateKurlProxyCert() error {
+func (c *Controller) RotateKurlProxyCert(ctx context.Context) error {
 	ns := c.Config.KurlProxyCertNamespace
 	secretName := c.Config.KurlProxyCertSecret
 
 	// 1. Parse current cert from secret
-	secret, err := c.Config.Client.CoreV1().Secrets(ns).Get(context.TODO(), secretName, metav1.GetOptions{})
+	secret, err := c.Config.Client.CoreV1().Secrets(ns).Get(ctx, secretName, metav1.GetOptions{})
 	if err != nil {
 		if util.IsNotFoundErr(err) {
 			c.Log.Debugf("Kurl proxy cert secret does not exist, skipping renewal")
@@ -73,7 +73,7 @@ func (c *Controller) RotateKurlProxyCert() error {
 	// 5. Update the secret
 	secret.Data["tls.crt"] = certData
 	secret.Data["tls.key"] = keyData
-	if _, err := c.Config.Client.CoreV1().Secrets(ns).Update(context.TODO(), secret, metav1.UpdateOptions{}); err != nil {
+	if _, err := c.Config.Client.CoreV1().Secrets(ns).Update(ctx, secret, metav1.UpdateOptions{}); err != nil {
 		return errors.Wrapf(err, "update")
 	}
 
@@ -81,11 +81,11 @@ func (c *Controller) RotateKurlProxyCert() error {
 }
 
 // Copies apiserver-kubelet-client.crt into secret used by kotsadm to collect metrics
-func (c *Controller) UpdateKubeletClientCertSecret() error {
+func (c *Controller) UpdateKubeletClientCertSecret(ctx context.Context) error {
 	ns := c.Config.KotsadmKubeletCertNamespace
 	secretName := c.Config.KotsadmKubeletCertSecret
 
-	secret, err := c.Config.Client.CoreV1().Secrets(ns).Get(context.TODO(), secretName, metav1.GetOptions{})
+	secret, err := c.Config.Client.CoreV1().Secrets(ns).Get(ctx, secretName, metav1.GetOptions{})
 	if err != nil {
 		if util.IsNotFoundErr(err) {
 			c.Log.Debugf("Kubelet client secret does not exist, skipping update")
@@ -119,7 +119,7 @@ func (c *Controller) UpdateKubeletClientCertSecret() error {
 	}
 
 	c.Log.Info("Updating kubelet client cert")
-	if _, err := c.Config.Client.CoreV1().Secrets(ns).Update(context.TODO(), secret, metav1.UpdateOptions{}); err != nil {
+	if _, err := c.Config.Client.CoreV1().Secrets(ns).Update(ctx, secret, metav1.UpdateOptions{}); err != nil {
 		return errors.Wrapf(err, "update")
 	}
 

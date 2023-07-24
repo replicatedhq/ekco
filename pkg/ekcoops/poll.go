@@ -26,8 +26,11 @@ func (o *Operator) Poll(ctx context.Context, interval time.Duration) {
 				logger.Infof("Skipping reconcile: failed to list nodes: %v", err)
 				continue
 			}
+
+			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
 			doFullReconcile := i%60 == 0
-			err = o.Reconcile(nodeList.Items, doFullReconcile)
+			err = o.Reconcile(ctx, nodeList.Items, doFullReconcile)
+			cancel()
 			if err != nil {
 				logger.Infof("Reconcile failed: %v", err)
 				continue
@@ -42,7 +45,7 @@ func (o *Operator) Poll(ctx context.Context, interval time.Duration) {
 
 func (o *Operator) onLaunch(ctx context.Context) error {
 	if o.config.RotateCerts {
-		if err := o.RotateCerts(true); err != nil {
+		if err := o.RotateCerts(ctx, true); err != nil {
 			return errors.Wrap(err, "rotate certs")
 		}
 	}

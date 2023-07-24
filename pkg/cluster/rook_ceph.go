@@ -110,8 +110,8 @@ func (c *Controller) UseNodesForStorage(ctx context.Context, rookVersion semver.
 	return c.countUniqueHostsWithOSD(ctx, rookVersion)
 }
 
-func (c *Controller) removeCephClusterStorageNode(name string) error {
-	cluster, err := c.GetCephCluster(context.TODO())
+func (c *Controller) removeCephClusterStorageNode(ctx context.Context, name string) error {
+	cluster, err := c.GetCephCluster(ctx)
 	if err != nil {
 		return errors.Wrapf(err, "get CephCluster config")
 	}
@@ -133,7 +133,7 @@ func (c *Controller) removeCephClusterStorageNode(name string) error {
 			Path:  "/spec/storage/nodes",
 			Value: next,
 		})
-		_, err = c.JSONPatchCephCluster(context.TODO(), patches)
+		_, err = c.JSONPatchCephCluster(ctx, patches)
 		if err != nil {
 			return errors.Wrap(err, "patch CephCluster with new storage node list")
 		}
@@ -145,14 +145,14 @@ func (c *Controller) removeCephClusterStorageNode(name string) error {
 }
 
 // returns the osd id if found
-func (c *Controller) deleteK8sDeploymentOSD(name string) (string, error) {
+func (c *Controller) deleteK8sDeploymentOSD(ctx context.Context, name string) (string, error) {
 	var osdID string
 
 	rookOSDLabels := map[string]string{"app": "rook-ceph-osd"}
 	opts := metav1.ListOptions{
 		LabelSelector: labels.SelectorFromSet(rookOSDLabels).String(),
 	}
-	deploys, err := c.Config.Client.AppsV1().Deployments(RookCephNS).List(context.TODO(), opts)
+	deploys, err := c.Config.Client.AppsV1().Deployments(RookCephNS).List(ctx, opts)
 	if err != nil {
 		return "", errors.Wrap(err, "list Rook OSD deployments")
 	}
@@ -165,7 +165,7 @@ func (c *Controller) deleteK8sDeploymentOSD(name string) (string, error) {
 			opts := metav1.DeleteOptions{
 				PropagationPolicy: &background,
 			}
-			err := c.Config.Client.AppsV1().Deployments(RookCephNS).Delete(context.TODO(), deploy.Name, opts)
+			err := c.Config.Client.AppsV1().Deployments(RookCephNS).Delete(ctx, deploy.Name, opts)
 			if err != nil {
 				return "", errors.Wrapf(err, "delete deployment %s", deploy.Name)
 			}
@@ -178,12 +178,12 @@ func (c *Controller) deleteK8sDeploymentOSD(name string) (string, error) {
 }
 
 // getBlockPoolReplicationLevel returns ceph block pool replication size
-func (c *Controller) GetBlockPoolReplicationLevel(name string) (int, error) {
+func (c *Controller) GetBlockPoolReplicationLevel(ctx context.Context, name string) (int, error) {
 	if name == "" {
 		return 0, fmt.Errorf("name of CephBlockPool required")
 	}
 
-	pool, err := c.Config.CephV1.CephBlockPools(RookCephNS).Get(context.TODO(), name, metav1.GetOptions{})
+	pool, err := c.Config.CephV1.CephBlockPools(RookCephNS).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		if util.IsNotFoundErr(err) {
 			return 0, nil
@@ -195,12 +195,12 @@ func (c *Controller) GetBlockPoolReplicationLevel(name string) (int, error) {
 }
 
 // SetBlockPoolReplicationLevel ignores NotFound errors.
-func (c *Controller) SetBlockPoolReplication(rookVersion semver.Version, cephVersion *semver.Version, name string, level int, doFullReconcile bool) (bool, error) {
+func (c *Controller) SetBlockPoolReplication(ctx context.Context, rookVersion semver.Version, cephVersion *semver.Version, name string, level int, doFullReconcile bool) (bool, error) {
 	if name == "" {
 		return false, nil
 	}
 
-	pool, err := c.Config.CephV1.CephBlockPools(RookCephNS).Get(context.TODO(), name, metav1.GetOptions{})
+	pool, err := c.Config.CephV1.CephBlockPools(RookCephNS).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		if util.IsNotFoundErr(err) {
 			return false, nil
@@ -227,7 +227,7 @@ func (c *Controller) SetBlockPoolReplication(rookVersion semver.Version, cephVer
 		return false, errors.Wrap(err, "marshal patch data")
 	}
 	c.Log.Debugf("Patching CephBlockPool %s with %s", pool.Name, string(patchData))
-	_, err = c.Config.CephV1.CephBlockPools(RookCephNS).Patch(context.TODO(), pool.Name, apitypes.JSONPatchType, patchData, metav1.PatchOptions{})
+	_, err = c.Config.CephV1.CephBlockPools(RookCephNS).Patch(ctx, pool.Name, apitypes.JSONPatchType, patchData, metav1.PatchOptions{})
 	if err != nil {
 		return false, errors.Wrapf(err, "patch CephBlockPool %s", name)
 	}
@@ -242,11 +242,11 @@ func (c *Controller) SetBlockPoolReplication(rookVersion semver.Version, cephVer
 		// Rook will also run this command but there is a race condition: if the next command that
 		// sets the min_size runs before Rook has increased the size, then the min_size command will
 		// fail. This command is idempotent.
-		err = c.cephOSDPoolSetSize(rookVersion, cephVersion, name, level)
+		err = c.cephOSDPoolSetSize(ctx, rookVersion, cephVersion, name, level)
 		if err != nil {
 			return false, errors.Wrapf(err, "set block pool %q size to %d", name, minSize)
 		}
-		err = c.cephOSDPoolSetMinSize(rookVersion, name, minSize)
+		err = c.cephOSDPoolSetMinSize(ctx, rookVersion, name, minSize)
 		if err != nil {
 			return false, errors.Wrapf(err, "set block pool %q min_size to %d", name, minSize)
 		}
@@ -254,7 +254,7 @@ func (c *Controller) SetBlockPoolReplication(rookVersion semver.Version, cephVer
 	return true, nil
 }
 
-func (c *Controller) SetDeviceHealthMetricsReplication(rookVersion semver.Version, cephVersion *semver.Version, cephBlockPoolName string, level int, doFullReconcile bool) (bool, error) {
+func (c *Controller) SetDeviceHealthMetricsReplication(ctx context.Context, rookVersion semver.Version, cephVersion *semver.Version, cephBlockPoolName string, level int, doFullReconcile bool) (bool, error) {
 	if rookVersion.LT(Rookv14) {
 		return false, nil
 	}
@@ -276,11 +276,11 @@ func (c *Controller) SetDeviceHealthMetricsReplication(rookVersion semver.Versio
 
 	c.Log.Debugf("Ensuring %s replication level is %d", poolName, level)
 
-	err := c.cephOSDPoolSetSize(rookVersion, cephVersion, poolName, level)
+	err := c.cephOSDPoolSetSize(ctx, rookVersion, cephVersion, poolName, level)
 	if err != nil {
 		return false, errors.Wrapf(err, "scale %s pool size", poolName)
 	}
-	err = c.cephOSDPoolSetMinSize(rookVersion, poolName, minSize)
+	err = c.cephOSDPoolSetMinSize(ctx, rookVersion, poolName, minSize)
 	if err != nil {
 		return false, errors.Wrapf(err, "scale %s pool min_size", poolName)
 	}
@@ -437,12 +437,12 @@ func cephCSIResourcesNeedsUpdate(data map[string]string) bool {
 
 // SetSharedFilesystemReplication will set the shared filesystem replication to
 // the number of OSDs in the cluster. Returns true if the resource was updated.
-func (c *Controller) SetFilesystemReplication(rookVersion semver.Version, cephVersion *semver.Version, name string, level int, doFullReconcile bool) (bool, error) {
+func (c *Controller) SetFilesystemReplication(ctx context.Context, rookVersion semver.Version, cephVersion *semver.Version, name string, level int, doFullReconcile bool) (bool, error) {
 	if name == "" {
 		return false, nil
 	}
 
-	cephFilesystem, err := c.Config.CephV1.CephFilesystems(RookCephNS).Get(context.TODO(), name, metav1.GetOptions{})
+	cephFilesystem, err := c.Config.CephV1.CephFilesystems(RookCephNS).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		if util.IsNotFoundErr(err) {
 			return false, nil
@@ -487,7 +487,7 @@ func (c *Controller) SetFilesystemReplication(rookVersion semver.Version, cephVe
 	}
 
 	c.Log.Debugf("Patching CephFilesystem %s with %s", cephFilesystem.Name, string(patchData))
-	_, err = c.Config.CephV1.CephFilesystems(RookCephNS).Patch(context.TODO(), cephFilesystem.Name, apitypes.JSONPatchType, patchData, metav1.PatchOptions{})
+	_, err = c.Config.CephV1.CephFilesystems(RookCephNS).Patch(ctx, cephFilesystem.Name, apitypes.JSONPatchType, patchData, metav1.PatchOptions{})
 	if err != nil {
 		return false, errors.Wrapf(err, "patch Filesystem %s", name)
 	}
@@ -498,19 +498,19 @@ func (c *Controller) SetFilesystemReplication(rookVersion semver.Version, cephVe
 		}
 		// Changing the size in the CephFilesystem has no effect so it needs to be set manually
 		// https://github.com/rook/rook/issues/3144
-		err := c.cephOSDPoolSetSize(rookVersion, cephVersion, RookCephSharedFSMetadataPool, level)
+		err := c.cephOSDPoolSetSize(ctx, rookVersion, cephVersion, RookCephSharedFSMetadataPool, level)
 		if err != nil {
 			return false, errors.Wrapf(err, "scale shared cephFS metadata pool size")
 		}
-		err = c.cephOSDPoolSetMinSize(rookVersion, RookCephSharedFSMetadataPool, minSize)
+		err = c.cephOSDPoolSetMinSize(ctx, rookVersion, RookCephSharedFSMetadataPool, minSize)
 		if err != nil {
 			return false, errors.Wrapf(err, "scale shared cephFS metadata pool min_size")
 		}
-		err = c.cephOSDPoolSetSize(rookVersion, cephVersion, RookCephSharedFSDataPool, level)
+		err = c.cephOSDPoolSetSize(ctx, rookVersion, cephVersion, RookCephSharedFSDataPool, level)
 		if err != nil {
 			return false, errors.Wrapf(err, "scale shared cephFS data pool size")
 		}
-		err = c.cephOSDPoolSetMinSize(rookVersion, RookCephSharedFSDataPool, minSize)
+		err = c.cephOSDPoolSetMinSize(ctx, rookVersion, RookCephSharedFSDataPool, minSize)
 		if err != nil {
 			return false, errors.Wrapf(err, "scale shared cephFS data pool min_size")
 		}
@@ -523,9 +523,7 @@ func (c *Controller) SetFilesystemReplication(rookVersion semver.Version, cephVe
 // preferredDuringSchedulingIgnoredDuringExecution podAntiAffinity rule back to the more correct
 // requiredDuringSchedulingIgnoredDuringExecution equivalent if the number of nodes is greater than
 // one.
-func (c *Controller) PatchFilesystemMDSPlacementMultinode(name string, numNodes int) error {
-	ctx := context.TODO()
-
+func (c *Controller) PatchFilesystemMDSPlacementMultinode(ctx context.Context, name string, numNodes int) error {
 	if name == "" {
 		return nil
 	}
@@ -565,12 +563,12 @@ func (c *Controller) PatchFilesystemMDSPlacementMultinode(name string, numNodes 
 
 // SetObjectStoreReplication will set the object store pool replication to the
 // number of OSDs in the cluster. Returns true if the resource was updated.
-func (c *Controller) SetObjectStoreReplication(rookVersion semver.Version, cephVersion *semver.Version, name string, level int, doFullReconcile bool) (bool, error) {
+func (c *Controller) SetObjectStoreReplication(ctx context.Context, rookVersion semver.Version, cephVersion *semver.Version, name string, level int, doFullReconcile bool) (bool, error) {
 	if name == "" {
 		return false, nil
 	}
 
-	os, err := c.Config.CephV1.CephObjectStores(RookCephNS).Get(context.TODO(), name, metav1.GetOptions{})
+	os, err := c.Config.CephV1.CephObjectStores(RookCephNS).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		if util.IsNotFoundErr(err) {
 			return false, nil
@@ -618,7 +616,7 @@ func (c *Controller) SetObjectStoreReplication(rookVersion semver.Version, cephV
 	}
 
 	c.Log.Debugf("Patching CephObjectStore %s with %s", os.Name, string(patchData))
-	_, err = c.Config.CephV1.CephObjectStores(RookCephNS).Patch(context.TODO(), os.Name, apitypes.JSONPatchType, patchData, metav1.PatchOptions{})
+	_, err = c.Config.CephV1.CephObjectStores(RookCephNS).Patch(ctx, os.Name, apitypes.JSONPatchType, patchData, metav1.PatchOptions{})
 	if err != nil {
 		return false, errors.Wrapf(err, "patch CephObjectStore %s", name)
 	}
@@ -629,7 +627,7 @@ func (c *Controller) SetObjectStoreReplication(rookVersion semver.Version, cephV
 		pools := append([]string{RookCephObjectStoreRootPool}, RookCephObjectStoreMetadataPools...)
 		pools = append(pools, RookCephObjectStoreDataPools...)
 		for _, pool := range pools {
-			err := c.cephOSDPoolSetSize(rookVersion, cephVersion, objectStorePoolName(name, pool), level)
+			err := c.cephOSDPoolSetSize(ctx, rookVersion, cephVersion, objectStorePoolName(name, pool), level)
 			if err == cephErrENOENT && slices.Contains(RookCephObjectStoreMetadataPools, pool) {
 				// the non-ec metadata pool doesn't always exist
 				continue
@@ -637,7 +635,7 @@ func (c *Controller) SetObjectStoreReplication(rookVersion semver.Version, cephV
 			if err != nil {
 				return false, errors.Wrapf(err, "scale ceph object store pool %s size", pool)
 			}
-			err = c.cephOSDPoolSetMinSize(rookVersion, objectStorePoolName(name, pool), minSize)
+			err = c.cephOSDPoolSetMinSize(ctx, rookVersion, objectStorePoolName(name, pool), minSize)
 			if err != nil {
 				return false, errors.Wrapf(err, "scale ceph object store pool %s min_size", pool)
 			}
@@ -649,7 +647,7 @@ func (c *Controller) SetObjectStoreReplication(rookVersion semver.Version, cephV
 	if cephVersion != nil && cephVersion.Major >= CephQuincy.Major {
 		var multiErr error
 		for _, pool := range append([]string{RookCephObjectStoreRootPool}, RookCephObjectStoreMetadataPoolsQuincy...) {
-			err := c.cephOSDPoolSetPgNumMin(rookVersion, objectStorePoolName(name, pool), 8)
+			err := c.cephOSDPoolSetPgNumMin(ctx, rookVersion, objectStorePoolName(name, pool), 8)
 			if err != nil {
 				multiErr = multierror.Append(multiErr, errors.Wrapf(err, "set ceph object store metadata pool %s pg_num_min", pool))
 			}
@@ -663,12 +661,12 @@ func (c *Controller) SetObjectStoreReplication(rookVersion semver.Version, cephV
 }
 
 // Toolbox is deployed with Rook 1.4 since ceph commands can't be executed in operator
-func (c *Controller) rookCephExec(rookVersion semver.Version, cmd ...string) error {
+func (c *Controller) rookCephExec(ctx context.Context, rookVersion semver.Version, cmd ...string) error {
 	container, rookLabels := c.rookCephExecTarget(rookVersion)
 	opts := metav1.ListOptions{
 		LabelSelector: rookLabels,
 	}
-	pods, err := c.Config.Client.CoreV1().Pods(RookCephNS).List(context.TODO(), opts)
+	pods, err := c.Config.Client.CoreV1().Pods(RookCephNS).List(ctx, opts)
 	if err != nil {
 		return errors.Wrap(err, "list Rook pods")
 	}
@@ -676,7 +674,7 @@ func (c *Controller) rookCephExec(rookVersion semver.Version, cmd ...string) err
 		return errors.Wrap(err, "found no Rook pods for executing ceph commands")
 	}
 
-	exitCode, stdout, stderr, err := c.SyncExecutor.ExecContainer(context.TODO(), RookCephNS, pods.Items[0].Name, container, cmd...)
+	exitCode, stdout, stderr, err := c.SyncExecutor.ExecContainer(ctx, RookCephNS, pods.Items[0].Name, container, cmd...)
 	if err != nil {
 		return err
 	}
@@ -695,12 +693,12 @@ func (c *Controller) rookCephExec(rookVersion semver.Version, cmd ...string) err
 	return nil
 }
 
-func (c *Controller) execCephOSDPurge(rookVersion semver.Version, osdID string, hostname string) error {
+func (c *Controller) execCephOSDPurge(ctx context.Context, rookVersion semver.Version, osdID string, hostname string) error {
 	container, rookLabels := c.rookCephExecTarget(rookVersion)
 	opts := metav1.ListOptions{
 		LabelSelector: rookLabels,
 	}
-	pods, err := c.Config.Client.CoreV1().Pods(RookCephNS).List(context.TODO(), opts)
+	pods, err := c.Config.Client.CoreV1().Pods(RookCephNS).List(ctx, opts)
 	if err != nil {
 		return errors.Wrap(err, "list Rook tools pods")
 	}
@@ -708,9 +706,9 @@ func (c *Controller) execCephOSDPurge(rookVersion semver.Version, osdID string, 
 		return errors.Wrapf(err, "found no Rook pods for executing ceph commands")
 	}
 	// ignore error - OSD is probably already down
-	_, _, _, _ = c.SyncExecutor.ExecContainer(context.TODO(), RookCephNS, pods.Items[0].Name, container, "ceph", "osd", "down", osdID)
+	_, _, _, _ = c.SyncExecutor.ExecContainer(ctx, RookCephNS, pods.Items[0].Name, container, "ceph", "osd", "down", osdID)
 
-	exitCode, stdout, stderr, err := c.SyncExecutor.ExecContainer(context.TODO(), RookCephNS, pods.Items[0].Name, container, "ceph", "osd", "purge", osdID, "--yes-i-really-mean-it")
+	exitCode, stdout, stderr, err := c.SyncExecutor.ExecContainer(ctx, RookCephNS, pods.Items[0].Name, container, "ceph", "osd", "purge", osdID, "--yes-i-really-mean-it")
 	if exitCode != 0 {
 		c.Log.Debugf("`ceph osd purge %s` stdout: %s", osdID, stdout)
 		return fmt.Errorf("failed to purge OSD: %s", stderr)
@@ -720,7 +718,7 @@ func (c *Controller) execCephOSDPurge(rookVersion semver.Version, osdID string, 
 	}
 
 	// This removes the phantom OSD from the output of `ceph osd tree`
-	exitCode, stdout, stderr, err = c.SyncExecutor.ExecContainer(context.TODO(), RookCephNS, pods.Items[0].Name, container, "ceph", "osd", "crush", "rm", hostname)
+	exitCode, stdout, stderr, err = c.SyncExecutor.ExecContainer(ctx, RookCephNS, pods.Items[0].Name, container, "ceph", "osd", "crush", "rm", hostname)
 	if exitCode != 0 {
 		c.Log.Debugf("`ceph osd crush rm %s` stdout: %s", hostname, stdout)
 		return fmt.Errorf("failed to rm %s from crush map: %s", hostname, stderr)
@@ -732,12 +730,12 @@ func (c *Controller) execCephOSDPurge(rookVersion semver.Version, osdID string, 
 	return nil
 }
 
-func (c *Controller) CephFilesystemOK(rookVersion semver.Version, name string) (bool, error) {
+func (c *Controller) CephFilesystemOK(ctx context.Context, rookVersion semver.Version, name string) (bool, error) {
 	container, rookLabels := c.rookCephExecTarget(rookVersion)
 	opts := metav1.ListOptions{
 		LabelSelector: rookLabels,
 	}
-	pods, err := c.Config.Client.CoreV1().Pods(RookCephNS).List(context.TODO(), opts)
+	pods, err := c.Config.Client.CoreV1().Pods(RookCephNS).List(ctx, opts)
 	if err != nil {
 		return false, errors.Wrap(err, "list Rook tools pods")
 	}
@@ -746,7 +744,7 @@ func (c *Controller) CephFilesystemOK(rookVersion semver.Version, name string) (
 	}
 	// The filesystem will appear in `ceph fs ls` before it's ready to use. `ceph mds metadata` is
 	// better because it waits for the mds daemons to be running
-	exitCode, stdout, stderr, err := c.SyncExecutor.ExecContainer(context.TODO(), RookCephNS, pods.Items[0].Name, container, "ceph", "mds", "metadata")
+	exitCode, stdout, stderr, err := c.SyncExecutor.ExecContainer(ctx, RookCephNS, pods.Items[0].Name, container, "ceph", "mds", "metadata")
 	if err != nil {
 		return false, errors.Wrap(err, "running 'ceph fs ls'")
 	}
@@ -762,7 +760,7 @@ func (c *Controller) CephFilesystemOK(rookVersion semver.Version, name string) (
 }
 
 func (c *Controller) WaitCephFilesystem(ctx context.Context, rookVersion semver.Version, name string) error {
-	ok, err := c.CephFilesystemOK(rookVersion, name)
+	ok, err := c.CephFilesystemOK(ctx, rookVersion, name)
 	if err != nil {
 		return err
 	}
@@ -775,7 +773,7 @@ func (c *Controller) WaitCephFilesystem(ctx context.Context, rookVersion semver.
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-time.After(time.Second):
-			ok, err := c.CephFilesystemOK(rookVersion, name)
+			ok, err := c.CephFilesystemOK(ctx, rookVersion, name)
 			if err != nil {
 				return err
 			}
@@ -861,8 +859,8 @@ func parseCephOSDStatusHosts(s string) ([]string, error) {
 	return ret, nil
 }
 
-func (c *Controller) PrioritizeRook() error {
-	if err := c.prioritizeRookAgent(); err != nil {
+func (c *Controller) PrioritizeRook(ctx context.Context) error {
+	if err := c.prioritizeRookAgent(ctx); err != nil {
 		return err
 	}
 
@@ -875,7 +873,7 @@ func (c *Controller) PrioritizeRook() error {
 	}
 	for _, selector := range selectors {
 		c.Log.Debugf("Setting priority class for rook-ceph deployments with label %s", selector)
-		if err := c.prioritizeRookDeployments(RookCephNS, selector); err != nil {
+		if err := c.prioritizeRookDeployments(ctx, RookCephNS, selector); err != nil {
 			return err
 		}
 	}
@@ -883,9 +881,9 @@ func (c *Controller) PrioritizeRook() error {
 	return nil
 }
 
-func (c *Controller) prioritizeRookAgent() error {
+func (c *Controller) prioritizeRookAgent(ctx context.Context) error {
 	dsClient := c.Config.Client.AppsV1().DaemonSets(RookCephNS)
-	agentDS, err := dsClient.Get(context.TODO(), "rook-ceph-agent", metav1.GetOptions{})
+	agentDS, err := dsClient.Get(ctx, "rook-ceph-agent", metav1.GetOptions{})
 	if err != nil {
 		if util.IsNotFoundErr(err) {
 			c.Log.Debugf("rook-ceph-agent daemonset not found")
@@ -900,18 +898,18 @@ func (c *Controller) prioritizeRookAgent() error {
 
 	c.Log.Infof("Setting rook-ceph-agent priorityclass %s", c.Config.RookPriorityClass)
 	agentDS.Spec.Template.Spec.PriorityClassName = c.Config.RookPriorityClass
-	_, err = dsClient.Update(context.TODO(), agentDS, metav1.UpdateOptions{})
+	_, err = dsClient.Update(ctx, agentDS, metav1.UpdateOptions{})
 	if err != nil {
 		return errors.Wrap(err, "update rook-ceph-agent priority")
 	}
 	return nil
 }
 
-func (c *Controller) prioritizeRookDeployments(namespace, selector string) error {
+func (c *Controller) prioritizeRookDeployments(ctx context.Context, namespace, selector string) error {
 	opts := metav1.ListOptions{
 		LabelSelector: selector,
 	}
-	deployments, err := c.Config.Client.AppsV1().Deployments(namespace).List(context.TODO(), opts)
+	deployments, err := c.Config.Client.AppsV1().Deployments(namespace).List(ctx, opts)
 	if err != nil {
 		return errors.Wrapf(err, "list deployments %q", selector)
 	}
@@ -922,7 +920,7 @@ func (c *Controller) prioritizeRookDeployments(namespace, selector string) error
 		}
 		deployment.Spec.Template.Spec.PriorityClassName = c.Config.RookPriorityClass
 		c.Log.Infof("Setting %s priority class %s", deployment.Name, c.Config.RookPriorityClass)
-		if _, err := c.Config.Client.AppsV1().Deployments(namespace).Update(context.TODO(), &deployment, metav1.UpdateOptions{}); err != nil {
+		if _, err := c.Config.Client.AppsV1().Deployments(namespace).Update(ctx, &deployment, metav1.UpdateOptions{}); err != nil {
 			return errors.Wrapf(err, "update %s priority class", deployment.Name)
 		}
 		// Change at most 1 deployment per reconcile to prevent disruptions
@@ -947,23 +945,23 @@ func (c *Controller) JSONPatchCephCluster(ctx context.Context, patches []k8s.JSO
 	return c.Config.CephV1.CephClusters(RookCephNS).Patch(ctx, CephClusterName, apitypes.JSONPatchType, patchData, metav1.PatchOptions{})
 }
 
-func (c *Controller) cephOSDPoolSetSize(rookVersion semver.Version, cephVersion *semver.Version, name string, size int) error {
+func (c *Controller) cephOSDPoolSetSize(ctx context.Context, rookVersion semver.Version, cephVersion *semver.Version, name string, size int) error {
 	args := []string{"ceph", "osd", "pool", "set", name, "size", strconv.Itoa(size)}
 	if size == 1 && cephVersion != nil && cephVersion.Major >= CephPacific.Major {
 		args = append(args, "--yes-i-really-mean-it")
 	}
-	return c.rookCephExec(rookVersion, args...)
+	return c.rookCephExec(ctx, rookVersion, args...)
 }
 
-func (c *Controller) cephOSDPoolSetMinSize(rookVersion semver.Version, name string, minSize int) error {
+func (c *Controller) cephOSDPoolSetMinSize(ctx context.Context, rookVersion semver.Version, name string, minSize int) error {
 	args := []string{"ceph", "osd", "pool", "set", name, "min_size", strconv.Itoa(minSize)}
-	return c.rookCephExec(rookVersion, args...)
+	return c.rookCephExec(ctx, rookVersion, args...)
 }
 
 // cephOSDPoolSetPgNumMin sets the pg_num_min property of the given pool to pgNumMin.
-func (c *Controller) cephOSDPoolSetPgNumMin(rookVersion semver.Version, name string, pgNumMin uint64) error {
+func (c *Controller) cephOSDPoolSetPgNumMin(ctx context.Context, rookVersion semver.Version, name string, pgNumMin uint64) error {
 	args := []string{"ceph", "osd", "pool", "set", name, "pg_num_min", strconv.FormatUint(pgNumMin, 10)}
-	return c.rookCephExec(rookVersion, args...)
+	return c.rookCephExec(ctx, rookVersion, args...)
 }
 
 // GetRookVersion gets the Rook version from the container image tag of the rook-ceph-operator

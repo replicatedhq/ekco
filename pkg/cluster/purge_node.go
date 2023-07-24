@@ -121,17 +121,17 @@ func (c *Controller) PurgeNode(ctx context.Context, name string, rook bool, rook
 
 // purgeCephOsd safely removes the OSD on a particular node name from the Ceph cluster.
 func (c *Controller) purgeCephOsd(ctx context.Context, rookVersion semver.Version, name string) error {
-	if err := c.removeCephClusterStorageNode(name); err != nil {
+	if err := c.removeCephClusterStorageNode(ctx, name); err != nil {
 		return err
 	}
 
-	osdID, err := c.deleteK8sDeploymentOSD(name)
+	osdID, err := c.deleteK8sDeploymentOSD(ctx, name)
 	if err != nil {
 		return err
 	}
 
 	if osdID != "" {
-		if err := c.execCephOSDPurge(rookVersion, osdID, name); err != nil {
+		if err := c.execCephOSDPurge(ctx, rookVersion, osdID, name); err != nil {
 			return err
 		}
 		c.Log.Infof("Purge node %q: ceph osd purge command executed", name)

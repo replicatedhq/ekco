@@ -12,8 +12,8 @@ import (
 )
 
 // ScalePrometheus scales the prometheus operator to the given number of replicas
-func ScalePrometheus(promClient dynamic.NamespaceableResourceInterface, replicas int64) error {
-	prometheus, _ := promClient.Namespace("monitoring").Get(context.TODO(), "k8s", metav1.GetOptions{})
+func ScalePrometheus(ctx context.Context, promClient dynamic.NamespaceableResourceInterface, replicas int64) error {
+	prometheus, _ := promClient.Namespace("monitoring").Get(ctx, "k8s", metav1.GetOptions{})
 	if prometheus == nil {
 		return nil
 	}
@@ -33,7 +33,7 @@ func ScalePrometheus(promClient dynamic.NamespaceableResourceInterface, replicas
 		if err != nil {
 			return fmt.Errorf("failed to marshal json: %w", err)
 		}
-		_, err = promClient.Namespace("monitoring").Patch(context.TODO(), "k8s", types.JSONPatchType, prometheusPayload, metav1.PatchOptions{})
+		_, err = promClient.Namespace("monitoring").Patch(ctx, "k8s", types.JSONPatchType, prometheusPayload, metav1.PatchOptions{})
 		if err != nil {
 			return fmt.Errorf("failed to patch prometheus to %d replicas: %w", replicas, err)
 		}
@@ -43,8 +43,8 @@ func ScalePrometheus(promClient dynamic.NamespaceableResourceInterface, replicas
 }
 
 // ScaleAlertManager scales the prometheus operator to the given number of replicas
-func ScaleAlertManager(alertClient dynamic.NamespaceableResourceInterface, replicas int64) error {
-	alertManager, _ := alertClient.Namespace("monitoring").Get(context.TODO(), "prometheus-alertmanager", metav1.GetOptions{})
+func ScaleAlertManager(ctx context.Context, alertClient dynamic.NamespaceableResourceInterface, replicas int64) error {
+	alertManager, _ := alertClient.Namespace("monitoring").Get(ctx, "prometheus-alertmanager", metav1.GetOptions{})
 	if alertManager == nil {
 		return nil
 	}
@@ -64,7 +64,7 @@ func ScaleAlertManager(alertClient dynamic.NamespaceableResourceInterface, repli
 		if err != nil {
 			return fmt.Errorf("failed to marshal json: %w", err)
 		}
-		_, err = alertClient.Namespace("monitoring").Patch(context.TODO(), "prometheus-alertmanager", types.JSONPatchType, alertManagersPayload, metav1.PatchOptions{})
+		_, err = alertClient.Namespace("monitoring").Patch(ctx, "prometheus-alertmanager", types.JSONPatchType, alertManagersPayload, metav1.PatchOptions{})
 		if err != nil {
 			return fmt.Errorf("failed to patch alertmanager: %w", err)
 		}

@@ -24,12 +24,12 @@ func (c *Controller) SetKubeconfigServer(ctx context.Context, node corev1.Node, 
 	err = c.pollForPodCompleted(ctx, c.Config.HostTaskNamespace, pod.Name)
 	if err != nil {
 		if err == errPodFailed {
-			c.logPodResults(c.Config.HostTaskNamespace, pod.Name)
+			c.logPodResults(ctx, c.Config.HostTaskNamespace, pod.Name)
 		}
 		return errors.Wrapf(err, "run set-kubeconfig-server pod on node %s", node.Name)
 	}
 
-	if err := c.deletePods(c.Config.HostTaskNamespace, SetKubeconfigServerSelector); err != nil {
+	if err := c.deletePods(ctx, c.Config.HostTaskNamespace, SetKubeconfigServerSelector); err != nil {
 		c.Log.Warnf("Failed to delete set-kubeconfig-server pods: %v", err)
 	}
 

@@ -17,9 +17,9 @@ import (
 var errPodFailed error = errors.New("pod failed")
 
 // Any time this returns true it updates the last attempted timestamp
-func (c *Controller) CheckRotateCertsDue(reset bool) (bool, error) {
+func (c *Controller) CheckRotateCertsDue(ctx context.Context, reset bool) (bool, error) {
 	client := c.Config.Client.CoreV1().ConfigMaps(c.Config.RotateCertsNamespace)
-	cm, err := client.Get(context.TODO(), RotateCertsValue, metav1.GetOptions{})
+	cm, err := client.Get(ctx, RotateCertsValue, metav1.GetOptions{})
 	if err != nil {
 		if !util.IsNotFoundErr(err) {
 			return false, errors.Wrapf(err, "get configmap %s/%s", c.Config.RotateCertsNamespace, RotateCertsValue)
@@ -35,7 +35,7 @@ func (c *Controller) CheckRotateCertsDue(reset bool) (bool, error) {
 				RotateCertsLastAttempted: time.Now().Format(time.RFC3339),
 			},
 		}
-		if _, err := client.Create(context.TODO(), cm, metav1.CreateOptions{}); err != nil {
+		if _, err := client.Create(ctx, cm, metav1.CreateOptions{}); err != nil {
 			return false, errors.Wrapf(err, "create configmap %s/%s", c.Config.RotateCertsNamespace, RotateCertsValue)
 		}
 		return true, nil
@@ -53,7 +53,7 @@ func (c *Controller) CheckRotateCertsDue(reset bool) (bool, error) {
 
 	cm.Data[RotateCertsLastAttempted] = time.Now().Format(time.RFC3339)
 
-	if _, err := client.Update(context.TODO(), cm, metav1.UpdateOptions{}); err != nil {
+	if _, err := client.Update(ctx, cm, metav1.UpdateOptions{}); err != nil {
 		return false, errors.Wrapf(err, "update configmap %s/%s", c.Config.RotateCertsNamespace, RotateCertsValue)
 	}
 
@@ -63,13 +63,13 @@ func (c *Controller) CheckRotateCertsDue(reset bool) (bool, error) {
 // This launches a pod on each primary to mount /etc/kubernetes and rotate the certs.
 // It leaves the pods up if any fail.
 func (c *Controller) RotateAllCerts(ctx context.Context) error {
-	if err := c.deletePods(c.Config.RotateCertsNamespace, RotateCertsSelector); err != nil {
+	if err := c.deletePods(ctx, c.Config.RotateCertsNamespace, RotateCertsSelector); err != nil {
 		c.Log.Warnf("Failed to delete rotate pods: %v", err)
 	}
 	opts := metav1.ListOptions{
 		LabelSelector: "node-role.kubernetes.io/master=",
 	}
-	node, err := c.Config.Client.CoreV1().Nodes().List(context.TODO(), opts)
+	node, err := c.Config.Client.CoreV1().Nodes().List(ctx, opts)
 	if err != nil {
 		return errors.Wrap(err, "list primary nodes")
 	}
@@ -77,7 +77,7 @@ func (c *Controller) RotateAllCerts(ctx context.Context) error {
 		opts = metav1.ListOptions{
 			LabelSelector: "node-role.kubernetes.io/control-plane=",
 		}
-		node, err = c.Config.Client.CoreV1().Nodes().List(context.TODO(), opts)
+		node, err = c.Config.Client.CoreV1().Nodes().List(ctx, opts)
 		if err != nil {
 			return errors.Wrap(err, "list primary nodes")
 		}
@@ -91,33 +91,33 @@ func (c *Controller) RotateAllCerts(ctx context.Context) error {
 			time.Sleep(time.Second * 5)
 		}
 		pod := c.getRotateCertsPodConfig(node.Name)
-		pod, err := c.Config.Client.CoreV1().Pods(c.Config.RotateCertsNamespace).Create(context.TODO(), pod, metav1.CreateOptions{})
+		pod, err := c.Config.Client.CoreV1().Pods(c.Config.RotateCertsNamespace).Create(ctx, pod, metav1.CreateOptions{})
 		if err != nil {
 			return errors.Wrapf(err, "create rotate pod for node %s", node.Name)
 		}
 		err = c.pollForPodCompleted(ctx, c.Config.RotateCertsNamespace, pod.Name)
 		if err != nil {
 			if err == errPodFailed {
-				c.logPodResults(c.Config.RotateCertsNamespace, pod.Name)
+				c.logPodResults(ctx, c.Config.RotateCertsNamespace, pod.Name)
 			}
 			return errors.Wrapf(err, "rotate certs pod for node %s", node.Name)
 		}
-		c.logPodResults(c.Config.RotateCertsNamespace, pod.Name)
+		c.logPodResults(ctx, c.Config.RotateCertsNamespace, pod.Name)
 	}
 
-	if err := c.deletePods(c.Config.RotateCertsNamespace, RotateCertsSelector); err != nil {
+	if err := c.deletePods(ctx, c.Config.RotateCertsNamespace, RotateCertsSelector); err != nil {
 		c.Log.Warnf("Failed to delete rotate pods: %v", err)
 	}
 
 	return nil
 }
 
-func (c *Controller) deletePods(namespace string, selector labels.Selector) error {
+func (c *Controller) deletePods(ctx context.Context, namespace string, selector labels.Selector) error {
 	options := metav1.ListOptions{
 		LabelSelector: selector.String(),
 	}
 
-	return c.Config.Client.CoreV1().Pods(namespace).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, options)
+	return c.Config.Client.CoreV1().Pods(namespace).DeleteCollection(ctx, metav1.DeleteOptions{}, options)
 }
 
 func (c *Controller) getRotateCertsPodConfig(nodeName string) *corev1.Pod {
@@ -199,7 +199,7 @@ func (c *Controller) pollForPodCompleted(ctx context.Context, namespace, name st
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-ticker.C:
-			pod, err := c.Config.Client.CoreV1().Pods(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+			pod, err := c.Config.Client.CoreV1().Pods(namespace).Get(ctx, name, metav1.GetOptions{})
 			if err != nil {
 				c.Log.Debugf("Poll for pod completed: get pod %s: %v", name, err)
 				continue
@@ -214,9 +214,9 @@ func (c *Controller) pollForPodCompleted(ctx context.Context, namespace, name st
 	}
 }
 
-func (c *Controller) logPodResults(namespace, name string) {
+func (c *Controller) logPodResults(ctx context.Context, namespace, name string) {
 	req := c.Config.Client.CoreV1().Pods(namespace).GetLogs(name, &corev1.PodLogOptions{})
-	logs, err := req.Stream(context.TODO())
+	logs, err := req.Stream(ctx)
 	if err != nil {
 		c.Log.Warnf("Failed to get pod %s logs: %v", name, err)
 		return
