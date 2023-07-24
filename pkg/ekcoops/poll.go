@@ -9,7 +9,7 @@ import (
 )
 
 // Poll will run the reconcile function on an interval
-func (o *Operator) Poll(ctx context.Context, interval time.Duration) {
+func (o *Operator) Poll(ctx context.Context, interval, timeout time.Duration) {
 	logger := o.controller.Log
 	ticker := time.NewTicker(interval)
 
@@ -21,13 +21,16 @@ func (o *Operator) Poll(ctx context.Context, interval time.Duration) {
 	for {
 		select {
 		case <-ticker.C:
-			nodeList, err := o.client.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
+			nodeList, err := o.client.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
 			if err != nil {
 				logger.Infof("Skipping reconcile: failed to list nodes: %v", err)
 				continue
 			}
+
+			timeoutCtx, cancel := context.WithTimeout(ctx, timeout)
 			doFullReconcile := i%60 == 0
-			err = o.Reconcile(nodeList.Items, doFullReconcile)
+			err = o.Reconcile(timeoutCtx, nodeList.Items, doFullReconcile)
+			cancel()
 			if err != nil {
 				logger.Infof("Reconcile failed: %v", err)
 				continue
@@ -42,7 +45,7 @@ func (o *Operator) Poll(ctx context.Context, interval time.Duration) {
 
 func (o *Operator) onLaunch(ctx context.Context) error {
 	if o.config.RotateCerts {
-		if err := o.RotateCerts(true); err != nil {
+		if err := o.RotateCerts(ctx, true); err != nil {
 			return errors.Wrap(err, "rotate certs")
 		}
 	}

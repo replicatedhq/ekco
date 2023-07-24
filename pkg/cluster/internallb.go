@@ -24,7 +24,7 @@ func (c *Controller) ReconcileInternalLB(ctx context.Context, nodes []corev1.Nod
 	nextInternalLB := strings.Join(nodeProps, ",")
 
 	client := c.Config.Client.CoreV1().ConfigMaps(c.Config.HostTaskNamespace)
-	cm, err := client.Get(context.TODO(), UpdateInternalLBValue, metav1.GetOptions{})
+	cm, err := client.Get(ctx, UpdateInternalLBValue, metav1.GetOptions{})
 	if err != nil {
 		if !util.IsNotFoundErr(err) {
 			return errors.Wrapf(err, "get configmap %s/%s", c.Config.HostTaskNamespace, UpdateInternalLBValue)
@@ -40,7 +40,7 @@ func (c *Controller) ReconcileInternalLB(ctx context.Context, nodes []corev1.Nod
 				UpdateInternalLBValue: "", // hasn't yet been successful
 			},
 		}
-		if _, err := client.Create(context.TODO(), cm, metav1.CreateOptions{}); err != nil {
+		if _, err := client.Create(ctx, cm, metav1.CreateOptions{}); err != nil {
 			return errors.Wrapf(err, "create configmap %s/%s", c.Config.HostTaskNamespace, UpdateInternalLBValue)
 		}
 		return nil
@@ -55,7 +55,7 @@ func (c *Controller) ReconcileInternalLB(ctx context.Context, nodes []corev1.Nod
 	}
 	cm.Data[UpdateInternalLBValue] = nextInternalLB
 
-	if _, err := client.Update(context.TODO(), cm, metav1.UpdateOptions{}); err != nil {
+	if _, err := client.Update(ctx, cm, metav1.UpdateOptions{}); err != nil {
 		return errors.Wrapf(err, "update configmap %s/%s", c.Config.HostTaskNamespace, UpdateInternalLBValue)
 	}
 	return nil
@@ -63,7 +63,7 @@ func (c *Controller) ReconcileInternalLB(ctx context.Context, nodes []corev1.Nod
 
 // Update /etc/haproxy/haproxy.cfg and /etc/kubernetes/manifests/haproxy.yaml on all nodes.
 func (c *Controller) UpdateInternalLB(ctx context.Context, nodes []corev1.Node) error {
-	if err := c.deletePods(c.Config.HostTaskNamespace, UpdateInternalLBSelector); err != nil {
+	if err := c.deletePods(ctx, c.Config.HostTaskNamespace, UpdateInternalLBSelector); err != nil {
 		c.Log.Warnf("Failed to delete update internal loadbalancer pods: %v", err)
 	}
 	var primaryHosts []string
@@ -88,7 +88,7 @@ func (c *Controller) UpdateInternalLB(ctx context.Context, nodes []corev1.Node) 
 
 		pod := c.getUpdateInternalLBPod(node.Name, primaryHosts...)
 
-		pod, err := c.Config.Client.CoreV1().Pods(c.Config.HostTaskNamespace).Create(context.TODO(), pod, metav1.CreateOptions{})
+		pod, err := c.Config.Client.CoreV1().Pods(c.Config.HostTaskNamespace).Create(ctx, pod, metav1.CreateOptions{})
 		if err != nil {
 			return errors.Wrapf(err, "create update internal loadbalancer pod for node %s", node.Name)
 		}
@@ -96,17 +96,17 @@ func (c *Controller) UpdateInternalLB(ctx context.Context, nodes []corev1.Node) 
 		err = c.pollForPodCompleted(ctx, c.Config.HostTaskNamespace, pod.Name)
 		if err != nil {
 			if err == errPodFailed {
-				c.logPodResults(c.Config.HostTaskNamespace, pod.Name)
+				c.logPodResults(ctx, c.Config.HostTaskNamespace, pod.Name)
 			}
 			return errors.Wrapf(err, "update internal loadbalancer pod for node %s", node.Name)
 		}
 	}
 
-	if err := c.deletePods(c.Config.HostTaskNamespace, UpdateInternalLBSelector); err != nil {
+	if err := c.deletePods(ctx, c.Config.HostTaskNamespace, UpdateInternalLBSelector); err != nil {
 		c.Log.Warnf("Failed to delete internal loadbalancer update pods: %v", err)
 	}
 
-	if err := c.sighupPods("kube-system", labels.SelectorFromSet(labels.Set{"app": "kurl-haproxy"}), "haproxy"); err != nil {
+	if err := c.sighupPods(ctx, "kube-system", labels.SelectorFromSet(labels.Set{"app": "kurl-haproxy"}), "haproxy"); err != nil {
 		c.Log.Warnf("Failed to send SIGHUP to haproxy pods: %v", err)
 		return nil
 	}
@@ -116,12 +116,12 @@ func (c *Controller) UpdateInternalLB(ctx context.Context, nodes []corev1.Node) 
 	return nil
 }
 
-func (c *Controller) sighupPods(namespace string, selector labels.Selector, container string) error {
+func (c *Controller) sighupPods(ctx context.Context, namespace string, selector labels.Selector, container string) error {
 	options := metav1.ListOptions{
 		LabelSelector: selector.String(),
 	}
 
-	pods, err := c.Config.Client.CoreV1().Pods(namespace).List(context.TODO(), options)
+	pods, err := c.Config.Client.CoreV1().Pods(namespace).List(ctx, options)
 	if err != nil {
 		return errors.Wrap(err, "list pods")
 	}
@@ -144,7 +144,7 @@ func (c *Controller) sighupPods(namespace string, selector labels.Selector, cont
 		pod := pod
 		go func() {
 			defer wg.Done()
-			exitCode, _, stderr, err := c.SyncExecutor.ExecContainer(context.TODO(), namespace, pod.Name, container, cmd...)
+			exitCode, _, stderr, err := c.SyncExecutor.ExecContainer(ctx, namespace, pod.Name, container, cmd...)
 			if err != nil {
 				errs <- errors.Wrapf(err, "exec pod %s", pod.Name)
 			} else if exitCode != 0 {

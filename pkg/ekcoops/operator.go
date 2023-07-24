@@ -23,6 +23,10 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
+var (
+	minioMutex = &sync.Mutex{}
+)
+
 type Operator struct {
 	config     Config
 	client     kubernetes.Interface
@@ -45,15 +49,13 @@ func New(
 	}
 }
 
-func (o *Operator) Reconcile(nodes []corev1.Node, doFullReconcile bool) error {
+func (o *Operator) Reconcile(ctx context.Context, nodes []corev1.Node, doFullReconcile bool) error {
 	o.mtx.Lock()
 	defer o.mtx.Unlock()
 
 	if doFullReconcile {
 		o.log.Debugf("Performing full reconcile")
 	}
-
-	ctx := context.TODO()
 
 	var multiErr error
 
@@ -68,7 +70,7 @@ func (o *Operator) Reconcile(nodes []corev1.Node, doFullReconcile bool) error {
 
 	readyMasters, readyWorkers := util.NodeReadyCounts(nodes)
 	for _, node := range nodes {
-		err := o.reconcileNode(node, readyMasters, readyWorkers, rookVersion)
+		err := o.reconcileNode(ctx, node, readyMasters, readyWorkers, rookVersion)
 		if err != nil {
 			multiErr = multierror.Append(multiErr, errors.Wrapf(err, "reconcile node %s", node.Name))
 		}
@@ -82,7 +84,7 @@ func (o *Operator) Reconcile(nodes []corev1.Node, doFullReconcile bool) error {
 	}
 
 	if o.config.RotateCerts && doFullReconcile {
-		err := o.RotateCerts(false)
+		err := o.RotateCerts(ctx, false)
 		if err != nil {
 			multiErr = multierror.Append(multiErr, errors.Wrap(err, "rotate certs"))
 		}
@@ -94,7 +96,7 @@ func (o *Operator) Reconcile(nodes []corev1.Node, doFullReconcile bool) error {
 		}
 	}
 
-	if err := o.ReconcilePrometheus(len(nodes)); err != nil {
+	if err := o.ReconcilePrometheus(ctx, len(nodes)); err != nil {
 		multiErr = multierror.Append(multiErr, errors.Wrap(err, "failed to reconcile prometheus"))
 	}
 
@@ -103,25 +105,28 @@ func (o *Operator) Reconcile(nodes []corev1.Node, doFullReconcile bool) error {
 	}
 
 	if o.config.AutoApproveKubeletCertSigningRequests {
-		if err := o.reconcileCertificateSigningRequests(); err != nil {
+		if err := o.reconcileCertificateSigningRequests(ctx); err != nil {
 			multiErr = multierror.Append(multiErr, errors.Wrap(err, "reconcile csrs"))
 		}
 	}
 
 	if o.config.EnableHAMinio {
-		if err := o.reconcileMinio(); err != nil {
-			multiErr = multierror.Append(multiErr, errors.Wrap(err, "reconcile minio"))
-		}
+		go func() {
+			// run minio reconcile in the background as it can take ~unbounded time to migrate data
+			if err := o.reconcileMinio(context.Background()); err != nil {
+				o.log.Errorf("Failed to reconcile minio: %v", err)
+			}
+		}()
 	}
 
 	if o.config.EnableHAKotsadm {
-		if err := o.reconcileKotsadm(); err != nil {
+		if err := o.reconcileKotsadm(ctx); err != nil {
 			multiErr = multierror.Append(multiErr, errors.Wrap(err, "reconcile kotsadm"))
 		}
 	}
 
 	if o.config.RookMinimumNodeCount > 2 {
-		if err := o.reconcileRookCluster(); err != nil {
+		if err := o.reconcileRookCluster(ctx); err != nil {
 			multiErr = multierror.Append(multiErr, errors.Wrap(err, "reconcile rook cluster"))
 		}
 	}
@@ -129,7 +134,7 @@ func (o *Operator) Reconcile(nodes []corev1.Node, doFullReconcile bool) error {
 	return multiErr
 }
 
-func (o *Operator) reconcileNode(node corev1.Node, readyMasters, readyWorkers int, rookVersion *semver.Version) error {
+func (o *Operator) reconcileNode(ctx context.Context, node corev1.Node, readyMasters, readyWorkers int, rookVersion *semver.Version) error {
 	if o.config.PurgeDeadNodes && o.isDead(node) {
 		if util.NodeIsMaster(node) && readyMasters < o.config.MinReadyMasterNodes {
 			o.log.Debugf("Skipping auto-purge master: %d ready masters", readyMasters)
@@ -139,14 +144,14 @@ func (o *Operator) reconcileNode(node corev1.Node, readyMasters, readyWorkers in
 			return nil
 		}
 		o.log.Infof("Automatically purging dead node %s", node.Name)
-		err := o.controller.PurgeNode(context.TODO(), node.Name, o.config.MaintainRookStorageNodes, rookVersion)
+		err := o.controller.PurgeNode(ctx, node.Name, o.config.MaintainRookStorageNodes, rookVersion)
 		if err != nil {
 			return errors.Wrapf(err, "purge dead node %s", node.Name)
 		}
 	}
 
 	if o.config.ClearDeadNodes && o.isDead(node) {
-		err := o.controller.ClearNode(context.TODO(), node.Name)
+		err := o.controller.ClearNode(ctx, node.Name)
 		if err != nil {
 			return errors.Wrapf(err, "clear dead node %s", node.Name)
 		}
@@ -156,6 +161,15 @@ func (o *Operator) reconcileNode(node corev1.Node, readyMasters, readyWorkers in
 }
 
 func (o *Operator) reconcileRook(ctx context.Context, rookVersion semver.Version, nodes []corev1.Node, doFullReconcile bool) error {
+	// if there is no CephCluster, we don't need to do anything
+	_, err := o.controller.GetCephCluster(ctx)
+	if err != nil {
+		if !util.IsNotFoundErr(err) {
+			return errors.Wrapf(err, "get CephCluster")
+		}
+		return nil
+	}
+
 	var multiErr error
 
 	if o.config.MaintainRookStorageNodes {
@@ -171,15 +185,15 @@ func (o *Operator) reconcileRook(ctx context.Context, rookVersion semver.Version
 				multiErr = multierror.Append(multiErr, errors.Wrapf(err, "ensure all ready nodes used for storage"))
 			}
 		} else {
-			err := o.adjustPoolReplicationLevels(rookVersion, readyCount, doFullReconcile)
+			err := o.adjustPoolReplicationLevels(ctx, rookVersion, readyCount, doFullReconcile)
 			if err != nil {
 				multiErr = multierror.Append(multiErr, errors.Wrapf(err, "adjust pool replication levels"))
 			}
-			err = o.controller.ReconcileMonCount(context.TODO(), readyCount)
+			err = o.controller.ReconcileMonCount(ctx, readyCount)
 			if err != nil {
 				multiErr = multierror.Append(multiErr, errors.Wrapf(err, "reconcile mon count"))
 			}
-			err = o.controller.ReconcileMgrCount(context.TODO(), rookVersion, readyCount)
+			err = o.controller.ReconcileMgrCount(ctx, rookVersion, readyCount)
 			if err != nil {
 				multiErr = multierror.Append(multiErr, errors.Wrapf(err, "reconcile mgr count"))
 			}
@@ -188,21 +202,21 @@ func (o *Operator) reconcileRook(ctx context.Context, rookVersion semver.Version
 	}
 
 	if o.config.ReconcileCephCSIResources {
-		_, err := o.controller.SetCephCSIResources(context.TODO(), rookVersion, len(nodes))
+		_, err := o.controller.SetCephCSIResources(ctx, rookVersion, len(nodes))
 		if err != nil {
 			multiErr = multierror.Append(multiErr, errors.Wrapf(err, "patch filesystem %s mds placement", o.config.CephFilesystem))
 		}
 	}
 
 	if o.config.ReconcileRookMDSPlacement {
-		err := o.controller.PatchFilesystemMDSPlacementMultinode(o.config.CephFilesystem, len(nodes))
+		err := o.controller.PatchFilesystemMDSPlacementMultinode(ctx, o.config.CephFilesystem, len(nodes))
 		if err != nil {
 			multiErr = multierror.Append(multiErr, errors.Wrapf(err, "patch filesystem %s mds placement", o.config.CephFilesystem))
 		}
 	}
 
 	if o.config.RookPriorityClass != "" {
-		if err := o.controller.PrioritizeRook(); err != nil {
+		if err := o.controller.PrioritizeRook(ctx); err != nil {
 			multiErr = multierror.Append(multiErr, errors.Wrap(err, "set rook priority class"))
 		}
 	}
@@ -241,7 +255,7 @@ func (o *Operator) ensureAllUsedForStorage(ctx context.Context, rookVersion semv
 }
 
 // adjustPoolSizes changes ceph pool replication factors up and down
-func (o *Operator) adjustPoolReplicationLevels(rookVersion semver.Version, numNodes int, doFullReconcile bool) error {
+func (o *Operator) adjustPoolReplicationLevels(ctx context.Context, rookVersion semver.Version, numNodes int, doFullReconcile bool) error {
 	factor := numNodes
 
 	if factor < o.config.MinCephPoolReplication {
@@ -254,7 +268,7 @@ func (o *Operator) adjustPoolReplicationLevels(rookVersion semver.Version, numNo
 	var multiErr error
 
 	var cephVersion *semver.Version
-	cephcluster, err := o.controller.GetCephCluster(context.TODO())
+	cephcluster, err := o.controller.GetCephCluster(ctx)
 	if err != nil {
 		multiErr = multierror.Append(multiErr, errors.Wrapf(err, "get CephCluster config"))
 	} else {
@@ -266,18 +280,18 @@ func (o *Operator) adjustPoolReplicationLevels(rookVersion semver.Version, numNo
 		}
 	}
 
-	didUpdate, err := o.controller.SetBlockPoolReplication(rookVersion, cephVersion, o.config.CephBlockPool, factor, doFullReconcile)
+	didUpdate, err := o.controller.SetBlockPoolReplication(ctx, rookVersion, cephVersion, o.config.CephBlockPool, factor, doFullReconcile)
 	if err != nil {
 		multiErr = multierror.Append(multiErr, errors.Wrapf(err, "set pool %s replication to %d", o.config.CephBlockPool, factor))
 	}
 
-	ok, err := o.controller.SetFilesystemReplication(rookVersion, cephVersion, o.config.CephFilesystem, factor, doFullReconcile)
+	ok, err := o.controller.SetFilesystemReplication(ctx, rookVersion, cephVersion, o.config.CephFilesystem, factor, doFullReconcile)
 	if err != nil {
 		multiErr = multierror.Append(multiErr, errors.Wrapf(err, "set filesystem %s replication to %d", o.config.CephFilesystem, factor))
 	}
 	didUpdate = didUpdate || ok
 
-	ok, err = o.controller.SetObjectStoreReplication(rookVersion, cephVersion, o.config.CephObjectStore, factor, doFullReconcile)
+	ok, err = o.controller.SetObjectStoreReplication(ctx, rookVersion, cephVersion, o.config.CephObjectStore, factor, doFullReconcile)
 	if err != nil {
 		multiErr = multierror.Append(multiErr, errors.Wrapf(err, "set object store %s replication to %d", o.config.CephObjectStore, factor))
 	}
@@ -285,7 +299,7 @@ func (o *Operator) adjustPoolReplicationLevels(rookVersion semver.Version, numNo
 
 	// There is no CR to compare the desired and current level.
 	// Assume that if cephblockpool replication level has not yet been set then we need to do the same for device_health_metrics.
-	_, err = o.controller.SetDeviceHealthMetricsReplication(rookVersion, cephVersion, o.config.CephBlockPool, factor, doFullReconcile || didUpdate)
+	_, err = o.controller.SetDeviceHealthMetricsReplication(ctx, rookVersion, cephVersion, o.config.CephBlockPool, factor, doFullReconcile || didUpdate)
 	if err != nil {
 		multiErr = multierror.Append(multiErr, errors.Wrapf(err, "set device_health_metrics replication to %d", factor))
 	}
@@ -293,27 +307,27 @@ func (o *Operator) adjustPoolReplicationLevels(rookVersion semver.Version, numNo
 	return multiErr
 }
 
-func (o *Operator) RotateCerts(force bool) error {
-	due, err := o.controller.CheckRotateCertsDue(force)
+func (o *Operator) RotateCerts(ctx context.Context, force bool) error {
+	due, err := o.controller.CheckRotateCertsDue(ctx, force)
 	if err != nil {
 		return errors.Wrapf(err, "check if it's time to run cert rotation jobs")
 	}
 	if due {
 		var multiErr error
 
-		if err := o.controller.RotateContourCerts(); err != nil {
+		if err := o.controller.RotateContourCerts(ctx); err != nil {
 			multiErr = multierror.Append(multiErr, errors.Wrap(err, "rotate contour certs"))
 		}
-		if err := o.controller.RotateRegistryCert(); err != nil {
+		if err := o.controller.RotateRegistryCert(ctx); err != nil {
 			multiErr = multierror.Append(multiErr, errors.Wrap(err, "rotate registry cert"))
 		}
-		if err := o.controller.RotateKurlProxyCert(); err != nil {
+		if err := o.controller.RotateKurlProxyCert(ctx); err != nil {
 			multiErr = multierror.Append(multiErr, errors.Wrap(err, "rotate kurl proxy cert"))
 		}
-		if err := o.controller.UpdateKubeletClientCertSecret(); err != nil {
+		if err := o.controller.UpdateKubeletClientCertSecret(ctx); err != nil {
 			multiErr = multierror.Append(multiErr, errors.Wrap(err, "update kotsadm kubelet client cert secret"))
 		}
-		if err := o.controller.RotateAllCerts(context.Background()); err != nil {
+		if err := o.controller.RotateAllCerts(ctx); err != nil {
 			multiErr = multierror.Append(multiErr, errors.Wrap(err, "rotate certs on primaries"))
 		}
 
@@ -349,8 +363,8 @@ func shouldUseNodeForStorage(node corev1.Node, cluster *cephv1.CephCluster, rook
 	return false
 }
 
-func (o *Operator) reconcileCertificateSigningRequests() error {
-	csrList, err := o.client.CertificatesV1().CertificateSigningRequests().List(context.TODO(), metav1.ListOptions{})
+func (o *Operator) reconcileCertificateSigningRequests(ctx context.Context) error {
+	csrList, err := o.client.CertificatesV1().CertificateSigningRequests().List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return errors.Wrap(err, "list csrs")
 	}
@@ -365,7 +379,7 @@ func (o *Operator) reconcileCertificateSigningRequests() error {
 				Message: "automated ekco approval of kubelet csr request",
 				Status:  corev1.ConditionTrue,
 			})
-			_, err := o.client.CertificatesV1().CertificateSigningRequests().UpdateApproval(context.TODO(), csr.Name, &csr, metav1.UpdateOptions{})
+			_, err := o.client.CertificatesV1().CertificateSigningRequests().UpdateApproval(ctx, csr.Name, &csr, metav1.UpdateOptions{})
 			if err != nil {
 				return errors.Wrapf(err, "approve csr %s", csr.Name)
 			}
@@ -375,13 +389,19 @@ func (o *Operator) reconcileCertificateSigningRequests() error {
 	return nil
 }
 
-func (o *Operator) reconcileMinio() error {
+func (o *Operator) reconcileMinio(ctx context.Context) error {
 	if overrides.MinIOPaused() {
 		o.log.Debug("Not updating ha-minio as that has been paused")
 		return nil // minio management is paused while other migrations are in progress
 	}
 
-	exists, err := o.controller.DoesHAMinioExist(context.TODO(), o.config.MinioNamespace)
+	// only one operator should manage minio at a time, and if it's not us then we should not do anything
+	if !minioMutex.TryLock() {
+		return nil
+	}
+	defer minioMutex.Unlock()
+
+	exists, err := o.controller.DoesHAMinioExist(ctx, o.config.MinioNamespace)
 	if err != nil {
 		return errors.Wrap(err, "determine if ha-minio exists to be managed")
 	}
@@ -389,32 +409,32 @@ func (o *Operator) reconcileMinio() error {
 		return nil // nothing to manage
 	}
 
-	nodes, err := o.client.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
+	nodes, err := o.client.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return errors.Wrap(err, "list nodes")
 	}
 
 	if m, w := util.NodeReadyCounts(nodes.Items); m+w >= 3 {
-		err = o.controller.ScaleMinioStatefulset(context.TODO(), o.config.MinioNamespace)
+		err = o.controller.ScaleMinioStatefulset(ctx, o.config.MinioNamespace)
 		if err != nil {
 			return errors.Wrap(err, "scale minio statefulset")
 		}
 
 		// possibly migrate from old non-replicated minio and remove it
-		_, err = o.client.AppsV1().Deployments(o.config.MinioNamespace).Get(context.TODO(), "minio", metav1.GetOptions{})
+		_, err = o.client.AppsV1().Deployments(o.config.MinioNamespace).Get(ctx, "minio", metav1.GetOptions{})
 		if err != nil {
 			if !util.IsNotFoundErr(err) {
 				return errors.Wrap(err, "get minio deployment")
 			}
 		} else {
-			err = o.controller.MigrateMinioData(context.TODO(), o.config.MinioUtilImage, o.config.MinioNamespace)
+			err = o.controller.MigrateMinioData(ctx, o.config.MinioUtilImage, o.config.MinioNamespace)
 			if err != nil {
 				return errors.Wrap(err, "migrate data to ha minio")
 			}
 		}
 	}
 
-	err = o.controller.MaybeRebalanceMinioServers(context.TODO(), o.config.MinioNamespace)
+	err = o.controller.MaybeRebalanceMinioServers(ctx, o.config.MinioNamespace)
 	if err != nil {
 		return errors.Wrap(err, "rebalance minio servers")
 	}
@@ -422,18 +442,18 @@ func (o *Operator) reconcileMinio() error {
 	return nil
 }
 
-func (o *Operator) reconcileKotsadm() error {
+func (o *Operator) reconcileKotsadm(ctx context.Context) error {
 	if overrides.KotsadmPaused() {
 		o.log.Debug("Not updating kotsadm as that has been paused")
 		return nil // kotsadm management is paused while other migrations are in progress
 	}
-	nodes, err := o.client.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
+	nodes, err := o.client.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return errors.Wrap(err, "list nodes")
 	}
 
 	if m, w := util.NodeReadyCounts(nodes.Items); m+w >= 3 {
-		err := o.controller.EnableHAKotsadm(context.TODO(), metav1.NamespaceDefault)
+		err := o.controller.EnableHAKotsadm(ctx, metav1.NamespaceDefault)
 		if err != nil {
 			return errors.Wrap(err, "enable HA kotsadm")
 		}
@@ -442,15 +462,15 @@ func (o *Operator) reconcileKotsadm() error {
 	return nil
 }
 
-func (o *Operator) reconcileRookCluster() error {
-	nodes, err := o.client.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
+func (o *Operator) reconcileRookCluster(ctx context.Context) error {
+	nodes, err := o.client.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return errors.Wrap(err, "list nodes")
 	}
 
 	if m, w := util.NodeReadyCounts(nodes.Items); m+w >= o.config.RookMinimumNodeCount {
 		o.log.Debugf("reconcileRookCluster(): Rook minimum node count of %d has been met by this cluster.\n", o.config.RookMinimumNodeCount)
-		err := o.controller.EnsureCephCluster(context.TODO(), o.config.RookStorageClass)
+		err := o.controller.EnsureCephCluster(ctx, o.config.RookStorageClass)
 		if err != nil {
 			return errors.Wrap(err, "ensure ceph cluster")
 		}

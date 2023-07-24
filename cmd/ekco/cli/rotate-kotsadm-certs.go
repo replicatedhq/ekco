@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"time"
 
 	"github.com/pkg/errors"
@@ -35,7 +36,7 @@ func RotateKotsadmCertsCmd(v *viper.Viper) *cobra.Command {
 				return errors.Wrap(err, "failed to initialize cluster controller")
 			}
 
-			return clusterController.RotateKurlProxyCert()
+			return clusterController.RotateKurlProxyCert(context.Background())
 		},
 	}
 

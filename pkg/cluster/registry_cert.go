@@ -31,7 +31,7 @@ type certConfig struct {
 	PublicKeyAlgorithm x509.PublicKeyAlgorithm
 }
 
-func (c *Controller) RotateRegistryCert() error {
+func (c *Controller) RotateRegistryCert(ctx context.Context) error {
 	ns := c.Config.RegistryCertNamespace
 	name := c.Config.RegistryCertSecret
 
@@ -40,7 +40,7 @@ func (c *Controller) RotateRegistryCert() error {
 		return nil
 	}
 
-	cert, err := c.readRegistryCert(ns, name)
+	cert, err := c.readRegistryCert(ctx, ns, name)
 	if err != nil {
 		return errors.Wrapf(err, "load existing certificate")
 	}
@@ -67,7 +67,7 @@ func (c *Controller) RotateRegistryCert() error {
 		return errors.Wrap(err, "generate new cert")
 	}
 
-	if err := c.updateRegistryCert(ns, name, newCert, newKey); err != nil {
+	if err := c.updateRegistryCert(ctx, ns, name, newCert, newKey); err != nil {
 		return errors.Wrap(err, "save new cert")
 	}
 
@@ -76,7 +76,7 @@ func (c *Controller) RotateRegistryCert() error {
 	selector := metav1.ListOptions{
 		LabelSelector: labels.SelectorFromSet(labels.Set{"app": "registry"}).String(),
 	}
-	if err := c.Config.Client.CoreV1().Pods(ns).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, selector); err != nil {
+	if err := c.Config.Client.CoreV1().Pods(ns).DeleteCollection(ctx, metav1.DeleteOptions{}, selector); err != nil {
 		return errors.Wrap(err, "restart registry")
 	}
 
@@ -85,8 +85,8 @@ func (c *Controller) RotateRegistryCert() error {
 	return nil
 }
 
-func (c *Controller) readRegistryCert(namespace, name string) (*x509.Certificate, error) {
-	secret, err := c.Config.Client.CoreV1().Secrets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+func (c *Controller) readRegistryCert(ctx context.Context, namespace, name string) (*x509.Certificate, error) {
+	secret, err := c.Config.Client.CoreV1().Secrets(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		if util.IsNotFoundErr(err) {
 			return nil, nil
@@ -105,8 +105,8 @@ func (c *Controller) readRegistryCert(namespace, name string) (*x509.Certificate
 	return certs[0], nil
 }
 
-func (c *Controller) updateRegistryCert(namespace, name string, crt *x509.Certificate, key crypto.PrivateKey) error {
-	secret, err := c.Config.Client.CoreV1().Secrets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+func (c *Controller) updateRegistryCert(ctx context.Context, namespace, name string, crt *x509.Certificate, key crypto.PrivateKey) error {
+	secret, err := c.Config.Client.CoreV1().Secrets(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		return errors.Wrapf(err, "get secret %s/%s", namespace, name)
 	}
@@ -123,7 +123,7 @@ func (c *Controller) updateRegistryCert(namespace, name string, crt *x509.Certif
 	}
 	secret.Data["registry.key"] = keyData
 
-	if _, err := c.Config.Client.CoreV1().Secrets(namespace).Update(context.TODO(), secret, metav1.UpdateOptions{}); err != nil {
+	if _, err := c.Config.Client.CoreV1().Secrets(namespace).Update(ctx, secret, metav1.UpdateOptions{}); err != nil {
 		return errors.Wrapf(err, "update secret %s/%s", namespace, name)
 	}
 
