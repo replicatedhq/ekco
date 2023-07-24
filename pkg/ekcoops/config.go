@@ -48,6 +48,7 @@ type Config struct {
 	CertificatesDir string `mapstructure:"certificates_dir"`
 
 	ReconcileInterval time.Duration `mapstructure:"reconcile_interval"`
+	ReconcileTimeout  time.Duration `mapstructure:"reconcile_timeout"`
 
 	RotateCerts                           bool          `mapstructure:"rotate_certs"`
 	RotateCertsImage                      string        `mapstructure:"rotate_certs_image"`

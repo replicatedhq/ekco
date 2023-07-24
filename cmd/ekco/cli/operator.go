@@ -72,6 +72,9 @@ func OperatorCmd(v *viper.Viper) *cobra.Command {
 					return errors.Wrap(err, "delete webhook config")
 				}
 			}
+			if config.ReconcileTimeout == 0 {
+				config.ReconcileTimeout = 15 * time.Minute
+			}
 
 			ctx, cancel := context.WithCancel(context.Background())
 
@@ -94,7 +97,7 @@ func OperatorCmd(v *viper.Viper) *cobra.Command {
 				cancel()
 			}()
 
-			operator.Poll(ctx, config.ReconcileInterval)
+			operator.Poll(ctx, config.ReconcileInterval, config.ReconcileTimeout)
 
 			return nil
 		},
