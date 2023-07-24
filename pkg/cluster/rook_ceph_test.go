@@ -750,7 +750,7 @@ func TestController_removeCephClusterStorageNode(t *testing.T) {
 				},
 				Log: logger.NewDiscardLogger(),
 			}
-			err := c.removeCephClusterStorageNode(tt.args.name)
+			err := c.removeCephClusterStorageNode(context.TODO(), tt.args.name)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Controller.removeCephClusterStorageNode() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -893,7 +893,7 @@ func TestController_SetBlockPoolReplication(t *testing.T) {
 				},
 				Log: logger.NewDiscardLogger(),
 			}
-			got, err := c.SetBlockPoolReplication(tt.args.rookVersion, tt.args.cephVersion, tt.args.name, tt.args.level, tt.args.doFullReconcile)
+			got, err := c.SetBlockPoolReplication(context.TODO(), tt.args.rookVersion, tt.args.cephVersion, tt.args.name, tt.args.level, tt.args.doFullReconcile)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Controller.SetBlockPoolReplication() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -1263,7 +1263,7 @@ func TestController_SetFilesystemReplication(t *testing.T) {
 				},
 				Log: logger.NewDiscardLogger(),
 			}
-			got, err := c.SetFilesystemReplication(tt.args.rookVersion, tt.args.cephVersion, tt.args.name, tt.args.level, tt.args.doFullReconcile)
+			got, err := c.SetFilesystemReplication(context.TODO(), tt.args.rookVersion, tt.args.cephVersion, tt.args.name, tt.args.level, tt.args.doFullReconcile)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Controller.SetFilesystemReplication() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -1508,7 +1508,7 @@ func TestController_SetObjectStoreReplication(t *testing.T) {
 				Log:          logger.NewDiscardLogger(),
 			}
 
-			got, err := c.SetObjectStoreReplication(tt.args.rookVersion, tt.args.cephVersion, tt.args.name, tt.args.level, tt.args.doFullReconcile)
+			got, err := c.SetObjectStoreReplication(context.TODO(), tt.args.rookVersion, tt.args.cephVersion, tt.args.name, tt.args.level, tt.args.doFullReconcile)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Controller.SetObjectStoreReplication() error = %v, wantErr %v", err, tt.wantErr)
 				return
