@@ -144,7 +144,7 @@ func IsMigrationReady(ctx context.Context, config ekcoops.Config, controllers ty
 	_, err = controllers.Client.CoreV1().Secrets(cluster.RookCephNS).Get(ctx, "rook-ceph-object-user-rook-ceph-store-kurl", v1.GetOptions{})
 	if err != nil {
 		if errors.IsNotFound(err) {
-			return nil, fmt.Errorf("ceph object store secret not found")
+			return &MigrationReadyResult{Reason: "ceph object store secret not found", Ready: false}, nil
 		}
 		return nil, fmt.Errorf("get ceph object store secret: %w", err)
 	}
