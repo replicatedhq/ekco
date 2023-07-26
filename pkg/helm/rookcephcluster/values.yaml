@@ -158,7 +158,8 @@ cephBlockPools:
         compression_mode: none
       mirroring:
         enabled: false
-
+    storageClass:
+      enabled: false
 
 # -- A list of CephFileSystem configurations to deploy
 # @default -- See [below](#ceph-file-systems)
