@@ -16,6 +16,7 @@ import (
 	"github.com/replicatedhq/ekco/pkg/objectstore"
 	"github.com/replicatedhq/ekco/pkg/util"
 	"github.com/replicatedhq/pvmigrate/pkg/migrate"
+	"github.com/replicatedhq/pvmigrate/pkg/preflight"
 	cephv1 "github.com/rook/rook/pkg/apis/ceph.rook.io/v1"
 	"github.com/rook/rook/pkg/daemon/ceph/client"
 	corev1 "k8s.io/api/core/v1"
@@ -320,8 +321,6 @@ func migrateStorageClasses(ctx context.Context, config ekcoops.Config, controlle
 		SetDefaults:  true,
 	}
 
-	migrationStatus = MIGRATION_STATUS_PVCMIGRATE
-
 	overrides.PausePrometheus()
 	defer overrides.ResumePrometheus()
 	overrides.PauseKotsadm()
@@ -335,11 +334,15 @@ func migrateStorageClasses(ctx context.Context, config ekcoops.Config, controlle
 		return fmt.Errorf("scale down prometheus: %v", err)
 	}
 
-	//addLogs("checking that the %q storageclass is available", config.RookStorageClass)
-	//_, err = preflight.Validate(ctx, fileLog, client, options)
-	//if err != nil {
-	//	return fmt.Errorf("preflight check: %v", err)
-	//}
+	addLogs("checking that the %q storageclass is available", config.RookStorageClass)
+	validationErrors, err := preflight.Validate(ctx, fileLog, client, options)
+	if err != nil {
+		return fmt.Errorf("preflight check: %v", err)
+	}
+	if len(validationErrors) != 0 {
+		preflight.PrintValidationFailures(logsWriter, validationErrors)
+		return fmt.Errorf("preflight check failed: %v", validationErrors)
+	}
 
 	addLogs("migrating data from %q storageclass to %q", "scaling", config.RookStorageClass)
 	err = migrate.Migrate(ctx, fileLog, client, options)
