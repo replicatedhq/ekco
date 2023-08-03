@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"sync"
+	"time"
 
 	"github.com/replicatedhq/ekco/pkg/cluster"
 	"github.com/replicatedhq/ekco/pkg/cluster/types"
@@ -326,11 +327,19 @@ func migrateStorageClasses(ctx context.Context, config ekcoops.Config, controlle
 	overrides.PauseKotsadm()
 	defer overrides.ResumeKotsadm()
 
+	time.Sleep(time.Second * 30) // wait for the storageclass to actually be real
+
 	addLogs("scaling down prometheus")
 	err := util.ScalePrometheus(ctx, controllers.PrometheusV1, 0)
 	if err != nil {
 		return fmt.Errorf("scale down prometheus: %v", err)
 	}
+
+	//addLogs("checking that the %q storageclass is available", config.RookStorageClass)
+	//_, err = preflight.Validate(ctx, fileLog, client, options)
+	//if err != nil {
+	//	return fmt.Errorf("preflight check: %v", err)
+	//}
 
 	addLogs("migrating data from %q storageclass to %q", "scaling", config.RookStorageClass)
 	err = migrate.Migrate(ctx, fileLog, client, options)
