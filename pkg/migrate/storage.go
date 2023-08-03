@@ -366,6 +366,7 @@ func migrateStorageClasses(ctx context.Context, config ekcoops.Config, controlle
 }
 
 func addLogs(format string, args ...interface{}) {
+	fmt.Printf(format+"\n", args...)
 	migrationLogs += fmt.Sprintf(format, args...) + "\n"
 }
 
