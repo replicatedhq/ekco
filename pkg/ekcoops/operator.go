@@ -11,21 +11,20 @@ import (
 	"github.com/blang/semver"
 	multierror "github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
-	"github.com/replicatedhq/ekco/pkg/cluster"
-	"github.com/replicatedhq/ekco/pkg/ekcoops/overrides"
-	"github.com/replicatedhq/ekco/pkg/rook"
-	"github.com/replicatedhq/ekco/pkg/util"
 	cephv1 "github.com/rook/rook/pkg/apis/ceph.rook.io/v1"
 	"go.uber.org/zap"
 	certificatesv1 "k8s.io/api/certificates/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+
+	"github.com/replicatedhq/ekco/pkg/cluster"
+	"github.com/replicatedhq/ekco/pkg/ekcoops/overrides"
+	"github.com/replicatedhq/ekco/pkg/rook"
+	"github.com/replicatedhq/ekco/pkg/util"
 )
 
-var (
-	minioMutex = &sync.Mutex{}
-)
+var minioMutex = &sync.Mutex{}
 
 type Operator struct {
 	config     Config
@@ -162,11 +161,16 @@ func (o *Operator) reconcileNode(ctx context.Context, node corev1.Node, readyMas
 
 func (o *Operator) reconcileRook(ctx context.Context, rookVersion semver.Version, nodes []corev1.Node, doFullReconcile bool) error {
 	// if there is no CephCluster, we don't need to do anything
-	_, err := o.controller.GetCephCluster(ctx)
+	cephCluster, err := o.controller.GetCephCluster(ctx)
 	if err != nil {
 		if !util.IsNotFoundErr(err) {
 			return errors.Wrapf(err, "get CephCluster")
 		}
+		return nil
+	}
+
+	// if Ceph Cluster spec was created by Helm don't touch it
+	if rook.CephClusterManagedByHelm(*cephCluster) {
 		return nil
 	}
 

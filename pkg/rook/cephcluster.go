@@ -24,3 +24,16 @@ func GetCephVersion(cluster cephv1.CephCluster) (semver.Version, error) {
 
 	return semver.Parse(cluster.Status.CephVersion.Version)
 }
+
+// CephClusterManagedByHelm returns true if the CephCluster spec was applied by Helm
+func CephClusterManagedByHelm(cluster cephv1.CephCluster) bool {
+	labels := cluster.Labels
+
+	managedBy, ok := labels["app.kubernetes.io/managed-by"]
+	if ok {
+		if strings.ToLower(managedBy) == "helm" {
+			return true
+		}
+	}
+	return false
+}
