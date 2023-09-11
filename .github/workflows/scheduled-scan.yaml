@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Run Trivy filesystem vulnerability scanner
         id: scan
         uses: aquasecurity/trivy-action@0.11.2
@@ -30,7 +30,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Build image
         run: make docker-image DOCKER_IMAGE=ekco:nightly
       - name: Run Trivy image vulnerability scanner
