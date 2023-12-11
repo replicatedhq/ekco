@@ -12,7 +12,7 @@ jobs:
         uses: actions/checkout@v4
       - name: Run Trivy filesystem vulnerability scanner
         id: scan
-        uses: aquasecurity/trivy-action@0.14.0
+        uses: aquasecurity/trivy-action@0.16.0
         with:
           scan-type: 'fs'
           format: 'sarif'
@@ -34,7 +34,7 @@ jobs:
       - name: Build image
         run: make docker-image DOCKER_IMAGE=ekco:nightly
       - name: Run Trivy image vulnerability scanner
-        uses: aquasecurity/trivy-action@0.14.0
+        uses: aquasecurity/trivy-action@0.16.0
         with:
           image-ref: 'ekco:nightly'
           format: 'sarif'
