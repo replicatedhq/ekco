@@ -1,6 +1,8 @@
 module github.com/replicatedhq/ekco
 
-go 1.20
+go 1.21
+
+toolchain go1.21.5
 
 require (
 	github.com/blang/semver v3.5.1+incompatible
@@ -12,7 +14,7 @@ require (
 	github.com/minio/minio-go/v7 v7.0.63
 	github.com/pkg/errors v0.9.1
 	github.com/projectcontour/contour v1.25.2
-	github.com/replicatedhq/pvmigrate v0.9.0
+	github.com/replicatedhq/pvmigrate v0.11.2
 	github.com/rook/rook v1.11.9
 	github.com/spf13/cobra v1.7.0
 	github.com/spf13/viper v1.16.0
@@ -23,11 +25,11 @@ require (
 	go.undefinedlabs.com/scopeagent v0.4.2
 	gopkg.in/yaml.v2 v2.4.0
 	helm.sh/helm/v3 v3.12.3
-	k8s.io/api v0.27.3
-	k8s.io/apimachinery v0.27.3
-	k8s.io/client-go v0.27.3
+	k8s.io/api v0.29.0
+	k8s.io/apimachinery v0.29.0
+	k8s.io/client-go v0.29.0
 	k8s.io/kubernetes v1.27.1
-	k8s.io/utils v0.0.0-20230406110748-d93618cff8a2
+	k8s.io/utils v0.0.0-20230726121419-3b25d923346b
 	sigs.k8s.io/yaml v1.3.0
 )
 
@@ -68,7 +70,7 @@ require (
 	github.com/docker/go-metrics v0.0.1 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
-	github.com/emicklei/go-restful/v3 v3.10.2 // indirect
+	github.com/emicklei/go-restful/v3 v3.11.0 // indirect
 	github.com/evanphx/json-patch v5.6.0+incompatible // indirect
 	github.com/evanphx/json-patch/v5 v5.6.0 // indirect
 	github.com/exponent-io/jsonpath v0.0.0-20151013193312-d6023ce2651d // indirect
@@ -80,7 +82,7 @@ require (
 	github.com/go-errors/errors v1.4.2 // indirect
 	github.com/go-gorp/gorp/v3 v3.0.5 // indirect
 	github.com/go-ini/ini v1.67.0 // indirect
-	github.com/go-logr/logr v1.2.4 // indirect
+	github.com/go-logr/logr v1.3.0 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-openapi/jsonpointer v0.19.6 // indirect
 	github.com/go-openapi/jsonreference v0.20.2 // indirect
@@ -96,7 +98,8 @@ require (
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/google/btree v1.0.1 // indirect
 	github.com/google/gnostic v0.6.9 // indirect
-	github.com/google/go-cmp v0.5.9 // indirect
+	github.com/google/gnostic-models v0.6.8 // indirect
+	github.com/google/go-cmp v0.6.0 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
 	github.com/google/uuid v1.3.0 // indirect
@@ -224,16 +227,16 @@ require (
 	k8s.io/cloud-provider v0.27.1 // indirect
 	k8s.io/cluster-bootstrap v0.27.1 // indirect
 	k8s.io/component-base v0.27.3 // indirect
-	k8s.io/klog/v2 v2.100.1 // indirect
-	k8s.io/kube-openapi v0.0.0-20230501164219-8b0f38b5fd1f // indirect
+	k8s.io/klog/v2 v2.110.1 // indirect
+	k8s.io/kube-openapi v0.0.0-20231010175941-2dd684a91f00 // indirect
 	k8s.io/kubectl v0.27.3 // indirect
 	oras.land/oras-go v1.2.3 // indirect
-	sigs.k8s.io/controller-runtime v0.14.6 // indirect
+	sigs.k8s.io/controller-runtime v0.16.3 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
 	sigs.k8s.io/kustomize/api v0.13.2 // indirect
 	sigs.k8s.io/kustomize/kyaml v0.14.2 // indirect
 	sigs.k8s.io/mcs-api v0.1.0 // indirect
-	sigs.k8s.io/structured-merge-diff/v4 v4.2.3 // indirect
+	sigs.k8s.io/structured-merge-diff/v4 v4.4.1 // indirect
 )
 
 // TODO: when controller-runtime past v0.14.6 is released, remove this line
@@ -291,21 +294,21 @@ exclude (
 	k8s.io/client-go v1.5.0
 	k8s.io/client-go v1.5.1
 	k8s.io/client-go v1.5.2
-	k8s.io/client-go v10.0.0+incompatible
-	k8s.io/client-go v11.0.0+incompatible
-	k8s.io/client-go v11.0.1-0.20190409021438-1a26190bd76a+incompatible
-	k8s.io/client-go v12.0.0+incompatible
-	k8s.io/client-go v2.0.0+incompatible
 	k8s.io/client-go v2.0.0-alpha.1+incompatible
-	k8s.io/client-go v3.0.0+incompatible
+	k8s.io/client-go v2.0.0+incompatible
 	k8s.io/client-go v3.0.0-beta.0+incompatible
-	k8s.io/client-go v4.0.0+incompatible
+	k8s.io/client-go v3.0.0+incompatible
 	k8s.io/client-go v4.0.0-beta.0+incompatible
+	k8s.io/client-go v4.0.0+incompatible
 	k8s.io/client-go v5.0.0+incompatible
 	k8s.io/client-go v5.0.1+incompatible
 	k8s.io/client-go v6.0.0+incompatible
 	k8s.io/client-go v7.0.0+incompatible
 	k8s.io/client-go v8.0.0+incompatible
-	k8s.io/client-go v9.0.0+incompatible
 	k8s.io/client-go v9.0.0-invalid+incompatible
+	k8s.io/client-go v9.0.0+incompatible
+	k8s.io/client-go v10.0.0+incompatible
+	k8s.io/client-go v11.0.0+incompatible
+	k8s.io/client-go v11.0.1-0.20190409021438-1a26190bd76a+incompatible
+	k8s.io/client-go v12.0.0+incompatible
 )
