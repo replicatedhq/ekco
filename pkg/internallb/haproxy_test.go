@@ -27,6 +27,7 @@ func TestGenerateHAProxyConfig(t *testing.T) {
 #---------------------------------------------------------------------
 global
     log stdout format raw local0 notice
+    tune.disable-zero-copy-forwarding
     daemon
 
 #---------------------------------------------------------------------
