@@ -1,4 +1,4 @@
-FROM golang:1.19-buster AS build
+FROM golang:1.21-bookworm AS build
 
 ARG git_sha=unknown
 ARG version=alpha
@@ -20,14 +20,12 @@ RUN helm pull rook-release/rook-ceph-cluster --version $rook_version && mv rook-
 RUN make build GIT_SHA=$git_sha VERSION=$version
 
 
-FROM debian:buster-slim
+FROM debian:bookworm-slim
 
 RUN DEBIAN_FRONTEND=noninteractive apt-get update -qq && apt-get upgrade -qq && apt-get install -y --no-install-recommends \
     libgcrypt20 \
     libgnutls30 \
-    libhogweed4 \
     liblz4-1 \
-    libnettle6 \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=build /go/src/github.com/replicatedhq/ekco/bin/* /usr/bin/

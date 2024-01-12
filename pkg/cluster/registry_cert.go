@@ -19,6 +19,7 @@ import (
 	"k8s.io/client-go/util/cert"
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/keyutil"
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
@@ -28,7 +29,7 @@ type certConfig struct {
 	certutil.Config
 	NotBefore          *time.Time
 	NotAfter           *time.Time
-	PublicKeyAlgorithm x509.PublicKeyAlgorithm
+	PublicKeyAlgorithm kubeadmapi.EncryptionAlgorithmType
 }
 
 func (c *Controller) RotateRegistryCert(ctx context.Context) error {
@@ -145,7 +146,7 @@ func certToConfig(crt *x509.Certificate) *certConfig {
 		},
 		NotBefore:          &notBefore,
 		NotAfter:           &notAfter,
-		PublicKeyAlgorithm: crt.PublicKeyAlgorithm,
+		PublicKeyAlgorithm: kubeadmapi.EncryptionAlgorithmType(crt.PublicKeyAlgorithm.String()),
 	}
 }
 

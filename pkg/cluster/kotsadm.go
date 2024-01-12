@@ -13,7 +13,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/duration"
 	certutil "k8s.io/client-go/util/cert"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -157,7 +157,7 @@ func (c *Controller) ScaleKotsadmRqlite(ctx context.Context, ns string, desiredS
 
 	c.Log.Infof("Scaling kotsadm-rqlite Statefulset to %d replicas", desiredScale)
 
-	kotsadmRqliteSts.Spec.Replicas = pointer.Int32(desiredScale)
+	kotsadmRqliteSts.Spec.Replicas = ptr.To(desiredScale)
 
 	for i, arg := range kotsadmRqliteSts.Spec.Template.Spec.Containers[0].Args {
 		if strings.HasPrefix(arg, "-bootstrap-expect") {
