@@ -426,6 +426,12 @@ func (o *Operator) reconcileMinio(ctx context.Context) error {
 			if !util.IsNotFoundErr(err) {
 				return errors.Wrap(err, "get minio deployment")
 			}
+
+			// ensure that the minio service points to ha-minio if the non-ha deployment has been removed
+			err = o.controller.EnsureHAMinioSvc(ctx, o.config.MinioNamespace)
+			if err != nil {
+				return errors.Wrap(err, "ensure ha minio svc")
+			}
 		} else {
 			err = o.controller.MigrateMinioData(ctx, o.config.MinioUtilImage, o.config.MinioNamespace)
 			if err != nil {

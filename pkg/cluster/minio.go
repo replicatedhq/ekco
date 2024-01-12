@@ -124,6 +124,27 @@ func (c *Controller) MigrateMinioData(ctx context.Context, utilImage string, ns 
 	return nil
 }
 
+// check that the minio service exists and is not disabled - if it is disabled point it at ha-minio
+// this function should only be called if the 'minio' deployment does not exist
+func (c *Controller) EnsureHAMinioSvc(ctx context.Context, ns string) error {
+	currentSvc, err := c.Config.Client.CoreV1().Services(ns).Get(ctx, "minio", metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("get minio service: %w", err)
+	}
+	if currentSvc.Spec.Selector["doesnotexist"] == "doesnotexist" {
+		// minio service is disabled, re-enable it
+		c.Log.Infof("Enabling MinIO service")
+		currentSvc.Spec.Selector = map[string]string{"app": "ha-minio"}
+
+		_, err = c.Config.Client.CoreV1().Services(ns).Update(ctx, currentSvc, metav1.UpdateOptions{})
+		if err != nil {
+			return fmt.Errorf("failed to enable minio service: %w", err)
+		}
+	}
+
+	return nil
+}
+
 // MaybeRebalanceMinioServers
 // first, check if minio is healthy. If it is not healthy, don't do anything.
 // (this may require manual intervention, or may be resolved when nodes come back online)
