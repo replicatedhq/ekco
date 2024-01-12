@@ -25,9 +25,7 @@ FROM debian:bookworm-slim
 RUN DEBIAN_FRONTEND=noninteractive apt-get update -qq && apt-get upgrade -qq && apt-get install -y --no-install-recommends \
     libgcrypt20 \
     libgnutls30 \
-    libhogweed4 \
     liblz4-1 \
-    libnettle6 \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=build /go/src/github.com/replicatedhq/ekco/bin/* /usr/bin/
