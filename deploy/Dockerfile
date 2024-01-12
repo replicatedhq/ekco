@@ -1,4 +1,4 @@
-FROM golang:1.21-buster AS build
+FROM golang:1.21-bookworm AS build
 
 ARG git_sha=unknown
 ARG version=alpha
