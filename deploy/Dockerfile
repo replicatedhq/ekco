@@ -20,7 +20,7 @@ RUN helm pull rook-release/rook-ceph-cluster --version $rook_version && mv rook-
 RUN make build GIT_SHA=$git_sha VERSION=$version
 
 
-FROM debian:buster-slim
+FROM debian:bookworm-slim
 
 RUN DEBIAN_FRONTEND=noninteractive apt-get update -qq && apt-get upgrade -qq && apt-get install -y --no-install-recommends \
     libgcrypt20 \
