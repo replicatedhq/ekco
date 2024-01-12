@@ -12,7 +12,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func TestEnableHAKotsadm(t *testing.T) {
@@ -42,7 +42,7 @@ func TestEnableHAKotsadm(t *testing.T) {
 								Namespace: "default",
 							},
 							Spec: appsv1.StatefulSetSpec{
-								Replicas: pointer.Int32(1),
+								Replicas: ptr.To(int32(1)),
 								Template: corev1.PodTemplateSpec{
 									Spec: corev1.PodSpec{
 										Containers: []corev1.Container{

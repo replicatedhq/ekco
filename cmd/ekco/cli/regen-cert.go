@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	certutil "k8s.io/client-go/util/cert"
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs/renewal"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
@@ -43,8 +44,8 @@ func RegenCertCmd(v *viper.Viper) *cobra.Command {
 					AltNames:     certutil.AltNames{},
 					Usages:       cert.ExtKeyUsage,
 				},
-				NotAfter:           &cert.NotAfter,
-				PublicKeyAlgorithm: cert.PublicKeyAlgorithm,
+				NotAfter:            &cert.NotAfter,
+				EncryptionAlgorithm: kubeadmapi.EncryptionAlgorithmType(cert.PublicKeyAlgorithm.String()),
 			}
 
 			newCertIPs := map[string]net.IP{}
