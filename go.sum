@@ -1807,8 +1807,8 @@ github.com/undefinedlabs/go-mpatch v1.0.6 h1:h8q5ORH/GaOE1Se1DMhrOyljXZEhRcROO7a
 github.com/undefinedlabs/go-mpatch v1.0.6/go.mod h1:TyJZDQ/5AgyN7FSLiBJ8RO9u2c6wbtRvK827b6AVqY4=
 github.com/vmihailenco/msgpack v4.0.4+incompatible h1:dSLoQfGFAo3F6OoNhwUmLwVgaUXK79GlxNBwueZn0xI=
 github.com/vmihailenco/msgpack v4.0.4+incompatible/go.mod h1:fy3FlTQTDXWkZ7Bh6AcGMlsjHatGryHQYUTf1ShIgkk=
-github.com/vmware-tanzu/velero v1.11.1 h1:Jw8P1DetGBhmAZQkMRFu2vBvJS0YOR85XfKNpe4BlV8=
-github.com/vmware-tanzu/velero v1.11.1/go.mod h1:ZBLIZSSNb6VzCea+rwcMsixm8AvvxCm6j8UjGiPv7XY=
+github.com/vmware-tanzu/velero v1.13.1 h1:CDEikGxZOjz4sxhrad6oMo5IW9xf+SdC5rwRWIe19YE=
+github.com/vmware-tanzu/velero v1.13.1/go.mod h1:87DH9gnd/uTRmsjLk7wc2JWsK+RjIqX4VEt6z5qkAfA=
 github.com/xeipuuv/gojsonpointer v0.0.0-20180127040702-4e3ac2762d5f/go.mod h1:N2zxlSyiKSe5eX1tZViRH5QA0qijqEDrYZiPEAiq3wU=
 github.com/xeipuuv/gojsonpointer v0.0.0-20190905194746-02993c407bfb h1:zGWFAtiMcyryUHoUjUJX0/lt1H2+i2Ka2n+D3DImSNo=
 github.com/xeipuuv/gojsonpointer v0.0.0-20190905194746-02993c407bfb/go.mod h1:N2zxlSyiKSe5eX1tZViRH5QA0qijqEDrYZiPEAiq3wU=
