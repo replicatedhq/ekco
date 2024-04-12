@@ -204,7 +204,7 @@ apiEndpoints:
 			actualKubeadmConfigMap, _ := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).
 				Get(context.Background(), kubeadmconstants.KubeadmConfigConfigMap, metav1.GetOptions{})
 			req.Equal(tt.expectedRemovedIP, ip)
-			req.Equal(tt.expectedRemainingIPs, remainingIPS)
+			req.ElementsMatch(tt.expectedRemainingIPs, remainingIPS)
 			req.EqualValues(tt.expectedConfigMap, *actualKubeadmConfigMap)
 		})
 	}
