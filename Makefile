@@ -86,3 +86,21 @@ build-ttl.sh: ## Build the EKCO Docker container and deploy it to ttl.sh for use
 generate-mocks: ## Generate mocks tests for CLI and preflight. More info: https://github.com/golang/mock
 	go install github.com/golang/mock/mockgen@v1.6.0
 	mockgen -source=pkg/k8s/exec.go -destination=pkg/k8s/mock/mock_exec.go
+
+.PHONY: scan
+scan:
+	trivy fs \
+		--scanners vuln \
+		--exit-code=1 \
+		--severity="HIGH,CRITICAL" \
+		--ignore-unfixed \
+		./
+
+.PHONY: scan-image
+scan-image:
+	trivy image \
+		--scanners vuln \
+		--exit-code=1 \
+		--severity="HIGH,CRITICAL" \
+		--ignore-unfixed \
+		$(DOCKER_IMAGE)
