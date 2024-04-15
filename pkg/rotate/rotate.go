@@ -37,7 +37,8 @@ func RotateCerts(ttl time.Duration, hostname string) error {
 		if ok, err := rm.CertificateExists(handler.Name); err != nil {
 			return errors.Wrapf(err, "check for existing %s on host %s", handler.Name, hostname)
 		} else if !ok {
-			return fmt.Errorf("Missing certificate %s on %s", handler.Name, hostname)
+			fmt.Printf("Missing certificate %s on host %s\n", handler.Name, hostname)
+			continue
 		}
 
 		ei, err := rm.GetCertificateExpirationInfo(handler.Name)
