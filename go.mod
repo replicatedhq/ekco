@@ -24,7 +24,7 @@ require (
 	go.uber.org/zap v1.27.0
 	go.undefinedlabs.com/scopeagent v0.4.2
 	gopkg.in/yaml.v2 v2.4.0
-	helm.sh/helm/v3 v3.14.2
+	helm.sh/helm/v3 v3.14.4
 	k8s.io/api v0.29.3
 	k8s.io/apimachinery v0.29.3
 	k8s.io/client-go v0.29.3
