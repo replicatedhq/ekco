@@ -1,8 +1,8 @@
 module github.com/replicatedhq/ekco
 
-go 1.21
+go 1.22.0
 
-toolchain go1.21.5
+toolchain go1.22.2
 
 require (
 	github.com/blang/semver v3.5.1+incompatible
@@ -14,7 +14,7 @@ require (
 	github.com/minio/minio-go/v7 v7.0.70
 	github.com/pkg/errors v0.9.1
 	github.com/projectcontour/contour v1.28.3
-	github.com/replicatedhq/pvmigrate v0.11.2
+	github.com/replicatedhq/pvmigrate v0.12.0
 	github.com/rook/rook v1.11.9
 	github.com/spf13/cobra v1.8.0
 	github.com/spf13/viper v1.18.2
@@ -25,9 +25,9 @@ require (
 	go.undefinedlabs.com/scopeagent v0.4.2
 	gopkg.in/yaml.v2 v2.4.0
 	helm.sh/helm/v3 v3.14.4
-	k8s.io/api v0.29.3
-	k8s.io/apimachinery v0.29.3
-	k8s.io/client-go v0.29.3
+	k8s.io/api v0.30.0
+	k8s.io/apimachinery v0.30.0
+	k8s.io/client-go v0.30.0
 	k8s.io/kubernetes v1.29.0
 	k8s.io/utils v0.0.0-20240102154912-e7106e64919e
 	sigs.k8s.io/yaml v1.4.0
@@ -207,7 +207,6 @@ require (
 	golang.org/x/term v0.18.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 	golang.org/x/time v0.5.0 // indirect
-	golang.org/x/tools v0.18.0 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.4.0 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
 	google.golang.org/genproto v0.0.0-20240125205218-1f4bbc51befe // indirect
@@ -227,7 +226,7 @@ require (
 	k8s.io/cluster-bootstrap v0.29.0 // indirect
 	k8s.io/component-base v0.29.3 // indirect
 	k8s.io/klog/v2 v2.120.1 // indirect
-	k8s.io/kube-openapi v0.0.0-20240103051144-eec4567ac022 // indirect
+	k8s.io/kube-openapi v0.0.0-20240228011516-70dd3763d340 // indirect
 	k8s.io/kubectl v0.29.0 // indirect
 	oras.land/oras-go v1.2.5 // indirect
 	sigs.k8s.io/controller-runtime v0.17.2 // indirect
