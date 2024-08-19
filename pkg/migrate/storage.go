@@ -19,7 +19,7 @@ import (
 	"github.com/rook/rook/pkg/daemon/ceph/client"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types2 "k8s.io/apimachinery/pkg/types"
 )
 
@@ -307,7 +307,7 @@ func migrateStorageClasses(ctx context.Context, config ekcoops.Config, controlle
 		defer logsReader.Close()
 		bufScanner := bufio.NewScanner(logsReader)
 		for bufScanner.Scan() {
-			addLogs(bufScanner.Text())
+			addLogs("%s", bufScanner.Text())
 		}
 	}()
 	fileLog := log.New(logsWriter, "", 0)
