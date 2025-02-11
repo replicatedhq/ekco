@@ -9,7 +9,7 @@ import (
 
 func main() {
 	rand.New(rand.NewSource(time.Now().UnixNano()))
-	
+
 	if err := cli.InitAndExecute(); err != nil {
 		log.Fatal(err)
 	}
