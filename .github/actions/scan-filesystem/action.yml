@@ -89,8 +89,8 @@ runs:
               "scanPath": $path,
               "repository": $repo,
               "scanTime": $scanTime,
-              "DisplayName": "filesystem:" + $path,
-              "UniqueID": "filesystem:" + $path,
+              "DisplayName": ["filesystem:", $path] | join(""),
+              "UniqueID": ["filesystem:", $path] | join(""),
               "scanMetadata": {
                 "path": $path,
                 "annotations": {
