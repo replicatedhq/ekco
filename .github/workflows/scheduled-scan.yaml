@@ -12,27 +12,15 @@ jobs:
         uses: actions/checkout@v4
       - name: Run Grype filesystem vulnerability scanner
         id: scan
-        uses: anchore/scan-action@v6
+        uses: ./.github/actions/scan-filesystem
         with:
           path: '.'
           fail-build: 'true'
           severity-cutoff: 'medium'
-          output-format: 'sarif'
           output-file: 'grype-filesystem-results.sarif'
           only-fixed: 'true'
-      - name: Upload Grype filesystem scan results to GitHub Security tab
-        if: ${{ !cancelled() }}
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: 'grype-filesystem-results.sarif'
-          category: 'filesystem-scan'
-      - name: Archive scan results
-        if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: 'grype-filesystem-results.sarif'
-          path: 'grype-filesystem-results.sarif'
           retention-days: '90'
+          category-prefix: 'filesystem-scan-'
 
   scan-image:
     name: Scan image for vulnerabilities
