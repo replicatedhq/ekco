@@ -2,3 +2,5 @@ version: "2"
 linters:
   exclusions:
     generated: lax
+    paths:
+      - "*_test.go"  # Ignore test files
