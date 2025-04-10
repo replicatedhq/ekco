@@ -3,4 +3,4 @@ linters:
   exclusions:
     generated: lax
     paths:
-      - "*_test.go"  # Ignore test files
+      - ".*_test\\.go$"  # Ignore test files
