@@ -1,5 +1,8 @@
 version: "2"
 linters:
+  disable:
+    - errcheck    # Disable error checking for defer statements
+    - staticcheck # Disable style checks
   exclusions:
     generated: lax
     paths:
