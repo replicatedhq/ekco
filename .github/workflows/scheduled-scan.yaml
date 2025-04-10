@@ -26,6 +26,13 @@ jobs:
         with:
           sarif_file: 'grype-filesystem-results.sarif'
           category: 'filesystem-scan'
+      - name: Archive scan results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: 'grype-filesystem-results.sarif'
+          path: 'grype-filesystem-results.sarif'
+          retention-days: '90'
 
   scan-image:
     name: Scan image for vulnerabilities
