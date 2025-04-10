@@ -99,6 +99,7 @@ runs:
            --arg name "${{ steps.image_details.outputs.image_name }}" \
            --arg tag "${{ steps.image_details.outputs.image_tag }}" \
            --arg scanTime "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" \
+           --arg fullName "replicatedhq/${{ steps.image_details.outputs.image_name }}" \
            '
            def strip_registry:
              if startswith("docker.io/") then
@@ -108,14 +109,16 @@ runs:
              end;
            def make_asset_id:
              "image:" + (. | strip_registry);
+           def make_full_ref:
+             if contains("/") then . else "replicatedhq/" + . end;
            .runs[0].properties = {
-              "imageRef": ($imageRef | strip_registry),
+              "imageRef": ($fullName + ":" + $tag),
               "repository": $repo,
               "scanTime": $scanTime,
-              "DisplayName": ($name + ":" + $tag | make_asset_id),
-              "UniqueID": ($name + ":" + $tag | make_asset_id),
+              "DisplayName": ($fullName + ":" + $tag | make_asset_id),
+              "UniqueID": ($fullName + ":" + $tag | make_asset_id),
               "imageMetadata": {
-                "name": ($name | strip_registry),
+                "name": $fullName,
                 "tag": $tag,
                 "annotations": {
                   "scanTime": $scanTime,
@@ -123,7 +126,20 @@ runs:
                   "toolVersion": "latest"
                 }
               }
-            }' ${{ inputs.output-file }} > enriched-results.sarif; then
+            } |
+           .runs[0].results[] |= (
+             if .locations then
+               .locations[].logicalLocations[].fullyQualifiedName |= 
+                 if contains("docker.io/") then
+                   .
+                 else
+                   "docker.io/" + ($fullName + ":" + $tag) + 
+                   "@" + (. | split("@")[1])
+                 end
+             else
+               .
+             end
+           )' ${{ inputs.output-file }} > enriched-results.sarif; then
           echo "::error::Failed to enrich SARIF file"
           # Restore the backup
           mv ${{ inputs.output-file }}.bak ${{ inputs.output-file }}
