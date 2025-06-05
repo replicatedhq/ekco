@@ -61,7 +61,10 @@ func (c *Controller) RotateRegistryCert(ctx context.Context) error {
 		return errors.Wrap(err, "load cluster CA")
 	}
 
-	config := certToConfig(cert)
+	config, err := certToConfig(cert)
+	if err != nil {
+		return errors.Wrap(err, "convert cert to config")
+	}
 
 	newCert, newKey, err := generateNewCertAndKey(caCert, caKey, config)
 	if err != nil {
@@ -131,9 +134,15 @@ func (c *Controller) updateRegistryCert(ctx context.Context, namespace, name str
 	return nil
 }
 
-func certToConfig(crt *x509.Certificate) *certConfig {
+func certToConfig(crt *x509.Certificate) (*certConfig, error) {
 	notBefore := time.Now().UTC()
-	notAfter := notBefore.Add(kubeadmconstants.CertificateValidity)
+	notAfter := notBefore.Add(kubeadmconstants.CertificateValidityPeriod)
+
+	encryptionAlgorithm, err := util.GetEncryptionAlgorithmType(crt)
+	if err != nil {
+		return nil, errors.Wrapf(err, "get encryption algorithm type from %s", crt.Subject.CommonName)
+	}
+
 	return &certConfig{
 		Config: cert.Config{
 			CommonName:   crt.Subject.CommonName,
@@ -146,8 +155,8 @@ func certToConfig(crt *x509.Certificate) *certConfig {
 		},
 		NotBefore:          &notBefore,
 		NotAfter:           &notAfter,
-		PublicKeyAlgorithm: kubeadmapi.EncryptionAlgorithmType(crt.PublicKeyAlgorithm.String()),
-	}
+		PublicKeyAlgorithm: encryptionAlgorithm,
+	}, nil
 }
 
 // Copied from pkiutil.NewCertAndKey
@@ -192,7 +201,7 @@ func newSignedCert(cfg *certConfig, key crypto.Signer, caCert *x509.Certificate,
 		notBefore = *cfg.NotBefore
 	}
 
-	notAfter := time.Now().Add(kubeadmconstants.CertificateValidity).UTC()
+	notAfter := time.Now().Add(kubeadmconstants.CertificateValidityPeriod).UTC()
 	if cfg.NotAfter != nil {
 		notAfter = *cfg.NotAfter
 	}

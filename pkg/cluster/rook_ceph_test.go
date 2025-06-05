@@ -1139,9 +1139,12 @@ func TestController_SetFilesystemReplication(t *testing.T) {
 						Namespace: "rook-ceph",
 					},
 					Spec: cephv1.FilesystemSpec{
-						MetadataPool: cephv1.PoolSpec{
-							Replicated: cephv1.ReplicatedSpec{
-								Size: 1,
+						MetadataPool: cephv1.NamedPoolSpec{
+							Name: "myfs-metadata",
+							PoolSpec: cephv1.PoolSpec{
+								Replicated: cephv1.ReplicatedSpec{
+									Size: 1,
+								},
 							},
 						},
 						DataPools: []cephv1.NamedPoolSpec{
@@ -1181,9 +1184,12 @@ func TestController_SetFilesystemReplication(t *testing.T) {
 						Namespace: "rook-ceph",
 					},
 					Spec: cephv1.FilesystemSpec{
-						MetadataPool: cephv1.PoolSpec{
-							Replicated: cephv1.ReplicatedSpec{
-								Size: 1,
+						MetadataPool: cephv1.NamedPoolSpec{
+							Name: "myfs-metadata",
+							PoolSpec: cephv1.PoolSpec{
+								Replicated: cephv1.ReplicatedSpec{
+									Size: 1,
+								},
 							},
 						},
 						DataPools: []cephv1.NamedPoolSpec{
@@ -1223,9 +1229,12 @@ func TestController_SetFilesystemReplication(t *testing.T) {
 						Namespace: "rook-ceph",
 					},
 					Spec: cephv1.FilesystemSpec{
-						MetadataPool: cephv1.PoolSpec{
-							Replicated: cephv1.ReplicatedSpec{
-								Size: 1,
+						MetadataPool: cephv1.NamedPoolSpec{
+							Name: "myfs-metadata",
+							PoolSpec: cephv1.PoolSpec{
+								Replicated: cephv1.ReplicatedSpec{
+									Size: 1,
+								},
 							},
 						},
 						DataPools: []cephv1.NamedPoolSpec{

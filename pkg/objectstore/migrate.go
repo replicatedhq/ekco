@@ -133,7 +133,7 @@ func updateRegistryObjectStore(ctx context.Context, client kubernetes.Interface,
 			return fmt.Errorf("get registry-s3-secret secret in kurl namespace: %v", err)
 		}
 	}
-	if registryConfig != nil && registrySecret != nil {
+	if registryConfig != nil && registrySecret != nil && registryConfig.Data != nil && registrySecret.Data != nil {
 		logs("Updating Registry to use new object store")
 
 		existingConfig := registryConfig.Data["config.yml"]
