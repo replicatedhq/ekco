@@ -58,7 +58,8 @@ func Test_generateNewCertAndKey(t *testing.T) {
 			parsedCA, err := x509.ParseCertificate(caBytes)
 			assert.NoError(t, err)
 
-			cfg := certToConfig(parsedCA)
+			cfg, err := certToConfig(parsedCA)
+			assert.NoError(t, err)
 			newCert, _, err := generateNewCertAndKey(parsedCA, caKey, cfg)
 			assert.NoError(t, err)
 

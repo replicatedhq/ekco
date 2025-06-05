@@ -61,7 +61,10 @@ func (c *Controller) RotateRegistryCert(ctx context.Context) error {
 		return errors.Wrap(err, "load cluster CA")
 	}
 
-	config := certToConfig(cert)
+	config, err := certToConfig(cert)
+	if err != nil {
+		return errors.Wrap(err, "convert cert to config")
+	}
 
 	newCert, newKey, err := generateNewCertAndKey(caCert, caKey, config)
 	if err != nil {
@@ -131,12 +134,14 @@ func (c *Controller) updateRegistryCert(ctx context.Context, namespace, name str
 	return nil
 }
 
-func certToConfig(crt *x509.Certificate) *certConfig {
+func certToConfig(crt *x509.Certificate) (*certConfig, error) {
 	notBefore := time.Now().UTC()
 	notAfter := notBefore.Add(kubeadmconstants.CertificateValidityPeriod)
 
-	// no error as this is a rotation, so the cert is already valid
-	encryptionAlgorithm, _ := util.GetEncryptionAlgorithmType(crt)
+	encryptionAlgorithm, err := util.GetEncryptionAlgorithmType(crt)
+	if err != nil {
+		return nil, errors.Wrapf(err, "get encryption algorithm type from %s", crt.Subject.CommonName)
+	}
 
 	return &certConfig{
 		Config: cert.Config{
@@ -151,7 +156,7 @@ func certToConfig(crt *x509.Certificate) *certConfig {
 		NotBefore:          &notBefore,
 		NotAfter:           &notAfter,
 		PublicKeyAlgorithm: encryptionAlgorithm,
-	}
+	}, nil
 }
 
 // Copied from pkiutil.NewCertAndKey
