@@ -133,7 +133,11 @@ func (c *Controller) updateRegistryCert(ctx context.Context, namespace, name str
 
 func certToConfig(crt *x509.Certificate) *certConfig {
 	notBefore := time.Now().UTC()
-	notAfter := notBefore.Add(kubeadmconstants.CertificateValidity)
+	notAfter := notBefore.Add(kubeadmconstants.CertificateValidityPeriod)
+
+	// no error as this is a rotation, so the cert is already valid
+	encryptionAlgorithm, _ := util.GetEncryptionAlgorithmType(crt)
+
 	return &certConfig{
 		Config: cert.Config{
 			CommonName:   crt.Subject.CommonName,
@@ -146,7 +150,7 @@ func certToConfig(crt *x509.Certificate) *certConfig {
 		},
 		NotBefore:          &notBefore,
 		NotAfter:           &notAfter,
-		PublicKeyAlgorithm: kubeadmapi.EncryptionAlgorithmType(crt.PublicKeyAlgorithm.String()),
+		PublicKeyAlgorithm: encryptionAlgorithm,
 	}
 }
 
@@ -192,7 +196,7 @@ func newSignedCert(cfg *certConfig, key crypto.Signer, caCert *x509.Certificate,
 		notBefore = *cfg.NotBefore
 	}
 
-	notAfter := time.Now().Add(kubeadmconstants.CertificateValidity).UTC()
+	notAfter := time.Now().Add(kubeadmconstants.CertificateValidityPeriod).UTC()
 	if cfg.NotAfter != nil {
 		notAfter = *cfg.NotAfter
 	}
