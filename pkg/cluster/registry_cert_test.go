@@ -49,7 +49,7 @@ func Test_generateNewCertAndKey(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			caKey, err := rsa.GenerateKey(rand.Reader, 1024)
+			caKey, err := rsa.GenerateKey(rand.Reader, 2048)
 			assert.NoError(t, err)
 
 			caBytes, err := x509.CreateCertificate(rand.Reader, test.ca, test.ca, &caKey.PublicKey, caKey)
@@ -58,7 +58,8 @@ func Test_generateNewCertAndKey(t *testing.T) {
 			parsedCA, err := x509.ParseCertificate(caBytes)
 			assert.NoError(t, err)
 
-			cfg := certToConfig(parsedCA)
+			cfg, err := certToConfig(parsedCA)
+			assert.NoError(t, err)
 			newCert, _, err := generateNewCertAndKey(parsedCA, caKey, cfg)
 			assert.NoError(t, err)
 
