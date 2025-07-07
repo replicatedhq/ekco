@@ -4,19 +4,19 @@ import (
 	"time"
 
 	cephv1 "github.com/rook/rook/pkg/client/clientset/versioned/typed/ceph.rook.io/v1"
-	velerov1 "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type ControllerConfig struct {
-	Client                                kubernetes.Interface
 	ClientConfig                          *rest.Config
+	Client                                kubernetes.Interface
+	CtrlClient                            client.Client
 	CephV1                                cephv1.CephV1Interface
 	AlertManagerV1                        dynamic.NamespaceableResourceInterface
 	PrometheusV1                          dynamic.NamespaceableResourceInterface
-	VeleroV1                              velerov1.VeleroV1Interface
 	CertificatesDir                       string
 	RookPriorityClass                     string
 	RotateCerts                           bool

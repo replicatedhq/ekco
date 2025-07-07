@@ -2,17 +2,20 @@ package objectstore
 
 import (
 	"context"
+	"testing"
+
 	"github.com/replicatedhq/ekco/pkg/cluster/types"
 	"github.com/replicatedhq/ekco/pkg/util"
 	"github.com/stretchr/testify/require"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	fakevelero "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/fake"
-	veleroclientv1 "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
-	"testing"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	ctrfake "sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
 func Test_updateKotsadmObjectStore(t *testing.T) {
@@ -251,10 +254,13 @@ version: 0.1`,
 }
 
 func Test_updateVeleroObjectStore(t *testing.T) {
+	scheme := runtime.NewScheme()
+	utilruntime.Must(velerov1.AddToScheme(scheme))
+
 	tests := []struct {
 		name              string
 		client            kubernetes.Interface
-		velero            veleroclientv1.VeleroV1Interface
+		ctrlClient        client.Client
 		accessKey         string
 		secretKey         string
 		hostname          string
@@ -262,7 +268,7 @@ func Test_updateVeleroObjectStore(t *testing.T) {
 		originalSecretKey string
 		originalHostname  string
 		wantErr           bool
-		validate          func(t *testing.T, client kubernetes.Interface, velero veleroclientv1.VeleroV1Interface)
+		validate          func(t *testing.T, kclient kubernetes.Interface, ctrlClient client.Client)
 	}{
 		{
 			name: "velero minio to rook",
@@ -284,7 +290,7 @@ aws_secret_access_key=UXyOV9D0HJKlg4T65j4KzC3RDxkUQV8Ask9BCJJd`),
 					},
 				},
 			),
-			velero: fakevelero.NewSimpleClientset(
+			ctrlClient: ctrfake.NewClientBuilder().WithScheme(scheme).WithObjects(
 				&velerov1.BackupStorageLocation{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "default",
@@ -321,28 +327,30 @@ aws_secret_access_key=UXyOV9D0HJKlg4T65j4KzC3RDxkUQV8Ask9BCJJd`),
 						VolumeNamespace:       "default",
 					},
 				},
-			).VeleroV1(),
+			).Build(),
 			accessKey:         "accessKey",
 			secretKey:         "secretKey",
 			hostname:          "hostname",
 			endpoint:          "endpoint",
 			originalSecretKey: "UXyOV9D0HJKlg4T65j4KzC3RDxkUQV8Ask9BCJJd",
 			originalHostname:  "minio.minio",
-			validate: func(t *testing.T, client kubernetes.Interface, velero veleroclientv1.VeleroV1Interface) {
+			validate: func(t *testing.T, kclient kubernetes.Interface, ctrlClient client.Client) {
 				req := require.New(t)
-				sec, err := client.CoreV1().Secrets("velero").Get(context.Background(), "cloud-credentials", metav1.GetOptions{})
+				sec, err := kclient.CoreV1().Secrets("velero").Get(context.Background(), "cloud-credentials", metav1.GetOptions{})
 				req.NoError(err)
 				req.Equal(`[default]
 aws_access_key_id=accessKey
 aws_secret_access_key=secretKey`, string(sec.Data["cloud"]))
 
 				// validate velero state
-				defLoc, err := velero.BackupStorageLocations("velero").Get(context.Background(), "default", metav1.GetOptions{})
+				defLoc := &velerov1.BackupStorageLocation{}
+				err = ctrlClient.Get(context.Background(), client.ObjectKey{Namespace: "velero", Name: "default"}, defLoc)
 				req.NoError(err)
 				req.Equal("http://endpoint/", defLoc.Spec.Config["publicUrl"])
 				req.Equal("hostname", defLoc.Spec.Config["s3Url"])
 
-				defRepo, err := velero.BackupRepositories("velero").Get(context.Background(), "default", metav1.GetOptions{})
+				defRepo := &velerov1.BackupRepository{}
+				err = ctrlClient.Get(context.Background(), client.ObjectKey{Namespace: "velero", Name: "default"}, defRepo)
 				req.NoError(err)
 				req.Equal("s3:http://hostname/velero/restic/default", defRepo.Spec.ResticIdentifier)
 			},
@@ -351,7 +359,7 @@ aws_secret_access_key=secretKey`, string(sec.Data["cloud"]))
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			req := require.New(t)
-			config := types.ControllerConfig{Client: tt.client, VeleroV1: tt.velero}
+			config := types.ControllerConfig{Client: tt.client, CtrlClient: tt.ctrlClient}
 			err := updateVeleroObjectStore(context.Background(), config, t.Logf, tt.accessKey, tt.secretKey, tt.hostname, tt.endpoint, tt.originalSecretKey, tt.originalHostname)
 			if tt.wantErr {
 				req.Error(err)
@@ -359,7 +367,7 @@ aws_secret_access_key=secretKey`, string(sec.Data["cloud"]))
 			} else {
 				req.NoError(err)
 			}
-			tt.validate(t, tt.client, tt.velero)
+			tt.validate(t, tt.client, tt.ctrlClient)
 		})
 	}
 }
