@@ -1,20 +1,26 @@
 package cli
 
 import (
-	"fmt"
 	"github.com/pkg/errors"
 	"github.com/replicatedhq/ekco/pkg/cluster"
 	"github.com/replicatedhq/ekco/pkg/cluster/types"
 	"github.com/replicatedhq/ekco/pkg/ekcoops"
 	cephv1 "github.com/rook/rook/pkg/client/clientset/versioned/typed/ceph.rook.io/v1"
 	"github.com/spf13/viper"
-	veleroclientv1 "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
+	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
 	restclient "k8s.io/client-go/rest"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
+
+func init() {
+	utilruntime.Must(velerov1.AddToScheme(scheme.Scheme))
+}
 
 func initEKCOConfig(v *viper.Viper) (*ekcoops.Config, error) {
 	config := &ekcoops.Config{}
@@ -39,9 +45,14 @@ func initClusterController(config *ekcoops.Config, log *zap.SugaredLogger) (*clu
 		return nil, errors.Wrap(err, "load kubernetes config")
 	}
 
-	client, err := kubernetes.NewForConfig(clientConfig)
+	kclient, err := kubernetes.NewForConfig(clientConfig)
 	if err != nil {
 		return nil, errors.Wrap(err, "initialize kubernetes client")
+	}
+
+	ctrlClient, err := client.New(clientConfig, client.Options{})
+	if err != nil {
+		return nil, errors.Wrap(err, "initialize controller runtime client")
 	}
 
 	rookcephclient, err := cephv1.NewForConfig(clientConfig)
@@ -52,11 +63,6 @@ func initClusterController(config *ekcoops.Config, log *zap.SugaredLogger) (*clu
 	dynamicClient, err := dynamic.NewForConfig(clientConfig)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed creating Kubernetes client.")
-	}
-
-	vclient, err := veleroclientv1.NewForConfig(clientConfig)
-	if err != nil {
-		return nil, fmt.Errorf("failed creating Velero client: %v", err)
 	}
 
 	prometheusClient := dynamicClient.Resource(schema.GroupVersionResource{
@@ -71,13 +77,13 @@ func initClusterController(config *ekcoops.Config, log *zap.SugaredLogger) (*clu
 	})
 
 	return cluster.NewController(types.ControllerConfig{
-		Client:                                client,
 		ClientConfig:                          clientConfig,
+		Client:                                kclient,
+		CtrlClient:                            ctrlClient,
 		CephV1:                                rookcephclient,
 		CertificatesDir:                       config.CertificatesDir,
 		AlertManagerV1:                        alertManagerClient,
 		PrometheusV1:                          prometheusClient,
-		VeleroV1:                              vclient,
 		RookPriorityClass:                     config.RookPriorityClass,
 		RotateCerts:                           config.RotateCerts,
 		RotateCertsImage:                      config.RotateCertsImage,

@@ -12,9 +12,11 @@ import (
 	"github.com/replicatedhq/ekco/pkg/cluster/types"
 	"github.com/replicatedhq/ekco/pkg/logger"
 	"github.com/replicatedhq/ekco/pkg/util"
+	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // SyncAllBuckets syncs copies all objects in all buckets in object store to another, and returns progress via a channel.
@@ -168,16 +170,14 @@ func updateRegistryObjectStore(ctx context.Context, client kubernetes.Interface,
 }
 
 func updateVeleroObjectStore(ctx context.Context, controllers types.ControllerConfig, logs logger.Logger, accessKey string, secretKey string, hostname string, endpoint string, originalSecretKey string, originalHostname string) error {
-	client := controllers.Client
 	restartVelero := false
 	// if kubernetes_resource_exists velero backupstoragelocation default
-	veleroBSL, err := controllers.VeleroV1.BackupStorageLocations("velero").Get(ctx, "default", metav1.GetOptions{})
-	if err != nil {
-		if !k8serrors.IsNotFound(err) {
-			return fmt.Errorf("get velero backupstoragelocation in velero namespace: %v", err)
-		}
+	var veleroBSL velerov1.BackupStorageLocation
+	err := controllers.CtrlClient.Get(ctx, client.ObjectKey{Namespace: "velero", Name: "default"}, &veleroBSL)
+	if client.IgnoreNotFound(err) != nil {
+		return fmt.Errorf("get velero backupstoragelocation in velero namespace: %v", err)
 	}
-	if veleroBSL != nil {
+	if err == nil {
 		veleroS3URL, ok := veleroBSL.Spec.Config["s3Url"]
 		if ok && strings.Contains(veleroS3URL, originalHostname) {
 			logs("Updating Velero backup locations to use new object store")
@@ -187,20 +187,21 @@ func updateVeleroObjectStore(ctx context.Context, controllers types.ControllerCo
 			veleroBSL.Spec.Config["s3Url"] = hostname
 			veleroBSL.Spec.Config["publicUrl"] = fmt.Sprintf("http://%s/", endpoint)
 
-			_, err = controllers.VeleroV1.BackupStorageLocations("velero").Update(ctx, veleroBSL, metav1.UpdateOptions{})
+			err = controllers.CtrlClient.Update(ctx, &veleroBSL)
 			if err != nil {
 				return fmt.Errorf("update velero backupstoragelocation in velero namespace: %v", err)
 			}
 
 			// update each restic repository
-			backupRepos, err := controllers.VeleroV1.BackupRepositories("velero").List(ctx, metav1.ListOptions{LabelSelector: "velero.io/storage-location=default"})
+			var backupRepos velerov1.BackupRepositoryList
+			err = controllers.CtrlClient.List(ctx, &backupRepos, client.InNamespace("velero"), client.MatchingLabels{"velero.io/storage-location": "default"})
 			if err != nil {
 				return fmt.Errorf("list velero backuprepositories in velero namespace: %v", err)
 			}
 			for _, backupRepo := range backupRepos.Items {
 				logs("Updating Velero backup repository %q to use new object store", backupRepo.Name)
 				backupRepo.Spec.ResticIdentifier = strings.ReplaceAll(backupRepo.Spec.ResticIdentifier, originalHostname, hostname)
-				_, err = controllers.VeleroV1.BackupRepositories("velero").Update(ctx, &backupRepo, metav1.UpdateOptions{})
+				err = controllers.CtrlClient.Update(ctx, &backupRepo)
 				if err != nil {
 					return fmt.Errorf("update velero backuprepository %s in velero namespace: %v", backupRepo.Name, err)
 				}
@@ -209,7 +210,7 @@ func updateVeleroObjectStore(ctx context.Context, controllers types.ControllerCo
 	}
 
 	// if kubernetes_resource_exists velero secret cloud-credentials
-	veleroSecret, err := client.CoreV1().Secrets("velero").Get(ctx, "cloud-credentials", metav1.GetOptions{})
+	veleroSecret, err := controllers.Client.CoreV1().Secrets("velero").Get(ctx, "cloud-credentials", metav1.GetOptions{})
 	if err != nil {
 		if !k8serrors.IsNotFound(err) {
 			return fmt.Errorf("get cloud-credentials secret in velero namespace: %v", err)
@@ -231,7 +232,7 @@ func updateVeleroObjectStore(ctx context.Context, controllers types.ControllerCo
 
 			veleroSecret.Data["cloud"] = []byte(cloudString)
 
-			_, err = client.CoreV1().Secrets("velero").Update(ctx, veleroSecret, metav1.UpdateOptions{})
+			_, err = controllers.Client.CoreV1().Secrets("velero").Update(ctx, veleroSecret, metav1.UpdateOptions{})
 			if err != nil {
 				return fmt.Errorf("update cloud-credentials secret in velero namespace: %v", err)
 			}
@@ -241,7 +242,7 @@ func updateVeleroObjectStore(ctx context.Context, controllers types.ControllerCo
 	if restartVelero {
 		logs("Restarting Velero's restic daemonset")
 
-		err = util.RestartDaemonSet(ctx, client, "velero", "restic")
+		err = util.RestartDaemonSet(ctx, controllers.Client, "velero", "restic")
 		if err != nil {
 			return fmt.Errorf("restart velero restic daemonset after migrating object store: %v", err)
 		}
@@ -249,7 +250,7 @@ func updateVeleroObjectStore(ctx context.Context, controllers types.ControllerCo
 		logs("Restic daemonset restarted")
 		logs("Restarting Velero")
 
-		err = util.RestartDeployment(ctx, client, "velero", "velero")
+		err = util.RestartDeployment(ctx, controllers.Client, "velero", "velero")
 		if err != nil {
 			return fmt.Errorf("restart velero deployment after migrating object store: %v", err)
 		}
