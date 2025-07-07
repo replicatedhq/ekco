@@ -9,6 +9,17 @@ updates:
       - "type::chore"
     schedule:
       interval: "weekly"
+    groups:
+      security:
+        update-types:
+          - "patch"
+          - "minor"
+      k8s.io:
+        patterns:
+          - "k8s.io/*"
+      rook:
+        patterns:
+          - "github.com/rook/rook*"
 
   - package-ecosystem: "github-actions"
     directory: "/"
