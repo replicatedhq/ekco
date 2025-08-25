@@ -12,7 +12,7 @@ require (
 	github.com/minio/minio-go/v7 v7.0.95
 	github.com/pkg/errors v0.9.1
 	github.com/projectcontour/contour v1.32.1
-	github.com/replicatedhq/pvmigrate v0.12.0
+	github.com/replicatedhq/pvmigrate v0.12.1
 	github.com/rook/rook v1.17.7
 	github.com/rook/rook/pkg/apis v0.0.0-20250707182258-efd02dfc7a4b
 	github.com/spf13/cobra v1.9.1
@@ -22,10 +22,10 @@ require (
 	go.etcd.io/etcd/client/v3 v3.6.4
 	go.uber.org/zap v1.27.0
 	gopkg.in/yaml.v2 v2.4.0
-	helm.sh/helm/v3 v3.18.5
-	k8s.io/api v0.33.3
-	k8s.io/apimachinery v0.33.3
-	k8s.io/client-go v0.33.3
+	helm.sh/helm/v3 v3.18.6
+	k8s.io/api v0.33.4
+	k8s.io/apimachinery v0.33.4
+	k8s.io/client-go v0.33.4
 	k8s.io/kubernetes v1.33.4
 	k8s.io/utils v0.0.0-20250604170112-4c0f3b243397
 	sigs.k8s.io/controller-runtime v0.21.0
