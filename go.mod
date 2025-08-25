@@ -17,7 +17,7 @@ require (
 	github.com/rook/rook/pkg/apis v0.0.0-20250707182258-efd02dfc7a4b
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/viper v1.20.1
-	github.com/stretchr/testify v1.10.0
+	github.com/stretchr/testify v1.11.0
 	github.com/vmware-tanzu/velero v1.16.2
 	go.etcd.io/etcd/client/v3 v3.6.4
 	go.uber.org/zap v1.27.0
