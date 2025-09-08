@@ -15,7 +15,7 @@ require (
 	github.com/replicatedhq/pvmigrate v0.12.1
 	github.com/rook/rook v1.17.7
 	github.com/rook/rook/pkg/apis v0.0.0-20250707182258-efd02dfc7a4b
-	github.com/spf13/cobra v1.9.1
+	github.com/spf13/cobra v1.10.1
 	github.com/spf13/viper v1.20.1
 	github.com/stretchr/testify v1.11.0
 	github.com/vmware-tanzu/velero v1.16.2
@@ -167,7 +167,7 @@ require (
 	github.com/sourcegraph/conc v0.3.0 // indirect
 	github.com/spf13/afero v1.12.0 // indirect
 	github.com/spf13/cast v1.7.1 // indirect
-	github.com/spf13/pflag v1.0.7 // indirect
+	github.com/spf13/pflag v1.0.9 // indirect
 	github.com/subosito/gotenv v1.6.0 // indirect
 	github.com/tinylib/msgp v1.3.0 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
