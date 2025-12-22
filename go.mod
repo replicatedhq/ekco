@@ -1,6 +1,6 @@
 module github.com/replicatedhq/ekco
 
-go 1.24.6
+go 1.25.0
 
 require (
 	github.com/blang/semver v3.5.1+incompatible
@@ -24,7 +24,7 @@ require (
 	gopkg.in/yaml.v2 v2.4.0
 	helm.sh/helm/v3 v3.19.4
 	k8s.io/api v0.34.3
-	k8s.io/apimachinery v0.34.3
+	k8s.io/apimachinery v0.35.0
 	k8s.io/client-go v0.34.3
 	k8s.io/kubernetes v1.34.3
 	k8s.io/utils v0.0.0-20251002143259-bc988d571ff4
