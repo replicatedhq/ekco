@@ -1,6 +1,6 @@
 module github.com/replicatedhq/ekco
 
-go 1.24.6
+go 1.25.7
 
 require (
 	github.com/blang/semver v3.5.1+incompatible
@@ -12,7 +12,7 @@ require (
 	github.com/minio/minio-go/v7 v7.0.98
 	github.com/pkg/errors v0.9.1
 	github.com/projectcontour/contour v1.33.2
-	github.com/replicatedhq/pvmigrate v0.12.1
+	github.com/replicatedhq/pvmigrate v0.12.2
 	github.com/rook/rook v1.18.8
 	github.com/rook/rook/pkg/apis v0.0.0-20251006183646-682f3527f01a
 	github.com/spf13/cobra v1.10.2
@@ -22,12 +22,12 @@ require (
 	go.etcd.io/etcd/client/v3 v3.6.8
 	go.uber.org/zap v1.27.1
 	gopkg.in/yaml.v2 v2.4.0
-	helm.sh/helm/v3 v3.19.4
+	helm.sh/helm/v3 v3.19.5
 	k8s.io/api v0.34.4
 	k8s.io/apimachinery v0.34.4
 	k8s.io/client-go v0.34.4
-	k8s.io/kubernetes v1.34.3
-	k8s.io/utils v0.0.0-20251002143259-bc988d571ff4
+	k8s.io/kubernetes v1.34.4
+	k8s.io/utils v0.0.0-20250604170112-4c0f3b243397
 	sigs.k8s.io/controller-runtime v0.22.5
 	sigs.k8s.io/yaml v1.6.0
 )
