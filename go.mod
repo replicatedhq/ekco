@@ -4,7 +4,7 @@ go 1.24.6
 
 require (
 	github.com/blang/semver v3.5.1+incompatible
-	github.com/coreos/go-systemd/v22 v22.6.0
+	github.com/coreos/go-systemd/v22 v22.7.0
 	github.com/gin-gonic/gin v1.11.0
 	github.com/golang/mock v1.7.0-rc.1
 	github.com/google/martian v2.1.0+incompatible
