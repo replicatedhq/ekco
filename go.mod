@@ -23,8 +23,8 @@ require (
 	go.uber.org/zap v1.27.1
 	gopkg.in/yaml.v2 v2.4.0
 	helm.sh/helm/v3 v3.19.5
-	k8s.io/api v0.34.4
-	k8s.io/apimachinery v0.35.2
+	k8s.io/api v0.35.3
+	k8s.io/apimachinery v0.35.3
 	k8s.io/client-go v0.34.4
 	k8s.io/kubernetes v1.34.4
 	k8s.io/utils v0.0.0-20251002143259-bc988d571ff4
