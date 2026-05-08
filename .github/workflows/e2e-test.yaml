@@ -1,0 +1,114 @@
+name: e2e-test
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      ekco_image:
+        description: 'EKCO image to test (e.g. ttl.sh/user/ekco:tag)'
+        required: true
+        type: string
+      replicated_app:
+        description: 'Replicated app slug to use for CMX (default: kurl-sandbox)'
+        required: false
+        type: string
+        default: 'kurl-sandbox'
+
+jobs:
+  e2e-test:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: 'go.mod'
+
+      - name: Install replicated CLI
+        run: |
+          REPLICATED_VERSION=$(curl -s https://api.github.com/repos/replicatedhq/replicated/releases/latest | jq -r '.tag_name | ltrimstr("v")')
+          curl -fsSL "https://github.com/replicatedhq/replicated/releases/download/v${REPLICATED_VERSION}/replicated_${REPLICATED_VERSION}_linux_amd64.tar.gz" | tar -xz -C /tmp
+          sudo mv /tmp/replicated /usr/local/bin/replicated
+          replicated version
+
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keygen -t ed25519 -N '' -f ~/.ssh/id_ed25519
+          cat ~/.ssh/id_ed25519.pub
+
+      - name: Build and push image (main)
+        if: github.event_name != 'workflow_dispatch'
+        run: |
+          make docker-image DOCKER_IMAGE=ttl.sh/replicated/ekco:$GITHUB_SHA VERSION=$GITHUB_REF_NAME
+          docker push ttl.sh/replicated/ekco:$GITHUB_SHA
+          echo "EKCO_IMAGE=ttl.sh/replicated/ekco:$GITHUB_SHA" >> $GITHUB_ENV
+
+      - name: Build and push image (manual)
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          make docker-image DOCKER_IMAGE=${{ inputs.ekco_image }} VERSION=$GITHUB_REF_NAME
+          docker push ${{ inputs.ekco_image }}
+          echo "EKCO_IMAGE=${{ inputs.ekco_image }}" >> $GITHUB_ENV
+
+      - name: Check Replicated API token
+        id: check-token
+        env:
+          REPLICATED_API_TOKEN: ${{ secrets.REPLICATED_API_TOKEN }}
+          INPUT_APP: ${{ inputs.replicated_app }}
+        run: |
+          if [ -z "$REPLICATED_API_TOKEN" ]; then
+            echo "REPLICATED_API_TOKEN secret is not configured. Skipping E2E tests."
+            echo "skipped=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          test_app() {
+            local app="$1"
+            replicated --token "$REPLICATED_API_TOKEN" --app "$app" installer ls --output json > /dev/null 2>&1
+          }
+
+          CANDIDATE_APP="${INPUT_APP:-kurl-sandbox}"
+          if test_app "$CANDIDATE_APP"; then
+            echo "Using app: $CANDIDATE_APP"
+            echo "replicated_app=$CANDIDATE_APP" >> $GITHUB_OUTPUT
+            echo "skipped=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          echo "Cannot access app '$CANDIDATE_APP'. Searching for an accessible app with installers..."
+          APP_LIST=$(replicated --token "$REPLICATED_API_TOKEN" app ls --output json 2>&1 || true)
+          SLUGS=$(echo "$APP_LIST" | jq -r '.[].app.slug' 2>/dev/null || true)
+
+          for slug in $SLUGS; do
+            if test_app "$slug"; then
+              echo "Found accessible app with installers: $slug"
+              echo "replicated_app=$slug" >> $GITHUB_OUTPUT
+              echo "skipped=false" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+          done
+
+          echo "No accessible app with installers found. Skipping E2E tests."
+          echo "skipped=true" >> $GITHUB_OUTPUT
+
+      - name: Run E2E tests
+        if: steps.check-token.outputs.skipped != 'true'
+        env:
+          REPLICATED_APP: ${{ steps.check-token.outputs.replicated_app }}
+          REPLICATED_API_TOKEN: ${{ secrets.REPLICATED_API_TOKEN }}
+          SSH_KEY: ~/.ssh/id_ed25519
+          VM_TTL: 2h
+        run: |
+          make test-e2e-ci
+
+      - name: Upload logs on failure
+        if: failure() && steps.check-token.outputs.skipped != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-logs
+          path: /tmp/e2e-*.log
+          retention-days: 7

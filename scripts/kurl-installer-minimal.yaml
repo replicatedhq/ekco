@@ -1,0 +1,13 @@
+apiVersion: cluster.kurl.sh/v1beta1
+kind: Installer
+metadata:
+  name: "ekco-e2e-test-minimal"
+spec:
+  containerd:
+    version: 1.7.29
+  ekco:
+    version: 0.28.13
+  flannel:
+    version: 0.28.1
+  kubernetes:
+    version: 1.29.15

@@ -23,6 +23,9 @@ Steps
    2. Replace .spec.imagePullPolicy with "Always"
    3. **kubectl delete pod -l app=ekc-operator -n kurl** - Delete the pod in the deployment to pull the new image
 
+### Automated testing
+The `scripts/e2e-test.sh` script automates the above manual workflow using [Replicated CMX](https://docs.replicated.com/vendor/testing-about). It provisions a CMX VM, installs a kURL cluster, patches the EKCO deployment with a ttl.sh image, and runs health checks. Run `make test-e2e` after `make build-ttl.sh` to use it.
+
 
 ## Release
 
