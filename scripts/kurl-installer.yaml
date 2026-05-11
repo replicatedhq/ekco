@@ -1,0 +1,19 @@
+apiVersion: cluster.kurl.sh/v1beta1
+kind: Installer
+metadata:
+  name: "ekco-e2e-test"
+spec:
+  containerd:
+    version: 1.7.29
+  ekco:
+    version: 0.28.13
+  flannel:
+    version: 0.28.1
+  kubernetes:
+    version: 1.29.15
+  minio:
+    version: 2025-10-15T17-29-55Z
+  openebs:
+    isLocalPVEnabled: true
+    localPVStorageClassName: local
+    version: 4.4.0

@@ -17,16 +17,15 @@ RUN helm repo add rook-release https://charts.rook.io/release
 RUN helm repo update
 RUN helm pull rook-release/rook-ceph-cluster --version $rook_version && mv rook-ceph-cluster-* pkg/helm/charts
 
-RUN make build GIT_SHA=$git_sha VERSION=$version
+RUN CGO_ENABLED=0 make build GIT_SHA=$git_sha VERSION=$version
 
 
-FROM debian:bookworm-slim
+FROM debian:trixie-slim
 
-RUN DEBIAN_FRONTEND=noninteractive apt-get update -qq && apt-get upgrade -qq && apt-get install -y --no-install-recommends \
-    libgcrypt20 \
-    libgnutls30 \
-    liblz4-1 \
-    && rm -rf /var/lib/apt/lists/*
+# Even though the binary is fully static and we don't install new packages,
+# apt-get upgrade patches existing base-image packages so vulnerability scans
+# (Grype, Docker Scout) report fewer inherited CVEs.
+RUN DEBIAN_FRONTEND=noninteractive apt-get update -qq && apt-get upgrade -qq && rm -rf /var/lib/apt/lists/*
 
 COPY --from=build /go/src/github.com/replicatedhq/ekco/bin/* /usr/bin/
 
@@ -36,4 +35,4 @@ ARG version=alpha
 ENV GIT_SHA=$git_sha
 ENV VERSION=$version
 
-ENTRYPOINT /usr/bin/ekco
+ENTRYPOINT ["/usr/bin/ekco"]

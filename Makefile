@@ -42,6 +42,8 @@ clean:
 .PHONY: deps
 deps:
 	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(shell go env GOPATH)/bin v2.11.4
+	curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b $(shell go env GOPATH)/bin
+	go install github.com/golang/mock/mockgen@v1.6.0
 
 .PHONY: lint
 lint:
@@ -82,7 +84,35 @@ build-ttl.sh: ## Build the EKCO Docker container and deploy it to ttl.sh for use
 		.
 	docker push ttl.sh/${CURRENT_USER}/ekco:12h
 
+.PHONY: install-grype
+install-grype:
+	curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b $(shell go env GOPATH)/bin
+
+.PHONY: grype-repo
+grype-repo: ## Scan the repo filesystem for vulnerabilities using Grype
+	grype dir:.
+
+.PHONY: grype-image
+grype-image: ## Scan the Docker image for vulnerabilities using Grype (image must exist locally)
+	grype $(DOCKER_IMAGE)
+
+.PHONY: docker-scout-image
+docker-scout-image: ## Scan the Docker image for vulnerabilities using Docker Scout (image must exist locally)
+	docker scout cves $(DOCKER_IMAGE)
+
 .PHONY: generate-mocks
 generate-mocks: ## Generate mocks tests for CLI and preflight. More info: https://github.com/golang/mock
 	go install github.com/golang/mock/mockgen@v1.6.0
 	mockgen -source=pkg/k8s/exec.go -destination=pkg/k8s/mock/mock_exec.go
+
+.PHONY: test-e2e
+test-e2e: build-ttl.sh ## Run E2E tests on a kURL cluster in CMX.
+	EKCO_IMAGE=ttl.sh/$(CURRENT_USER)/ekco:12h ./scripts/e2e-test.sh
+
+.PHONY: test-e2e-ci
+test-e2e-ci: ## Run E2E tests in CI using an already-built image.
+	@if [ -z "$(EKCO_IMAGE)" ]; then \
+		echo "ERROR: EKCO_IMAGE must be set for CI e2e tests"; \
+		exit 1; \
+	fi
+	./scripts/e2e-test.sh
