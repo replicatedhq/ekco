@@ -29,8 +29,21 @@ The `scripts/e2e-test.sh` script automates the above manual workflow using [Repl
 
 ## Release
 
-To make a new release push a tag in the format `v[0-9]+\.[0-9]+\.[0-9]+(-[0-9a-z-]+)?`.
+Releases are automated with [release-please](https://github.com/googleapis/release-please).
+
+### How it works
+
+1. When a PR with a [Conventional Commit](https://www.conventionalcommits.org/) message is merged to `main`, the `release-please` workflow opens (or updates) a release PR.
+2. The release PR bumps the version in `.release-please-manifest.json`, updates `CHANGELOG.md`, and proposes the next semantic version based on commit types.
+3. Merging the release PR triggers `release-please` to create a Git tag (e.g., `v0.29.0`) and a GitHub release.
+4. The `release-please` workflow then builds and pushes the Docker image `replicated/ekco:<tag>` automatically.
+
+### Manual release (if needed)
+
+If you must bypass the automated flow, push a tag in the format `v[0-9]+\.[0-9]+\.[0-9]+(-[0-9a-z-]+)?`:
 
 ```bash
 git tag -a v0.1.0 -m "Release v0.1.0" && git push origin v0.1.0
 ```
+
+This triggers the [`release`](.github/workflows/release.yaml) workflow, which builds and pushes the Docker image.
