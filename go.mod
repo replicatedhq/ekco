@@ -13,11 +13,11 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/projectcontour/contour v1.33.6
 	github.com/replicatedhq/pvmigrate v0.12.3
-	github.com/rook/rook v1.20.4
+	github.com/rook/rook v1.20.5
 	github.com/rook/rook/pkg/apis v0.0.0-20260813195739-a3794e0ce8ea
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/viper v1.21.0
-	github.com/stretchr/testify v1.12.0
+	github.com/stretchr/testify v1.12.1
 	github.com/vmware-tanzu/velero v1.18.2
 	go.etcd.io/etcd/client/v3 v3.7.1
 	go.uber.org/zap v1.28.0
