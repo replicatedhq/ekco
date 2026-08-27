@@ -7,7 +7,7 @@ jobs:
   test:
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
         with:
           go-version-file: 'go.mod'
@@ -16,6 +16,6 @@ jobs:
   build-image:
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - run: make docker-image DOCKER_IMAGE=ttl.sh/replicated/ekco:$GITHUB_SHA VERSION=$GITHUB_REF_NAME
       - run: docker push ttl.sh/replicated/ekco:$GITHUB_SHA
