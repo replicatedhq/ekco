@@ -16,7 +16,6 @@ import (
 	"github.com/replicatedhq/ekco/pkg/util"
 	"github.com/replicatedhq/pvmigrate/pkg/migrate"
 	cephv1 "github.com/rook/rook/pkg/apis/ceph.rook.io/v1"
-	"github.com/rook/rook/pkg/daemon/ceph/client"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -136,7 +135,7 @@ func IsMigrationReady(ctx context.Context, config ekcoops.Config, controllers ty
 
 	if cephCluster.Status.Phase != cephv1.ConditionReady {
 		return &MigrationReadyResult{Reason: fmt.Sprintf("ceph cluster was %s, not ready", cephCluster.Status.Phase)}, nil
-	} else if cephCluster.Status.CephStatus != nil && cephCluster.Status.CephStatus.Health != client.CephHealthOK {
+	} else if cephCluster.Status.CephStatus != nil && cephCluster.Status.CephStatus.Health != "HEALTH_OK" {
 		return &MigrationReadyResult{Reason: fmt.Sprintf("ceph cluster was %s, not healthy", cephCluster.Status.CephStatus.Health)}, nil
 	}
 
