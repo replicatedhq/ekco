@@ -212,7 +212,7 @@ require (
 	k8s.io/kubectl v0.36.2 // indirect
 	k8s.io/kubelet v0.34.1 // indirect
 	k8s.io/streaming v0.36.4 // indirect
-	oras.land/oras-go/v2 v2.6.1 // indirect
+	oras.land/oras-go/v2 v2.6.2 // indirect
 	sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730 // indirect
 	sigs.k8s.io/kustomize/api v0.21.1 // indirect
 	sigs.k8s.io/kustomize/kyaml v0.21.1 // indirect
