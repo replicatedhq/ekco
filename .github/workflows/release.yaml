@@ -20,3 +20,11 @@ jobs:
           password: ${{ secrets.DOCKERHUB_PASSWORD }}
       - run: make docker-image DOCKER_IMAGE=replicated/ekco:$GITHUB_REF_NAME VERSION=$GITHUB_REF_NAME
       - run: docker push replicated/ekco:$GITHUB_REF_NAME
+
+  notify:
+    needs: release
+    uses: replicatedhq/reusable-workflows/.github/workflows/notify-release.yml@main
+    with:
+      tag: ${{ github.ref_name }}
+    secrets:
+      slack_webhook: ${{ secrets.PRODUCTION_SYSTEMS_SLACK_WEBHOOK }}
