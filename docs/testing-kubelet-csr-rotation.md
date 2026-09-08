@@ -32,19 +32,29 @@ export NODE_NAME=worker-1
 kubectl drain "$NODE_NAME" --ignore-daemonsets --delete-emptydir-data
 ```
 
-### 3. Remove the kubelet serving certificate on the node
+### 3. Check whether kubelet serving cert rotation is enabled
 
-SSH to the node and delete the kubelet serving certificate/key. The kubelet will recreate them on restart and submit a new CSR.
+SSH to the node and list the kubelet PKI directory:
+
+```bash
+ssh "$NODE_NAME" sudo ls -la /var/lib/kubelet/pki
+```
+
+If you see `kubelet-server-*.pem` and `kubelet-server-current.pem`, serving cert rotation is enabled — skip to step 6.
+
+If you only see client certificates (`kubelet-client-*.pem`, `kubelet-client-current.pem`) and a self-signed `kubelet.crt`/`kubelet.key`, serving cert rotation is **not enabled**. You must enable it before this test can exercise the CSR approval path.
+
+### 4. Enable kubelet serving cert rotation (if needed)
+
+Add `serverTLSBootstrap: true` to the kubelet KubeletConfiguration file. The standard path is `/var/lib/kubelet/config.yaml`.
 
 ```bash
 ssh "$NODE_NAME" sudo bash -c '
-  ls -la /var/lib/kubelet/pki/kubelet-server*
-  rm -f /var/lib/kubelet/pki/kubelet-server-*.pem
-  rm -f /var/lib/kubelet/pki/kubelet-server-current.pem
+  grep -q "serverTLSBootstrap: true" /var/lib/kubelet/config.yaml || echo "serverTLSBootstrap: true" >> /var/lib/kubelet/config.yaml
 '
 ```
 
-### 4. Restart kubelet
+Then restart kubelet:
 
 ```bash
 ssh "$NODE_NAME" sudo systemctl restart kubelet
@@ -59,7 +69,36 @@ ssh "$NODE_NAME" sudo bash -c '
 '
 ```
 
-### 5. Watch for a new CSR
+After restart, the kubelet will create a `kubernetes.io/kubelet-serving` CSR. Verify it appears:
+
+```bash
+kubectl get csr -w
+```
+
+You should see a pending CSR like:
+
+```text
+NAME        AGE   SIGNERNAME                        REQUESTOR              STATUS
+worker-1... 0s    kubernetes.io/kubelet-serving     system:node:worker-1   Pending
+```
+
+At this point the initial serving cert is already being requested, so you do not need to delete it. Watch EKCO approve it in step 7, then come back to step 5 if you want to force a second rotation.
+
+### 5. Remove the kubelet serving certificate to force a second rotation
+
+Once serving cert rotation is enabled, you can delete the serving cert/key on the node. The kubelet will recreate them on restart and submit a new CSR.
+
+```bash
+ssh "$NODE_NAME" sudo bash -c '
+  ls -la /var/lib/kubelet/pki/kubelet-server*
+  rm -f /var/lib/kubelet/pki/kubelet-server-*.pem
+  rm -f /var/lib/kubelet/pki/kubelet-server-current.pem
+'
+```
+
+Then restart kubelet as shown in step 4.
+
+### 6. Watch for a new CSR
 
 From a control-plane node or your workstation:
 
@@ -76,7 +115,7 @@ worker-1... 0s    kubernetes.io/kubelet-serving     system:node:worker-1   Pendi
 
 The `REQUESTOR` must be `system:node:<node-name>` and the `SIGNERNAME` must be `kubernetes.io/kubelet-serving`.
 
-### 6. Watch EKCO approve the CSR
+### 7. Watch EKCO approve the CSR
 
 ```bash
 kubectl logs -n kurl deployment/ekc-operator -f
@@ -90,7 +129,7 @@ CSR approval is successful <csr-name>
 
 After the fix, the same message should appear only for a valid CSR that passes the new validation checks.
 
-### 7. Verify the kubelet serving certificate was renewed
+### 8. Verify the kubelet serving certificate was renewed
 
 Back on the worker node:
 
@@ -103,7 +142,7 @@ ssh "$NODE_NAME" sudo bash -c '
 
 You should see a new certificate issued by the cluster CA, with SANs matching the node’s addresses.
 
-### 8. Verify `kubectl logs`/`exec` work
+### 9. Verify `kubectl logs`/`exec` work
 
 ```bash
 kubectl run -it --rm debug --image=alpine --overrides='{"spec":{"nodeName":"'$NODE_NAME'"}}' --restart=Never -- sh
@@ -111,7 +150,7 @@ kubectl run -it --rm debug --image=alpine --overrides='{"spec":{"nodeName":"'$NO
 
 Inside the pod, run `hostname` and then exit. The command should succeed, which proves the kubelet serving cert is trusted by the API server.
 
-### 9. Uncordon the node
+### 10. Uncordon the node
 
 ```bash
 kubectl uncordon "$NODE_NAME"
