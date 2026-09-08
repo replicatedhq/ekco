@@ -103,6 +103,42 @@ func TestReconcileCertificateSigningRequests(t *testing.T) {
 			wantApproved: true,
 		},
 		{
+			name: "valid ECDSA kubelet-serving CSR with only digital signature and server auth is approved",
+			csr: &certificatesv1.CertificateSigningRequest{
+				ObjectMeta: metav1.ObjectMeta{Name: "worker-1-serving-ecdsa"},
+				Spec: certificatesv1.CertificateSigningRequestSpec{
+					Username:   "system:node:worker-1",
+					SignerName: "kubernetes.io/kubelet-serving",
+					Usages: []certificatesv1.KeyUsage{
+						certificatesv1.UsageDigitalSignature,
+						certificatesv1.UsageServerAuth,
+					},
+					Request: generateCSR(t, []string{"system:nodes"}, "system:node:worker-1", []string{"worker-1"}, []net.IP{net.ParseIP("10.0.0.1")}, nil, nil),
+				},
+			},
+			nodes:        []runtime.Object{validNode},
+			wantApproved: true,
+		},
+		{
+			name: "CSR with an extra usage is rejected",
+			csr: &certificatesv1.CertificateSigningRequest{
+				ObjectMeta: metav1.ObjectMeta{Name: "extra-usage"},
+				Spec: certificatesv1.CertificateSigningRequestSpec{
+					Username:   "system:node:worker-1",
+					SignerName: "kubernetes.io/kubelet-serving",
+					Usages: []certificatesv1.KeyUsage{
+						certificatesv1.UsageDigitalSignature,
+						certificatesv1.UsageKeyEncipherment,
+						certificatesv1.UsageServerAuth,
+						certificatesv1.UsageClientAuth,
+					},
+					Request: validCSR.Spec.Request,
+				},
+			},
+			nodes:        []runtime.Object{validNode},
+			wantApproved: false,
+		},
+		{
 			name: "ServiceAccount requesting API server names for a node is rejected",
 			csr: &certificatesv1.CertificateSigningRequest{
 				ObjectMeta: metav1.ObjectMeta{Name: "attack-apiserver-names"},

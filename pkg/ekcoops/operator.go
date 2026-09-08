@@ -467,19 +467,33 @@ func (o *Operator) isValidKubeletServingCSR(ctx context.Context, csr *certificat
 	return true
 }
 
-// isKubeletServingUsages reports whether the requested usages match the exact
-// set expected for a kubelet serving certificate.
+// isKubeletServingUsages reports whether the requested usages are valid for a
+// kubelet serving certificate. The request must include "server auth" and may
+// include "digital signature" and/or "key encipherment". RSA keys typically
+// request all three, while ECDSA keys only request "digital signature" and
+// "server auth". Any other usage is rejected.
 func isKubeletServingUsages(usages []certificatesv1.KeyUsage) bool {
-	if len(usages) != 3 {
+	if len(usages) == 0 {
 		return false
 	}
 	usageSet := make(map[certificatesv1.KeyUsage]bool)
 	for _, u := range usages {
 		usageSet[u] = true
 	}
-	return usageSet[certificatesv1.UsageDigitalSignature] &&
-		usageSet[certificatesv1.UsageKeyEncipherment] &&
-		usageSet[certificatesv1.UsageServerAuth]
+	if !usageSet[certificatesv1.UsageServerAuth] {
+		return false
+	}
+	for u := range usageSet {
+		switch u {
+		case certificatesv1.UsageDigitalSignature,
+			certificatesv1.UsageKeyEncipherment,
+			certificatesv1.UsageServerAuth:
+			// allowed
+		default:
+			return false
+		}
+	}
+	return true
 }
 
 func (o *Operator) reconcileMinio(ctx context.Context) error {
