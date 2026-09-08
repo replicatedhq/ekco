@@ -4,7 +4,12 @@ package ekcoops
 
 import (
 	"context"
+	"crypto/x509"
+	"encoding/pem"
 	"fmt"
+	"net"
+	"reflect"
+	"strings"
 	"sync"
 	"time"
 
@@ -373,6 +378,10 @@ func (o *Operator) reconcileCertificateSigningRequests(ctx context.Context) erro
 			continue
 		}
 		if len(csr.Status.Conditions) == 0 && len(csr.Status.Certificate) == 0 {
+			if !o.isValidKubeletServingCSR(ctx, &csr) {
+				o.log.Debugf("CSR %s failed kubelet-serving validation, skipping approval", csr.Name)
+				continue
+			}
 			csr.Status.Conditions = append(csr.Status.Conditions, certificatesv1.CertificateSigningRequestCondition{
 				Type:    certificatesv1.CertificateApproved,
 				Reason:  "ekcoApprove",
@@ -387,6 +396,90 @@ func (o *Operator) reconcileCertificateSigningRequests(ctx context.Context) erro
 		}
 	}
 	return nil
+}
+
+// isValidKubeletServingCSR validates that a kubelet-serving CSR was submitted by
+// the node named in the certificate subject and that every requested SAN is a
+// known address of that node. This prevents any principal that can create a CSR
+// from obtaining a cluster-CA-signed certificate for arbitrary names such as the
+// API server's.
+func (o *Operator) isValidKubeletServingCSR(ctx context.Context, csr *certificatesv1.CertificateSigningRequest) bool {
+	if !isKubeletServingUsages(csr.Spec.Usages) {
+		return false
+	}
+
+	block, _ := pem.Decode(csr.Spec.Request)
+	if block == nil || block.Type != "CERTIFICATE REQUEST" {
+		return false
+	}
+
+	x509cr, err := x509.ParseCertificateRequest(block.Bytes)
+	if err != nil {
+		return false
+	}
+
+	if !reflect.DeepEqual(x509cr.Subject.Organization, []string{"system:nodes"}) {
+		return false
+	}
+
+	if !strings.HasPrefix(x509cr.Subject.CommonName, "system:node:") {
+		return false
+	}
+	nodeName := strings.TrimPrefix(x509cr.Subject.CommonName, "system:node:")
+
+	if csr.Spec.Username != x509cr.Subject.CommonName {
+		return false
+	}
+
+	if len(x509cr.EmailAddresses) > 0 || len(x509cr.URIs) > 0 {
+		return false
+	}
+
+	node, err := o.client.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
+	if err != nil {
+		return false
+	}
+
+	nodeAddresses := make(map[string]bool)
+	for _, addr := range node.Status.Addresses {
+		nodeAddresses[addr.Address] = true
+	}
+
+	for _, dns := range x509cr.DNSNames {
+		if !nodeAddresses[dns] {
+			return false
+		}
+	}
+
+	for _, ip := range x509cr.IPAddresses {
+		found := false
+		for addr := range nodeAddresses {
+			if ip.Equal(net.ParseIP(addr)) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+
+	return true
+}
+
+// isKubeletServingUsages reports whether the requested usages match the exact
+// set expected for a kubelet serving certificate.
+func isKubeletServingUsages(usages []certificatesv1.KeyUsage) bool {
+	if len(usages) != 3 {
+		return false
+	}
+	usageSet := make(map[certificatesv1.KeyUsage]bool)
+	for _, u := range usages {
+		usageSet[u] = true
+	}
+	return usageSet[certificatesv1.UsageDigitalSignature] &&
+		usageSet[certificatesv1.UsageKeyEncipherment] &&
+		usageSet[certificatesv1.UsageServerAuth]
 }
 
 func (o *Operator) reconcileMinio(ctx context.Context) error {
