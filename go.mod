@@ -14,7 +14,7 @@ require (
 	github.com/projectcontour/contour v1.33.7
 	github.com/replicatedhq/pvmigrate v0.12.3
 	github.com/rook/rook v1.20.7
-	github.com/rook/rook/pkg/apis v0.0.0-20260915091545-fb2d518f653f
+	github.com/rook/rook/pkg/apis v0.0.0-20260918231610-27d4aedafedd
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/viper v1.21.0
 	github.com/stretchr/testify v1.12.1
