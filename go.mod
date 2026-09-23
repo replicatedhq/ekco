@@ -14,11 +14,11 @@ require (
 	github.com/projectcontour/contour v1.33.7
 	github.com/replicatedhq/pvmigrate v0.12.3
 	github.com/rook/rook v1.20.7
-	github.com/rook/rook/pkg/apis v0.0.0-20260903170734-d364b1e8ad7f
+	github.com/rook/rook/pkg/apis v0.0.0-20260918231610-27d4aedafedd
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/viper v1.21.0
 	github.com/stretchr/testify v1.12.1
-	github.com/vmware-tanzu/velero v1.18.2
+	github.com/vmware-tanzu/velero v1.18.3
 	go.etcd.io/etcd/client/v3 v3.7.1
 	go.uber.org/zap v1.28.0
 	gopkg.in/yaml.v2 v2.4.0
@@ -28,7 +28,7 @@ require (
 	k8s.io/client-go v0.37.0
 	k8s.io/kubernetes v1.37.0
 	k8s.io/utils v0.0.0-20260707023825-cf1189d6abe3
-	sigs.k8s.io/controller-runtime v0.25.0
+	sigs.k8s.io/controller-runtime v0.25.1
 	sigs.k8s.io/yaml v1.6.0
 )
 
@@ -187,8 +187,8 @@ require (
 	golang.org/x/term v0.46.0 // indirect
 	golang.org/x/text v0.42.0 // indirect
 	golang.org/x/time v0.15.0 // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20260904194346-d0f1323225a4 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20260904194346-d0f1323225a4 // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20260911204522-f61a6ca850bd // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20260911204522-f61a6ca850bd // indirect
 	google.golang.org/grpc v1.83.2 // indirect
 	google.golang.org/protobuf v1.36.12 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.13.0 // indirect
