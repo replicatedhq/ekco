@@ -1,6 +1,6 @@
 package:
-  name: ekco-0.28
-  version: "0.28.15"
+  name: ekco-head
+  version: "1000.0.0"
   epoch: 0
   description: Embedded kURL cluster operator
   copyright:
@@ -34,11 +34,11 @@ environment:
     keyring:
       - https://apk.cve0.io/key/cve0-signing.rsa.pub
     packages:
-      - bash-5.2
-      - busybox-1.37
+      - bash
+      - busybox
       - build-base
-      - go-1.26
-      - grump-1.0
+      - go
+      - grump
       - ca-certificates-bundle
 
 pipeline:
