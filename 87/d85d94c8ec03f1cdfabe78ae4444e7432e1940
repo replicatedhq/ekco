@@ -1,0 +1,19 @@
+securebuild/image/apko-ekco.test.yaml
+  s_9349e5f39f7283::t_e649a5133003e1 15-19
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "87d85d94c8ec03f1cdfabe78ae4444e7432e1940",
+  "prompts": {},
+  "sessions": {
+    "s_9349e5f39f7283": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0e9cc-0887-7ec1-8737-2e3ea525c0f9",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "Mikhail Swift <mikhail@replicated.com>"
+    }
+  }
+}
