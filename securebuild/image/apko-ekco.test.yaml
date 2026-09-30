@@ -12,9 +12,11 @@ test:
       runs: |
         set -eu
         ours=$(docker run --rm "${{ourImage}}" 2>&1)
-        reference=$(docker run --rm "${{refImage}}" 2>&1)
-        test -n "$ours"
-        test "$ours" = "$reference"
+        # Upstream releases are amd64-only. Read their version metadata so
+        # this comparison also runs on a native ARM64 SecureBuild worker.
+        reference_version=$(docker inspect --format='{{range .Config.Env}}{{println .}}{{end}}' "${{refImage}}" | sed -n 's/^VERSION=//p')
+        test -n "$reference_version"
+        test "$ours" = "Embedded kURL cluster operator (EKCO) $reference_version"
     - name: Exercise host-task commands as root
       runs: |
         set -eu
