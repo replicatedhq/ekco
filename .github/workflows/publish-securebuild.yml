@@ -1,0 +1,71 @@
+name: Publish SecureBuild package and image
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: Stable ekco release tag containing SecureBuild definitions
+        required: true
+        type: string
+    secrets:
+      SECUREBUILD_API_TOKEN:
+        required: true
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Stable ekco release tag containing SecureBuild definitions
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: securebuild-${{ inputs.version }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Validate release tag
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          if ! [[ "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Expected a stable release tag, such as v0.28.17: $VERSION" >&2
+            exit 1
+          fi
+
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.version }}
+          persist-credentials: false
+
+      - name: Verify release contains the definitions
+        run: |
+          test -s securebuild/package/ekco/melange.yaml
+          test -s securebuild/image/apko-ekco.yaml
+
+      - name: Install SecureBuild CLI
+        env:
+          SECUREBUILD_CLI_VERSION: v0.0.516
+        run: |
+          curl --fail --silent --show-error --location --retry 3 \
+            "https://github.com/securebuildhq/securebuild/releases/download/${SECUREBUILD_CLI_VERSION}/securebuild-cli-linux-amd64" \
+            --output "$RUNNER_TEMP/securebuild"
+          chmod +x "$RUNNER_TEMP/securebuild"
+
+      - name: Build and verify package on both architectures
+        env:
+          SECUREBUILD_API_TOKEN: ${{ secrets.SECUREBUILD_API_TOKEN }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          "$RUNNER_TEMP/securebuild" build package --package-family-name ekco --tag "$VERSION"
+
+      - name: Build image after the APKs are published
+        env:
+          SECUREBUILD_API_TOKEN: ${{ secrets.SECUREBUILD_API_TOKEN }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          "$RUNNER_TEMP/securebuild" build image --image-name ekco --tag "$VERSION" --image-tag "$VERSION"
