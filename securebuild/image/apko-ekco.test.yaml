@@ -1,0 +1,29 @@
+test:
+  pipeline:
+    - name: Compare upstream image configuration
+      uses: test/compare-images
+      with:
+        # Host-task pods need root access to mounted host configuration.
+        verifyNonRoot: "false"
+        # Version and commit are embedded in the binary. The generic APKO does
+        # not duplicate upstream's per-release VERSION/GIT_SHA environment.
+        compareEnv: "false"
+    - name: Compare ekco version with upstream
+      runs: |
+        set -eu
+        ours=$(docker run --rm "${{ourImage}}" 2>&1)
+        reference=$(docker run --rm "${{refImage}}" 2>&1)
+        test -n "$ours"
+        test "$ours" = "$reference"
+    - name: Exercise host-task commands as root
+      runs: |
+        set -eu
+        docker run --rm --entrypoint /bin/bash "${{ourImage}}" -ec '
+          test "$(id -u)" = 0
+          mkdir -p /tmp/ekco-host-task/haproxy /tmp/ekco-host-task/manifests
+          /usr/bin/ekco generate-haproxy-config --primary-host=10.0.0.1 > /tmp/ekco-host-task/haproxy/haproxy.cfg
+          grep -F 10.0.0.1 /tmp/ekco-host-task/haproxy/haproxy.cfg
+          /usr/bin/ekco generate-haproxy-manifest --primary-host=10.0.0.1 --file=/tmp/ekco-host-task/manifests/haproxy.yaml --image=haproxy:test
+          grep -F haproxy:test /tmp/ekco-host-task/manifests/haproxy.yaml
+          /usr/bin/ekco operator --help >/dev/null
+        '

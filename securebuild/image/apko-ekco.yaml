@@ -1,0 +1,31 @@
+contents:
+  repositories:
+    - https://apk.cve0.io
+  keyring:
+    - https://apk.cve0.io/key/cve0-signing.rsa.pub
+  packages:
+    - ekco
+    - bash
+    - busybox
+    - ca-certificates-bundle
+    - securebuild-baselayout
+
+# Host-task pods write mounted host configuration and explicitly invoke bash.
+accounts:
+  run-as: 0
+
+environment:
+  PATH: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+entrypoint:
+  command: /usr/bin/ekco
+
+archs:
+  - x86_64
+  - aarch64
+
+annotations:
+  org.opencontainers.image.title: EKCO
+  org.opencontainers.image.description: Embedded kURL cluster operator
+  org.opencontainers.image.source: https://github.com/replicatedhq/ekco
+  org.opencontainers.image.vendor: SecureBuild

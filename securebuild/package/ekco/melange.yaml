@@ -1,0 +1,83 @@
+package:
+  name: ekco-0.28
+  version: "0.28.15"
+  epoch: 0
+  description: Embedded kURL cluster operator
+  copyright:
+    - license: Apache-2.0
+  dependencies:
+    provides:
+      - ekco=${{package.full-version}}
+
+var-transforms:
+  - from: ${{package.version}}
+    match: ^(\d+\.\d+)\.\d+$
+    replace: "$1"
+    to: major-minor-version
+  - from: ${{package.version}}
+    match: ^(\d+).*
+    replace: $1
+    to: major-version
+
+vars:
+  rook-chart-version: "1.11.8"
+
+environment:
+  environment:
+    CGO_ENABLED: "0"
+    GOTOOLCHAIN: local
+    GOPROXY: https://proxy.golang.org,direct
+    GOSUMDB: sum.golang.org
+  contents:
+    repositories:
+      - https://apk.cve0.io
+    keyring:
+      - https://apk.cve0.io/key/cve0-signing.rsa.pub
+    packages:
+      - bash-5.2
+      - busybox-1.37
+      - build-base
+      - go-1.26
+      - grump-1.0
+      - ca-certificates-bundle
+
+pipeline:
+  - uses: git-checkout
+    with:
+      repository: https://github.com/replicatedhq/ekco
+      tag: v${{package.version}}
+  - name: Patch Go dependency vulnerabilities
+    runs: |
+      grump .
+  # Match deploy/Dockerfile: this chart must exist before Go embeds this directory.
+  - uses: fetch
+    with:
+      uri: https://charts.rook.io/release/rook-ceph-cluster-v${{vars.rook-chart-version}}.tgz
+      expected-sha256: b1cd3be804c5272dc1eda15f9a004f4c9a6c2901b01c191f9b258ed647462bfa
+      extract: false
+  - name: Embed the production Rook chart and build ekco
+    runs: |
+      mv rook-ceph-cluster-v${{vars.rook-chart-version}}.tgz pkg/helm/charts/
+      test -s pkg/helm/charts/rook-ceph-cluster-v${{vars.rook-chart-version}}.tgz
+      make build VERSION=v${{package.version}} GIT_SHA="$(git rev-parse HEAD)"
+      install -Dm755 bin/ekco ${{targets.destdir}}/usr/bin/ekco
+  - uses: strip
+
+test:
+  environment:
+    contents:
+      packages:
+        - ${{package.name}}=${{package.full-version}}
+        - busybox
+  pipeline:
+    - name: Verify version and CLI
+      runs: |
+        test -x /usr/bin/ekco
+        /usr/bin/ekco 2>&1 | grep -F 'v${{package.version}}'
+        /usr/bin/ekco operator --help
+    - name: Generate host-task configuration
+      runs: |
+        /usr/bin/ekco generate-haproxy-config --primary-host=10.0.0.1 > /tmp/haproxy.cfg
+        grep -F '10.0.0.1' /tmp/haproxy.cfg
+        /usr/bin/ekco generate-haproxy-manifest --primary-host=10.0.0.1 --file=/tmp/haproxy.yaml --image=haproxy:test
+        grep -F 'haproxy:test' /tmp/haproxy.yaml
