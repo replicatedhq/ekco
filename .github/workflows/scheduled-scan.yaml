@@ -21,26 +21,3 @@ jobs:
           only-fixed: 'true'
           retention-days: '90'
           category-prefix: 'filesystem-scan-'
-
-  scan-image:
-    name: Scan image for vulnerabilities
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      security-events: write
-      actions: read
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v7
-      - name: Build image
-        run: make docker-image DOCKER_IMAGE=ekco:nightly
-      - name: Run Grype image vulnerability scanner
-        uses: ./.github/actions/scan-image
-        with:
-          category-prefix: 'image-scan'
-          image-ref: 'ekco:nightly'
-          only-fixed: 'true'
-          output-file: 'ekco-image-results.sarif'
-          retention-days: '90'
-          severity-cutoff: 'medium'
-          upload-sarif: 'true'
