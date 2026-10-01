@@ -1,4 +1,4 @@
-FROM golang:1.26-bookworm AS build
+FROM golang:1.27-bookworm AS build
 
 ARG git_sha=unknown
 ARG version=alpha
@@ -19,13 +19,7 @@ RUN helm pull rook-release/rook-ceph-cluster --version $rook_version && mv rook-
 
 RUN CGO_ENABLED=0 make build GIT_SHA=$git_sha VERSION=$version
 
-
-FROM debian:trixie-slim
-
-# Even though the binary is fully static and we don't install new packages,
-# apt-get upgrade patches existing base-image packages so vulnerability scans
-# (Grype, Docker Scout) report fewer inherited CVEs.
-RUN DEBIAN_FRONTEND=noninteractive apt-get update -qq && apt-get upgrade -qq && rm -rf /var/lib/apt/lists/*
+FROM gcr.io/distroless/static-debian13
 
 COPY --from=build /go/src/github.com/replicatedhq/ekco/bin/* /usr/bin/
 
