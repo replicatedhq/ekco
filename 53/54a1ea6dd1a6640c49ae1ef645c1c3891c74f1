@@ -1,0 +1,19 @@
+.github/workflows/e2e-test.yaml
+  s_ccb85a8147b467::t_d2859cae9f3ada 7,84
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "5354a1ea6dd1a6640c49ae1ef645c1c3891c74f1",
+  "prompts": {},
+  "sessions": {
+    "s_ccb85a8147b467": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0f853-8b72-7ed3-9144-00fc8cdda44f",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Mikhail Swift <mikhail@replicated.com>"
+    }
+  }
+}
