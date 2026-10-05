@@ -13,12 +13,12 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/projectcontour/contour v1.33.7
 	github.com/replicatedhq/pvmigrate v0.12.3
-	github.com/rook/rook v1.20.7
+	github.com/rook/rook v1.20.8
 	github.com/rook/rook/pkg/apis v0.0.0-20260925202133-dc782926879a
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/viper v1.21.0
 	github.com/stretchr/testify v1.12.1
-	github.com/vmware-tanzu/velero v1.18.3
+	github.com/vmware-tanzu/velero v1.18.4
 	go.etcd.io/etcd/client/v3 v3.7.2
 	go.uber.org/zap v1.28.0
 	gopkg.in/yaml.v2 v2.4.0
@@ -28,7 +28,7 @@ require (
 	k8s.io/client-go v0.37.1
 	k8s.io/kubernetes v1.37.1
 	k8s.io/utils v0.0.0-20260707023825-cf1189d6abe3
-	sigs.k8s.io/controller-runtime v0.25.1
+	sigs.k8s.io/controller-runtime v0.25.2
 	sigs.k8s.io/yaml v1.6.0
 )
 
@@ -44,6 +44,7 @@ require (
 	github.com/Masterminds/squirrel v1.5.4 // indirect
 	github.com/ProtonMail/go-crypto v1.4.1 // indirect
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 // indirect
+	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/blang/semver/v4 v4.0.0 // indirect
 	github.com/bytedance/gopkg v0.1.4 // indirect
 	github.com/bytedance/sonic v1.15.3 // indirect
@@ -150,6 +151,10 @@ require (
 	github.com/peterbourgon/diskv v2.0.1+incompatible // indirect
 	github.com/philhofer/fwd v1.2.0 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
+	github.com/prometheus/client_golang v1.24.0 // indirect
+	github.com/prometheus/client_model v0.6.3 // indirect
+	github.com/prometheus/common v0.70.0 // indirect
+	github.com/prometheus/procfs v0.21.1 // indirect
 	github.com/quic-go/qpack v0.6.0 // indirect
 	github.com/quic-go/quic-go v0.59.1 // indirect
 	github.com/rs/xid v1.6.0 // indirect
@@ -173,8 +178,8 @@ require (
 	go.etcd.io/etcd/api/v3 v3.7.2 // indirect
 	go.etcd.io/etcd/client/pkg/v3 v3.7.2 // indirect
 	go.mongodb.org/mongo-driver/v2 v2.5.1 // indirect
-	go.opentelemetry.io/otel v1.44.0 // indirect
-	go.opentelemetry.io/otel/trace v1.44.0 // indirect
+	go.opentelemetry.io/otel v1.45.0 // indirect
+	go.opentelemetry.io/otel/trace v1.45.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.4 // indirect
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
