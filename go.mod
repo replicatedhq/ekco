@@ -13,8 +13,8 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/projectcontour/contour v1.33.7
 	github.com/replicatedhq/pvmigrate v0.12.3
-	github.com/rook/rook v1.20.8
-	github.com/rook/rook/pkg/apis v0.0.0-20261002151841-cb8b8024c749
+	github.com/rook/rook v1.21.0
+	github.com/rook/rook/pkg/apis v0.0.0-20261009183254-b50d3d86efa8
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/viper v1.21.0
 	github.com/stretchr/testify v1.12.1
@@ -151,9 +151,9 @@ require (
 	github.com/peterbourgon/diskv v2.0.1+incompatible // indirect
 	github.com/philhofer/fwd v1.2.0 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
-	github.com/prometheus/client_golang v1.24.0 // indirect
+	github.com/prometheus/client_golang v1.24.1 // indirect
 	github.com/prometheus/client_model v0.6.3 // indirect
-	github.com/prometheus/common v0.70.0 // indirect
+	github.com/prometheus/common v0.70.1 // indirect
 	github.com/prometheus/procfs v0.21.1 // indirect
 	github.com/quic-go/qpack v0.6.0 // indirect
 	github.com/quic-go/quic-go v0.59.1 // indirect
