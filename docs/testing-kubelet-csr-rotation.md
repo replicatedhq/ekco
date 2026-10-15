@@ -7,7 +7,7 @@ This guide exercises `reconcileCertificateSigningRequests` in a real kURL cluste
 - EKCO sees a new `kubernetes.io/kubelet-serving` CSR.
 - The operator’s approval logic runs against an authenticated, real-world request from a kubelet.
 - A valid CSR from the node itself is approved and the kubelet gets a new serving certificate.
-- After the fix, malicious CSRs (wrong requester, foreign SANs, etc.) are rejected.
+- After the fix, malicious CSRs (wrong requester, foreign SANs, etc.) are never approved — EKCO skips them and they remain `Pending`.
 
 ## Prerequisites
 
@@ -162,9 +162,9 @@ kubectl uncordon "$NODE_NAME"
 - If the kubelet does not restart cleanly, the node may become `NotReady`. Use `journalctl -u kubelet -f` on the node to debug.
 - If you test on a control-plane node and the kubelet serving cert is not approved quickly, `kubectl logs`/`exec` to pods on that node can break until the cert is restored.
 
-## Testing rejection of malicious CSRs
+## Testing that malicious CSRs stay Pending
 
-To verify the fix rejects attacker-shaped CSRs, create a test CSR manually and submit it:
+EKCO does not deny invalid CSRs; it simply never approves them, so an attacker-shaped CSR remains `Pending` until it expires or is deleted. To verify this behavior, create a test CSR manually and submit it:
 
 ```bash
 openssl req -new -newkey rsa:2048 -nodes \
