@@ -1,0 +1,20 @@
+docs/testing-kubelet-csr-rotation.md
+  s_905b2f45623789::t_abe564ce5e97c7 165,167
+  s_905b2f45623789::t_7aa01f2e73d5d3 10
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "7ca6f4c0f66be4048373d06a37d6cbb258029e99",
+  "prompts": {},
+  "sessions": {
+    "s_905b2f45623789": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_ec2075515ffeSAcbd000MRCvW4",
+        "model": "accounts/fireworks/routers/kimi-latest"
+      },
+      "human_author": "Xav Paice <xav@replicated.com>"
+    }
+  }
+}
