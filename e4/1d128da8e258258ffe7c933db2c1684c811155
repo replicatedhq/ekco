@@ -1,0 +1,21 @@
+pkg/ekcoops/csr_test.go
+  s_905b2f45623789::t_52a1db88dfc1fb 327,330-334
+  s_905b2f45623789::t_335a5c3d072e63 354-360
+  s_905b2f45623789::t_4174bcc97f5895 98-101
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "e41d128da8e258258ffe7c933db2c1684c811155",
+  "prompts": {},
+  "sessions": {
+    "s_905b2f45623789": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_ec2075515ffeSAcbd000MRCvW4",
+        "model": "accounts/fireworks/routers/kimi-latest"
+      },
+      "human_author": "Xav Paice <xav@replicated.com>"
+    }
+  }
+}
