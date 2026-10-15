@@ -1,0 +1,19 @@
+pkg/ekcoops/operator.go
+  s_905b2f45623789::t_b6cf8223c8f77e 444-449
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "02f71efd6c8a775e79a0a371a1727758b1a6185a",
+  "prompts": {},
+  "sessions": {
+    "s_905b2f45623789": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_ec2075515ffeSAcbd000MRCvW4",
+        "model": "accounts/fireworks/routers/kimi-latest"
+      },
+      "human_author": "Xav Paice <xav@replicated.com>"
+    }
+  }
+}
