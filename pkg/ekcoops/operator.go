@@ -441,6 +441,12 @@ func (o *Operator) isValidKubeletServingCSR(ctx context.Context, csr *certificat
 		return false, fmt.Sprintf("node %q not found: %v", nodeName, err)
 	}
 
+	// node.Status.Addresses is writable by the node itself: kubelet reports
+	// its own addresses. A fully compromised node could therefore add an
+	// address here and request a serving certificate covering it. This matches
+	// the trust model of the upstream kube-apiserver csrserving approver for
+	// this signer, and the checks above (requester == system:node:<name>)
+	// ensure only that node can obtain such a certificate.
 	nodeAddresses := make(map[string]bool)
 	for _, addr := range node.Status.Addresses {
 		nodeAddresses[addr.Address] = true
