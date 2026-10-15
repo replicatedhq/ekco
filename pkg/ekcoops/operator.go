@@ -4,7 +4,12 @@ package ekcoops
 
 import (
 	"context"
+	"crypto/x509"
+	"encoding/pem"
 	"fmt"
+	"net"
+	"reflect"
+	"strings"
 	"sync"
 	"time"
 
@@ -373,6 +378,10 @@ func (o *Operator) reconcileCertificateSigningRequests(ctx context.Context) erro
 			continue
 		}
 		if len(csr.Status.Conditions) == 0 && len(csr.Status.Certificate) == 0 {
+			if valid, reason := o.isValidKubeletServingCSR(ctx, &csr); !valid {
+				o.log.Warnf("Skipping approval of CSR %s requested by %q: %s", csr.Name, csr.Spec.Username, reason)
+				continue
+			}
 			csr.Status.Conditions = append(csr.Status.Conditions, certificatesv1.CertificateSigningRequestCondition{
 				Type:    certificatesv1.CertificateApproved,
 				Reason:  "ekcoApprove",
@@ -387,6 +396,111 @@ func (o *Operator) reconcileCertificateSigningRequests(ctx context.Context) erro
 		}
 	}
 	return nil
+}
+
+// isValidKubeletServingCSR validates that a kubelet-serving CSR was submitted by
+// the node named in the certificate subject and that every requested SAN is a
+// known address of that node. This prevents any principal that can create a CSR
+// from obtaining a cluster-CA-signed certificate for arbitrary names such as the
+// API server's. It returns a human-readable reason when the CSR is invalid so a
+// skipped legitimate request can be debugged from the operator logs.
+func (o *Operator) isValidKubeletServingCSR(ctx context.Context, csr *certificatesv1.CertificateSigningRequest) (bool, string) {
+	if !isKubeletServingUsages(csr.Spec.Usages) {
+		return false, fmt.Sprintf("usages %v are not the expected kubelet-serving set", csr.Spec.Usages)
+	}
+
+	block, _ := pem.Decode(csr.Spec.Request)
+	if block == nil || block.Type != "CERTIFICATE REQUEST" {
+		return false, "request is not a PEM-encoded CERTIFICATE REQUEST"
+	}
+
+	x509cr, err := x509.ParseCertificateRequest(block.Bytes)
+	if err != nil {
+		return false, fmt.Sprintf("failed to parse x509 certificate request: %v", err)
+	}
+
+	if !reflect.DeepEqual(x509cr.Subject.Organization, []string{"system:nodes"}) {
+		return false, fmt.Sprintf("subject organization %v is not [system:nodes]", x509cr.Subject.Organization)
+	}
+
+	if !strings.HasPrefix(x509cr.Subject.CommonName, "system:node:") {
+		return false, fmt.Sprintf("subject common name %q is missing the system:node: prefix", x509cr.Subject.CommonName)
+	}
+	nodeName := strings.TrimPrefix(x509cr.Subject.CommonName, "system:node:")
+
+	if csr.Spec.Username != x509cr.Subject.CommonName {
+		return false, fmt.Sprintf("requester %q does not match subject common name %q", csr.Spec.Username, x509cr.Subject.CommonName)
+	}
+
+	if len(x509cr.EmailAddresses) > 0 || len(x509cr.URIs) > 0 {
+		return false, fmt.Sprintf("request includes email addresses %v or URIs %v", x509cr.EmailAddresses, x509cr.URIs)
+	}
+
+	node, err := o.client.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
+	if err != nil {
+		return false, fmt.Sprintf("node %q not found: %v", nodeName, err)
+	}
+
+	// node.Status.Addresses is writable by the node itself: kubelet reports
+	// its own addresses. A fully compromised node could therefore add an
+	// address here and request a serving certificate covering it. This matches
+	// the trust model of the upstream kube-apiserver csrserving approver for
+	// this signer, and the checks above (requester == system:node:<name>)
+	// ensure only that node can obtain such a certificate.
+	nodeAddresses := make(map[string]bool)
+	for _, addr := range node.Status.Addresses {
+		nodeAddresses[addr.Address] = true
+	}
+
+	for _, dns := range x509cr.DNSNames {
+		if !nodeAddresses[dns] {
+			return false, fmt.Sprintf("DNS name %q is not an address of node %q", dns, nodeName)
+		}
+	}
+
+	for _, ip := range x509cr.IPAddresses {
+		found := false
+		for addr := range nodeAddresses {
+			if ip.Equal(net.ParseIP(addr)) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false, fmt.Sprintf("IP address %q is not an address of node %q", ip, nodeName)
+		}
+	}
+
+	return true, ""
+}
+
+// isKubeletServingUsages reports whether the requested usages are valid for a
+// kubelet serving certificate. The request must include "server auth" and may
+// include "digital signature" and/or "key encipherment". RSA keys typically
+// request all three, while ECDSA keys only request "digital signature" and
+// "server auth". Any other usage is rejected.
+func isKubeletServingUsages(usages []certificatesv1.KeyUsage) bool {
+	if len(usages) == 0 {
+		return false
+	}
+	usageSet := make(map[certificatesv1.KeyUsage]bool)
+	for _, u := range usages {
+		usageSet[u] = true
+	}
+	if !usageSet[certificatesv1.UsageServerAuth] {
+		return false
+	}
+	for u := range usageSet {
+		switch u {
+		case certificatesv1.UsageDigitalSignature,
+			certificatesv1.UsageKeyEncipherment,
+			certificatesv1.UsageServerAuth:
+			// allowed
+		default:
+			return false
+		}
+	}
+	return true
 }
 
 func (o *Operator) reconcileMinio(ctx context.Context) error {
