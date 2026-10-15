@@ -95,6 +95,10 @@ func TestReconcileCertificateSigningRequests(t *testing.T) {
 		csr          *certificatesv1.CertificateSigningRequest
 		nodes        []runtime.Object
 		wantApproved bool
+		// wantSkipped asserts the reconciler left the CSR untouched: no
+		// conditions beyond the ones seeded in the fixture. This catches
+		// regressions of the "only pending CSRs are approved" guard.
+		wantSkipped bool
 	}{
 		{
 			name:         "valid kubelet-serving CSR from the node itself is approved",
@@ -320,13 +324,14 @@ func TestReconcileCertificateSigningRequests(t *testing.T) {
 						certificatesv1.UsageKeyEncipherment,
 						certificatesv1.UsageServerAuth,
 					},
-					Request: validCSR.Spec.Request,
-				},
+				Request: validCSR.Spec.Request,
 			},
-			nodes:        []runtime.Object{validNode},
-			wantApproved: true,
 		},
-	}
+		nodes:        []runtime.Object{validNode},
+		wantApproved: true,
+		wantSkipped:  true,
+	},
+}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -346,7 +351,12 @@ func TestReconcileCertificateSigningRequests(t *testing.T) {
 					approved = true
 				}
 			}
-			require.Equal(t, tt.wantApproved, approved, "CSR %q approval status mismatch", tt.csr.Name)
-		})
+		require.Equal(t, tt.wantApproved, approved, "CSR %q approval status mismatch", tt.csr.Name)
+
+		if tt.wantSkipped {
+			require.Len(t, got.Status.Conditions, 1, "reconciler should not add conditions to CSR %q", tt.csr.Name)
+			require.Empty(t, got.Status.Conditions[0].Reason, "reconciler should not re-approve CSR %q", tt.csr.Name)
+		}
+	})
 	}
 }
