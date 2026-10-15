@@ -378,8 +378,8 @@ func (o *Operator) reconcileCertificateSigningRequests(ctx context.Context) erro
 			continue
 		}
 		if len(csr.Status.Conditions) == 0 && len(csr.Status.Certificate) == 0 {
-			if !o.isValidKubeletServingCSR(ctx, &csr) {
-				o.log.Debugf("CSR %s failed kubelet-serving validation, skipping approval", csr.Name)
+			if valid, reason := o.isValidKubeletServingCSR(ctx, &csr); !valid {
+				o.log.Warnf("Skipping approval of CSR %s requested by %q: %s", csr.Name, csr.Spec.Username, reason)
 				continue
 			}
 			csr.Status.Conditions = append(csr.Status.Conditions, certificatesv1.CertificateSigningRequestCondition{
@@ -402,42 +402,43 @@ func (o *Operator) reconcileCertificateSigningRequests(ctx context.Context) erro
 // the node named in the certificate subject and that every requested SAN is a
 // known address of that node. This prevents any principal that can create a CSR
 // from obtaining a cluster-CA-signed certificate for arbitrary names such as the
-// API server's.
-func (o *Operator) isValidKubeletServingCSR(ctx context.Context, csr *certificatesv1.CertificateSigningRequest) bool {
+// API server's. It returns a human-readable reason when the CSR is invalid so a
+// skipped legitimate request can be debugged from the operator logs.
+func (o *Operator) isValidKubeletServingCSR(ctx context.Context, csr *certificatesv1.CertificateSigningRequest) (bool, string) {
 	if !isKubeletServingUsages(csr.Spec.Usages) {
-		return false
+		return false, fmt.Sprintf("usages %v are not the expected kubelet-serving set", csr.Spec.Usages)
 	}
 
 	block, _ := pem.Decode(csr.Spec.Request)
 	if block == nil || block.Type != "CERTIFICATE REQUEST" {
-		return false
+		return false, "request is not a PEM-encoded CERTIFICATE REQUEST"
 	}
 
 	x509cr, err := x509.ParseCertificateRequest(block.Bytes)
 	if err != nil {
-		return false
+		return false, fmt.Sprintf("failed to parse x509 certificate request: %v", err)
 	}
 
 	if !reflect.DeepEqual(x509cr.Subject.Organization, []string{"system:nodes"}) {
-		return false
+		return false, fmt.Sprintf("subject organization %v is not [system:nodes]", x509cr.Subject.Organization)
 	}
 
 	if !strings.HasPrefix(x509cr.Subject.CommonName, "system:node:") {
-		return false
+		return false, fmt.Sprintf("subject common name %q is missing the system:node: prefix", x509cr.Subject.CommonName)
 	}
 	nodeName := strings.TrimPrefix(x509cr.Subject.CommonName, "system:node:")
 
 	if csr.Spec.Username != x509cr.Subject.CommonName {
-		return false
+		return false, fmt.Sprintf("requester %q does not match subject common name %q", csr.Spec.Username, x509cr.Subject.CommonName)
 	}
 
 	if len(x509cr.EmailAddresses) > 0 || len(x509cr.URIs) > 0 {
-		return false
+		return false, fmt.Sprintf("request includes email addresses %v or URIs %v", x509cr.EmailAddresses, x509cr.URIs)
 	}
 
 	node, err := o.client.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
 	if err != nil {
-		return false
+		return false, fmt.Sprintf("node %q not found: %v", nodeName, err)
 	}
 
 	nodeAddresses := make(map[string]bool)
@@ -447,7 +448,7 @@ func (o *Operator) isValidKubeletServingCSR(ctx context.Context, csr *certificat
 
 	for _, dns := range x509cr.DNSNames {
 		if !nodeAddresses[dns] {
-			return false
+			return false, fmt.Sprintf("DNS name %q is not an address of node %q", dns, nodeName)
 		}
 	}
 
@@ -460,11 +461,11 @@ func (o *Operator) isValidKubeletServingCSR(ctx context.Context, csr *certificat
 			}
 		}
 		if !found {
-			return false
+			return false, fmt.Sprintf("IP address %q is not an address of node %q", ip, nodeName)
 		}
 	}
 
-	return true
+	return true, ""
 }
 
 // isKubeletServingUsages reports whether the requested usages are valid for a
