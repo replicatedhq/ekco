@@ -13,7 +13,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/projectcontour/contour v1.33.7
 	github.com/replicatedhq/pvmigrate v0.12.3
-	github.com/rook/rook v1.21.0
+	github.com/rook/rook v1.21.1
 	github.com/rook/rook/pkg/apis v0.0.0-20261022223044-d4548cbb5834
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/viper v1.21.0
