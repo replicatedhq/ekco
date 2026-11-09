@@ -11,9 +11,9 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/minio/minio-go/v7 v7.4.1
 	github.com/pkg/errors v0.9.1
-	github.com/projectcontour/contour v1.33.7
+	github.com/projectcontour/contour v1.33.8
 	github.com/replicatedhq/pvmigrate v0.12.3
-	github.com/rook/rook v1.21.0
+	github.com/rook/rook v1.21.2
 	github.com/rook/rook/pkg/apis v0.0.0-20261022223044-d4548cbb5834
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/viper v1.21.0
@@ -23,10 +23,10 @@ require (
 	go.uber.org/zap v1.28.0
 	gopkg.in/yaml.v2 v2.4.0
 	helm.sh/helm/v3 v3.22.1
-	k8s.io/api v0.37.1
-	k8s.io/apimachinery v0.37.1
-	k8s.io/client-go v0.37.1
-	k8s.io/kubernetes v1.37.1
+	k8s.io/api v0.37.2
+	k8s.io/apimachinery v0.37.2
+	k8s.io/client-go v0.37.2
+	k8s.io/kubernetes v1.37.2
 	k8s.io/utils v0.0.0-20261023123148-ca04ba58ecab
 	sigs.k8s.io/controller-runtime v0.25.2
 	sigs.k8s.io/yaml v1.6.0
@@ -71,7 +71,7 @@ require (
 	github.com/gin-contrib/sse v1.1.1 // indirect
 	github.com/go-errors/errors v1.5.1 // indirect
 	github.com/go-gorp/gorp/v3 v3.1.0 // indirect
-	github.com/go-jose/go-jose/v4 v4.1.5 // indirect
+	github.com/go-jose/go-jose/v4 v4.1.6 // indirect
 	github.com/go-logr/logr v1.4.4 // indirect
 	github.com/go-openapi/jsonpointer v1.0.1 // indirect
 	github.com/go-openapi/jsonreference v1.0.2 // indirect
@@ -89,7 +89,7 @@ require (
 	github.com/go-openapi/swag/yamlutils v0.29.2 // indirect
 	github.com/go-playground/locales v0.14.1 // indirect
 	github.com/go-playground/universal-translator v0.18.1 // indirect
-	github.com/go-playground/validator/v10 v10.30.3 // indirect
+	github.com/go-playground/validator/v10 v10.30.4 // indirect
 	github.com/go-viper/mapstructure/v2 v2.5.0 // indirect
 	github.com/gobwas/glob v0.2.3 // indirect
 	github.com/goccy/go-json v0.10.6 // indirect
@@ -124,7 +124,7 @@ require (
 	github.com/kube-object-storage/lib-bucket-provisioner v0.0.0-20260420161730-5164e3746489 // indirect
 	github.com/lann/builder v0.0.0-20180802200727-47ae307949d0 // indirect
 	github.com/lann/ps v0.0.0-20150810152359-62de8c46ede0 // indirect
-	github.com/leodido/go-urn v1.4.0 // indirect
+	github.com/leodido/go-urn v1.5.0 // indirect
 	github.com/lib/pq v1.12.3 // indirect
 	github.com/libopenstorage/secrets v0.0.0-20260901190741-925417d11ff0 // indirect
 	github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de // indirect
@@ -185,7 +185,7 @@ require (
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	golang.org/x/arch v0.22.0 // indirect
 	golang.org/x/crypto v0.58.0 // indirect
-	golang.org/x/net v0.61.0 // indirect
+	golang.org/x/net v0.62.0 // indirect
 	golang.org/x/oauth2 v0.36.0 // indirect
 	golang.org/x/sync v0.24.0 // indirect
 	golang.org/x/sys v0.49.0 // indirect
@@ -212,7 +212,7 @@ require (
 	k8s.io/kube-proxy v0.37.0 // indirect
 	k8s.io/kubectl v0.37.1 // indirect
 	k8s.io/kubelet v0.37.0 // indirect
-	k8s.io/streaming v0.37.1 // indirect
+	k8s.io/streaming v0.37.2 // indirect
 	oras.land/oras-go/v2 v2.6.2 // indirect
 	sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730 // indirect
 	sigs.k8s.io/kustomize/api v0.21.1 // indirect
